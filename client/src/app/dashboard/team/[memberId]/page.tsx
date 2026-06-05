@@ -270,7 +270,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
             <div className="flex items-center gap-3 flex-wrap justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-medium shrink-0">Sort by:</span>
-                <Select value={sortBy} onValueChange={v => setSortBy(v as any || 'dueDate')}>
+                <Select value={sortBy} onValueChange={(v: string | null) => setSortBy(v as any || 'dueDate')}>
                   <SelectTrigger className="w-28 h-9 text-xs">
                     <SelectValue />
                   </SelectTrigger>
