@@ -210,7 +210,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (isTaskAdmin) {
       // Admin/TL can update everything
-      const { title, description, priority, status, due_date, assignee_id, feedback, drive_link, content_type, content_description, publish_date, publish_notes } = req.body;
+      const { title, description, priority, status, due_date, assignee_id, feedback, drive_link, content_type, content_description, publish_date, publish_notes, completion_note } = req.body;
       if (title !== undefined) updates.title = title;
       if (description !== undefined) updates.description = description;
       if (priority !== undefined) updates.priority = priority;
@@ -223,15 +223,17 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (content_description !== undefined) updates.content_description = content_description;
       if (publish_date !== undefined) updates.publish_date = publish_date;
       if (publish_notes !== undefined) updates.publish_notes = publish_notes;
+      if (completion_note !== undefined) updates.completion_note = completion_note;
     } else {
       // Members can update status, submission_link, progress_note, and publish_date
-      const { status, submission_link, progress_note, publish_date, publish_notes } = req.body;
+      const { status, submission_link, progress_note, publish_date, publish_notes, completion_note } = req.body;
       const allowedStatuses = ['todo', 'in_progress', 'submitted'];
       if (status && allowedStatuses.includes(status)) updates.status = status;
       if (submission_link !== undefined) updates.submission_link = submission_link;
       if (progress_note !== undefined) updates.progress_note = progress_note;
       if (publish_date !== undefined) updates.publish_date = publish_date;
       if (publish_notes !== undefined) updates.publish_notes = publish_notes;
+      if (completion_note !== undefined) updates.completion_note = completion_note;
     }
 
     updates.updated_at = new Date().toISOString();

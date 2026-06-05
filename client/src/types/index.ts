@@ -27,6 +27,7 @@ export interface Task {
   content_description?: string;
   publish_date?: string;
   publish_notes?: string;
+  completion_note?: string;
   creator_id: string;
   assignee_id?: string;
   creator?: User;

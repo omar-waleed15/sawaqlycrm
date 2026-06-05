@@ -42,6 +42,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [submittingComment, setSubmittingComment] = useState(false);
   const [submissionLink, setSubmissionLink] = useState('');
   const [submittingLink, setSubmittingLink] = useState(false);
+  const [completionNote, setCompletionNote] = useState('');
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [progressNote, setProgressNote] = useState('');
   const [updatingProgressNote, setUpdatingProgressNote] = useState(false);
@@ -60,6 +61,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       setSubmissionLink(taskData.task.submission_link || '');
       setProgressNote(taskData.task.progress_note || '');
       setFeedbackText(taskData.task.feedback || '');
+      setCompletionNote(taskData.task.completion_note || '');
       setComments(commentsData.comments);
     } catch {
       router.replace('/dashboard/tasks');
@@ -86,7 +88,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     if (!submissionLink.trim()) return;
     setSubmittingLink(true);
     try {
-      const data = await tasksApi.update(id, { submission_link: submissionLink, status: 'submitted' });
+      const data = await tasksApi.update(id, {
+        submission_link: submissionLink,
+        status: 'submitted',
+        completion_note: completionNote || undefined,
+      });
       setTask(data.task);
     } catch (err) { console.error(err); }
     finally { setSubmittingLink(false); }
@@ -325,10 +331,22 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             value={submissionLink}
                             onChange={e => setSubmissionLink(e.target.value)}
                           />
-                          <Button onClick={handleSubmitLink} disabled={submittingLink || !submissionLink.trim()}>
-                            {submittingLink ? <Loader2 className="size-4 animate-spin" /> : task.submission_link ? 'Update' : 'Submit'}
-                          </Button>
                         </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 mt-3">
+                        <Label htmlFor="completion_note">💭 Final Thoughts (optional)</Label>
+                        <Textarea
+                          id="completion_note"
+                          placeholder="Share your final thoughts, notes, or anything the admin should know about this task..."
+                          value={completionNote}
+                          onChange={e => setCompletionNote(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex justify-end mt-2">
+                        <Button onClick={handleSubmitLink} disabled={submittingLink || !submissionLink.trim()}>
+                          {submittingLink ? <Loader2 className="size-4 animate-spin" /> : task.submission_link ? 'Update & Resubmit' : 'Submit Work'}
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -350,6 +368,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <a href={task.submission_link} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">{task.submission_link} ↗</a>
                       </div>
                     )}
+                    {task.completion_note && (
+                      <div className="mt-3 border-t border-violet-200 pt-3">
+                        <span className="text-sm font-semibold text-violet-700 block mb-1">💭 Your Final Thoughts:</span>
+                        <p className="text-sm text-violet-900 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{task.completion_note}</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -363,6 +387,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     <p className="text-sm text-green-800">
                       This task has been fully completed and approved. No further action is required.
                     </p>
+                    {task.completion_note && (
+                      <div className="mt-3 border-t border-green-200 pt-3">
+                        <span className="text-sm font-semibold text-green-700 block mb-1">💭 Final Thoughts:</span>
+                        <p className="text-sm text-green-900 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{task.completion_note}</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -377,6 +407,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-blue-900 italic">&ldquo;{task.progress_note}&rdquo;</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Admin: Member Completion Note */}
+          {isOwner && task.completion_note && (
+            <Card className="border-l-4 border-l-emerald-500 bg-emerald-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-emerald-700">💭 Member&apos;s Final Thoughts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-emerald-900 whitespace-pre-wrap italic">&ldquo;{task.completion_note}&rdquo;</p>
               </CardContent>
             </Card>
           )}
