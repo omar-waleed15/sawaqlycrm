@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { tasksApi, clientsApi, contractsApi } from '@/lib/api';
 import { DashboardStats, Task, Client, FinanceStats } from '@/types';
 import TaskCard from '@/components/TaskCard';
+import SalesDashboard from '@/components/SalesDashboard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -107,6 +108,22 @@ export default function DashboardPage() {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
+
+  if (isSales) {
+    return (
+      <div className="page-container fade-in pb-12">
+        <div className="page-header flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="page-header-left">
+            <h1 className="page-header-title">
+              Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0]} 👋
+            </h1>
+            <p className="page-header-subtitle">Sales Intelligence Workspace · {today}</p>
+          </div>
+        </div>
+        <SalesDashboard />
+      </div>
+    );
+  }
 
   return (
     <div className="page-container fade-in pb-12">

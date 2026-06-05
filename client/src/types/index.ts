@@ -43,6 +43,7 @@ export interface Task {
   completion_note?: string;      // legacy
   creator_id: string;
   assignee_id?: string;          // legacy — use task_assignees
+  client_id?: string;
   creator?: User;
   assignee?: User;               // legacy
   task_assignees?: TaskAssignee[];
@@ -95,6 +96,8 @@ export interface Client {
   phone?: string;
   status: 'active' | 'inactive';
   pipeline_stage: 'new_lead' | 'contacted' | 'meeting_scheduled' | 'proposal_sent' | 'negotiation' | 'won' | 'lost';
+  sales_rep_id?: string;
+  meeting_date?: string;
   created_at: string;
 }
 
@@ -134,6 +137,7 @@ export interface Contract {
   status: 'active' | 'expired' | 'cancelled';
   start_date?: string;
   renewal_date?: string;
+  sales_rep_id?: string;
   installments?: ContractInstallment[];
   created_at: string;
 }
@@ -312,4 +316,35 @@ export interface FinanceAnalyticsPayload {
     ltmNetProfit: number;
     ltmMargin: number;
   };
+}
+
+export interface SalesTarget {
+  id: string;
+  user_id: string;
+  target_amount: number;
+  month: string;
+  created_at?: string;
+}
+
+export interface SalesCallLog {
+  id: string;
+  client_id: string;
+  sales_rep_id: string;
+  notes?: string;
+  outcome: string;
+  call_date: string;
+  client?: Client;
+}
+
+export interface SalesDashboardData {
+  target: SalesTarget | null;
+  achievements: {
+    mrr: number;
+    totalDealsWon: number;
+    totalDealsNegotiating: number;
+    collectedRevenue: number;
+  };
+  phoneList: Client[];
+  historicalDeals: Client[];
+  callLogs: SalesCallLog[];
 }

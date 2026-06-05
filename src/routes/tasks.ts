@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOnly, ownerOrTeamLeader } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrTeamLeader, ownerOrTeamLeaderOrSales } from '../middleware/roleCheck';
 
 const router = Router();
 
@@ -169,8 +169,8 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
   }
 });
 
-// POST /api/tasks — Create a new task (owner or team leader)
-router.post('/', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/tasks — Create a new task (owner, team leader or sales)
+router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date } = req.body;
 
   if (!title) {

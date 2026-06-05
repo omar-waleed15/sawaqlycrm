@@ -14,6 +14,7 @@ import contentIdeasRoutes from './routes/content_ideas';
 import expensesRoutes from './routes/expenses';
 import salariesRoutes from './routes/salaries';
 import analyticsRoutes from './routes/finance_analytics';
+import salesRoutes from './routes/sales';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use('/api/ideas', contentIdeasRoutes);
 app.use('/api/expenses', expensesRoutes);
 app.use('/api/salaries', salariesRoutes);
 app.use('/api/finance-analytics', analyticsRoutes);
+app.use('/api/sales', salesRoutes);
 
 // 404 handler
 app.use((_req, res) => {

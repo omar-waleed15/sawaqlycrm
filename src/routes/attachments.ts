@@ -1,7 +1,7 @@
 import { Router, Response, Request } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrTeamLeader } from '../middleware/roleCheck';
+import { ownerOrTeamLeader, ownerOrTeamLeaderOrSales } from '../middleware/roleCheck';
 import multer from 'multer';
 
 const router = Router({ mergeParams: true });
@@ -13,7 +13,7 @@ const upload = multer({
 });
 
 // POST /api/tasks/:taskId/attachments — Upload attachment (owner only)
-router.post('/', authMiddleware, ownerOrTeamLeader, upload.single('file'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, upload.single('file'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { taskId } = req.params;
 
   if (!req.file) {

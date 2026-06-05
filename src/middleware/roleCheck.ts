@@ -37,3 +37,15 @@ export const ownerOrSales = (
   next();
 };
 
+export const ownerOrTeamLeaderOrSales = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user || !['owner', 'team_leader', 'sales'].includes(req.user.role)) {
+    res.status(403).json({ error: 'Access denied. Owner, Team Leader or Sales only.' });
+    return;
+  }
+  next();
+};
+

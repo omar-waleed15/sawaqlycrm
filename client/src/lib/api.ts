@@ -209,3 +209,50 @@ export const salariesApi = {
 export const financeAnalyticsApi = {
   getDashboard: () => request<import('@/types').FinanceAnalyticsPayload>('/finance-analytics'),
 };
+
+// Sales API
+export const salesApi = {
+  getDashboard: (userId?: string) => request<import('@/types').SalesDashboardData>(`/sales/dashboard${userId ? `?userId=${userId}` : ''}`),
+  getTarget: (userId: string, month: string) =>
+    request<{ target: import('@/types').SalesTarget | null }>(`/sales/target/${userId}/${month}`),
+  setTarget: (userId: string, month: string, targetAmount: number) =>
+    request<{ target: import('@/types').SalesTarget }>('/sales/target', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, month, target_amount: targetAmount }),
+    }),
+  createLead: (data: { name: string; company?: string; email?: string; phone: string; pipeline_stage?: string } | { name: string; company?: string; email?: string; phone: string; pipeline_stage?: string }[]) =>
+    request<{ lead?: import('@/types').Client; leads?: import('@/types').Client[] }>('/sales/leads', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  logCall: (leadId: string, data: { notes?: string; outcome: string; meeting_date?: string }) =>
+    request<{ lead: import('@/types').Client }>(`/sales/leads/${leadId}/calls`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  closeWon: (leadId: string, data: {
+    name: string;
+    amount: number;
+    is_recurring: boolean;
+    billing_cycle: string;
+    start_date?: string;
+    renewal_date?: string;
+    tasks?: {
+      title: string;
+      description?: string;
+      priority: string;
+      dueDate?: string;
+      contentType?: string;
+      contentDescription?: string;
+    }[];
+  }) =>
+    request<{
+      message: string;
+      project: import('@/types').Project;
+      contract: import('@/types').Contract;
+      tasks: import('@/types').Task[];
+    }>(`/sales/leads/${leadId}/close-won`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};

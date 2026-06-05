@@ -4,9 +4,10 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, usersApi } from '@/lib/api';
+import { tasksApi, usersApi, salesApi } from '@/lib/api';
 import { Task, TaskAssignee, TaskStatus, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
+import SalesDashboard from '@/components/SalesDashboard';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,7 @@ import {
   Zap,
   Upload,
   RefreshCw,
+  Target,
 } from 'lucide-react';
 
 function getInitials(name: string): string {
@@ -90,6 +92,47 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'title'>('dueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  const [salesTarget, setSalesTarget] = useState<number | ''>('');
+  const [targetMonth, setTargetMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
+  const [fetchingTarget, setFetchingTarget] = useState(false);
+  const [savingTarget, setSavingTarget] = useState(false);
+  const [targetMessage, setTargetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchTarget = async (mId: string, month: string) => {
+    setFetchingTarget(true);
+    try {
+      const res = await salesApi.getTarget(mId, month);
+      if (res.target) {
+        setSalesTarget(res.target.target_amount);
+      } else {
+        setSalesTarget('');
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales target:', err);
+    } finally {
+      setFetchingTarget(false);
+    }
+  };
+
+  const handleSaveTarget = async () => {
+    if (!member) return;
+    setSavingTarget(true);
+    setTargetMessage(null);
+    try {
+      const amount = salesTarget === '' ? 0 : Number(salesTarget);
+      await salesApi.setTarget(member.id, targetMonth, amount);
+      setTargetMessage({ type: 'success', text: 'Target updated successfully!' });
+      setTimeout(() => setTargetMessage(null), 3000);
+    } catch (err: any) {
+      setTargetMessage({ type: 'error', text: err.message || 'Failed to update target' });
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
   useEffect(() => {
     if (user && user.role !== 'owner') {
       router.replace('/dashboard');
@@ -116,6 +159,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     };
     load();
   }, [memberId, user, router]);
+
+  useEffect(() => {
+    if (member && member.role === 'sales') {
+      fetchTarget(member.id, targetMonth);
+    }
+  }, [member?.id, member?.role, targetMonth]);
 
   if (user?.role !== 'owner') return null;
 
@@ -256,6 +305,89 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
           </div>
         </CardContent>
       </Card>
+
+      {/* Sales Target Card */}
+      {member.role === 'sales' && (
+        <Card className="border-border/80 shadow-sm mb-8 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
+                <Target className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight">Sales Performance Target</h2>
+                <p className="text-[11px] text-muted-foreground">Configure monthly sales target quotas for this representative.</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 pb-5">
+            <div className="flex flex-col sm:flex-row items-end gap-4 max-w-2xl">
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Month</label>
+                <Input
+                  type="month"
+                  value={targetMonth}
+                  onChange={e => setTargetMonth(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Quota Amount ($)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 10000"
+                    value={salesTarget}
+                    onChange={e => setSalesTarget(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="pl-6 h-9 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 w-full sm:w-auto">
+                <Button
+                  onClick={handleSaveTarget}
+                  disabled={savingTarget || fetchingTarget}
+                  className="w-full sm:w-auto h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  {savingTarget ? (
+                    <span className="flex items-center gap-1.5 justify-center">
+                      <RefreshCw className="size-3 animate-spin" /> Saving...
+                    </span>
+                  ) : 'Update Target'}
+                </Button>
+              </div>
+            </div>
+
+            {fetchingTarget && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 animate-pulse">
+                <RefreshCw className="size-3 animate-spin text-emerald-500" /> Loading monthly quota data...
+              </div>
+            )}
+
+            {targetMessage && (
+              <div className={`mt-3 text-xs p-2.5 rounded-lg border ${
+                targetMessage.type === 'success' 
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400' 
+                  : 'bg-rose-50 border-rose-100 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400'
+              }`}>
+                {targetMessage.text}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sales Dashboard for Admin viewing representative stats & finance */}
+      {member.role === 'sales' && (
+        <div className="mb-8 space-y-4">
+          <div className="border-t border-dashed pt-6 mt-6" />
+          <h2 className="text-base font-bold text-foreground tracking-tight">Representative Intelligence & Achievements</h2>
+          <SalesDashboard salesRepId={memberId} />
+        </div>
+      )}
 
       {/* Search, Filter & Switch View Panel */}
       <Card className="mb-6 shadow-sm border-border/80">

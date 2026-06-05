@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, contractsApi } from '@/lib/api';
-import { Task, Contract } from '@/types';
+import { tasksApi, contractsApi, clientsApi } from '@/lib/api';
+import { Task, Contract, Client } from '@/types';
 import Modal from '@/components/Modal';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,6 +58,7 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,16 +88,20 @@ export default function CalendarPage() {
     const fetchContracts = (user.role === 'owner' || user.role === 'sales')
       ? contractsApi.list() 
       : Promise.resolve({ contracts: [] as Contract[] });
+    const fetchClients = (user.role === 'owner' || user.role === 'sales')
+      ? clientsApi.list()
+      : Promise.resolve({ clients: [] as Client[] });
 
-    Promise.all([fetchTasks, fetchContracts])
-      .then(([tasksData, contractsData]) => {
+    Promise.all([fetchTasks, fetchContracts, fetchClients])
+      .then(([tasksData, contractsData, clientsData]) => {
         setTasks(tasksData.tasks);
         setContracts(contractsData.contracts);
+        setClients(clientsData.clients || []);
         setError(null);
       })
       .catch(err => {
         console.error('Failed to load calendar data:', err);
-        setError('Failed to fetch tasks or contracts.');
+        setError('Failed to fetch tasks, contracts, or clients.');
       })
       .finally(() => setLoading(false));
   }, [user]);
@@ -210,11 +215,11 @@ export default function CalendarPage() {
 
   // Compile all calendar events for the active month view
   const eventsByDay = useMemo(() => {
-    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; publications: Task[] }> = {};
+    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; publications: Task[]; meetings: Client[] }> = {};
     
     calendarCells.forEach(cell => {
       const dateStr = getLocalDateString(cell.date);
-      map[dateStr] = { tasks: [], payments: [], publications: [] };
+      map[dateStr] = { tasks: [], payments: [], publications: [], meetings: [] };
     });
 
     tasks.forEach(task => {
@@ -248,10 +253,19 @@ export default function CalendarPage() {
           }
         });
       });
+
+      clients.forEach(client => {
+        if (client.meeting_date && client.pipeline_stage === 'meeting_scheduled') {
+          const dateStr = client.meeting_date.split('T')[0];
+          if (map[dateStr]) {
+            map[dateStr].meetings.push(client);
+          }
+        }
+      });
     }
 
     return map;
-  }, [calendarCells, tasks, contracts, isOwner]);
+  }, [calendarCells, tasks, contracts, clients, isOwner]);
 
   // Compute month statistics
   const monthStats = useMemo(() => {
@@ -293,9 +307,9 @@ export default function CalendarPage() {
   }, [calendarCells, eventsByDay, isOwner, isTaskAdmin, user]);
 
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDate) return { tasks: [], payments: [], publications: [] };
+    if (!selectedDate) return { tasks: [], payments: [], publications: [], meetings: [] };
     const dateStr = getLocalDateString(selectedDate);
-    return eventsByDay[dateStr] || { tasks: [], payments: [], publications: [] };
+    return eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [] };
   }, [selectedDate, eventsByDay]);
 
   const handleDayClick = (date: Date) => {
@@ -433,8 +447,9 @@ export default function CalendarPage() {
               const displayTasks = dayEvents.tasks.slice(0, isOwner ? 2 : 3);
               const displayPayments = isOwner ? dayEvents.payments.slice(0, 1) : [];
               const displayPublications = (dayEvents.publications || []).slice(0, 2);
-              const totalItems = displayTasks.length + displayPayments.length + displayPublications.length;
-              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.publications || []).length;
+              const displayMeetings = isOwner ? (dayEvents.meetings || []).slice(0, 1) : [];
+              const totalItems = displayTasks.length + displayPayments.length + displayPublications.length + displayMeetings.length;
+              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.publications || []).length + (dayEvents.meetings || []).length;
               const hasMore = actualTotal > totalItems;
               const extraCount = actualTotal - totalItems;
 
@@ -464,6 +479,18 @@ export default function CalendarPage() {
                       >
                         <DollarSign className="size-2 shrink-0" />
                         <span>{formatCurrency(amount)}</span>
+                      </div>
+                    ))}
+
+                    {/* Meetings */}
+                    {isOwner && displayMeetings.map(client => (
+                      <div
+                        key={`meet-${client.id}`}
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 truncate flex items-center gap-0.5"
+                        title={`Meeting: ${client.name}`}
+                      >
+                        <Calendar className="size-2 shrink-0" />
+                        <span>🤝 {client.name}</span>
                       </div>
                     ))}
 
@@ -553,6 +580,54 @@ export default function CalendarPage() {
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No payments scheduled on this date.</p>
+                )}
+              </div>
+            )}
+
+            {/* Meetings Section (Owners / Sales) */}
+            {isOwner && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
+                  <Calendar className="size-3.5 text-indigo-500" /> Meetings Scheduled ({selectedDayEvents.meetings?.length || 0})
+                </h3>
+                
+                {selectedDayEvents.meetings && selectedDayEvents.meetings.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {selectedDayEvents.meetings.map(client => (
+                      <div key={client.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
+                        <div className="overflow-hidden flex-1">
+                          <h4 className="font-bold text-xs">🤝 Meeting with {client.name}</h4>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
+                            {client.company && (
+                              <>
+                                <span>Company: {client.company}</span>
+                                <span>•</span>
+                              </>
+                            )}
+                            <span>Phone: {client.phone}</span>
+                            {client.meeting_date && (
+                              <>
+                                <span>•</span>
+                                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                  Time: {new Date(client.meeting_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => { setIsModalOpen(false); router.push('/dashboard'); }} 
+                          className="h-7 text-xs font-semibold shrink-0"
+                        >
+                          View Lead
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No meetings scheduled on this date.</p>
                 )}
               </div>
             )}
