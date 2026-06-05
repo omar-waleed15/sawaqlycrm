@@ -67,7 +67,7 @@ export default function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'sales';
-  const isTaskAdmin = user?.role === 'owner' || user?.role === 'team_leader';
+  const isTaskAdmin = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   const isTaskCompleted = (t: Task) => {
     const assignees = t.task_assignees || [];

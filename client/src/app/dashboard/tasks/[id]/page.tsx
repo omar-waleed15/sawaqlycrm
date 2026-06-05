@@ -85,7 +85,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const [statusUpdating, setStatusUpdating] = useState(false);
 
-  const isOwner = user?.role === 'owner' || user?.role === 'team_leader';
+  const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);

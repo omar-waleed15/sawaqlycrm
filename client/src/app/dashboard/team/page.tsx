@@ -301,6 +301,8 @@ export default function TeamPage() {
                           member.role === 'owner' ? 'destructive' :
                           member.role === 'team_leader' ? 'default' :
                           member.role === 'sales' ? 'secondary' :
+                          member.role === 'moderation' ? 'secondary' :
+                          member.role === 'account_manager' ? 'secondary' :
                           'outline'
                         }
                         className="text-[10px] py-0.5 px-1.5"
@@ -308,6 +310,8 @@ export default function TeamPage() {
                         {member.role === 'owner' ? 'Admin' :
                          member.role === 'team_leader' ? 'Leader' :
                          member.role === 'sales' ? 'Sales' :
+                         member.role === 'moderation' ? 'Moderator' :
+                         member.role === 'account_manager' ? 'Account Manager' :
                          'Member'}
                       </Badge>
                     </div>
@@ -421,6 +425,8 @@ export default function TeamPage() {
                 <SelectItem value="member">Team Member</SelectItem>
                 <SelectItem value="team_leader">Team Leader</SelectItem>
                 <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="moderation">Moderator</SelectItem>
+                <SelectItem value="account_manager">Account Manager</SelectItem>
                 <SelectItem value="owner">Admin</SelectItem>
               </SelectContent>
             </Select>
@@ -488,6 +494,8 @@ export default function TeamPage() {
                 <SelectItem value="member">Team Member</SelectItem>
                 <SelectItem value="team_leader">Team Leader</SelectItem>
                 <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="moderation">Moderator</SelectItem>
+                <SelectItem value="account_manager">Account Manager</SelectItem>
                 <SelectItem value="owner">Admin</SelectItem>
               </SelectContent>
             </Select>

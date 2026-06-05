@@ -45,7 +45,7 @@ export default function CreateTaskPage() {
   const [assigneePickerId, setAssigneePickerId] = useState('');
 
   useEffect(() => {
-    if (user?.role !== 'owner' && user?.role !== 'team_leader') {
+    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
       router.replace('/dashboard');
       return;
     }

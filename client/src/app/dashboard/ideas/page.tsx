@@ -74,7 +74,7 @@ export default function IdeasPage() {
 
   // Redirect unauthorized users
   useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'moderation' && user.role !== 'account_manager') {
       router.replace('/dashboard');
     }
   }, [user, router]);

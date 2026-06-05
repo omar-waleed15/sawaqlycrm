@@ -39,7 +39,7 @@ export default function TasksPage() {
   const [selectedNotes, setSelectedNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const isOwner = user?.role === 'owner' || user?.role === 'team_leader';
+  const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   useEffect(() => {
     loadTasks();

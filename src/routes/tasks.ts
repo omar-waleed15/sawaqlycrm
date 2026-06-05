@@ -24,7 +24,7 @@ const TASK_SELECT = `
 
 // Helper: check if user is admin/TL
 function isTaskAdmin(role: string): boolean {
-  return role === 'owner' || role === 'team_leader';
+  return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
 
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)

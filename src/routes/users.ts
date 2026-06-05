@@ -7,7 +7,7 @@ const router = Router();
 
 // GET /api/users — List all team members (owner, team leader, sales)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!req.user || !['owner', 'team_leader', 'sales'].includes(req.user.role)) {
+  if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager'].includes(req.user.role)) {
     res.status(403).json({ error: 'Access denied.' });
     return;
   }
@@ -37,7 +37,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
     return;
   }
 
-  const validRoles = ['owner', 'team_leader', 'sales', 'member'];
+  const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'];
   const userRole = validRoles.includes(role) ? role : 'member';
 
   try {
@@ -86,7 +86,7 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
   try {
     const updates: Record<string, string> = {};
     if (name) updates.name = name;
-    if (role && ['owner', 'team_leader', 'sales', 'member'].includes(role)) updates.role = role;
+    if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'].includes(role)) updates.role = role;
 
     const { data, error } = await supabaseAdmin
       .from('profiles')

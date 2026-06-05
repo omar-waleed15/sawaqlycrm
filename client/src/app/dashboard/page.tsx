@@ -56,10 +56,12 @@ export default function DashboardPage() {
   const isTeamLeader = user?.role === 'team_leader';
   const isSales = user?.role === 'sales';
   const isMember = user?.role === 'member';
+  const isModerator = user?.role === 'moderation';
+  const isAccountManager = user?.role === 'account_manager';
 
   const showFinanceAndClients = isOwner || isSales;
-  const showTasks = isOwner || isTeamLeader || isMember;
-  const isTaskAdmin = isOwner || isTeamLeader;
+  const showTasks = isOwner || isTeamLeader || isMember || isModerator || isAccountManager;
+  const isTaskAdmin = isOwner || isTeamLeader || isModerator || isAccountManager;
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);

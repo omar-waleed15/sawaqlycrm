@@ -42,7 +42,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
   const { user } = useAuth();
   const assignees = task.task_assignees || [];
   const overdue = isOverdue(task.due_date, assignees);
-  const isOwner = user?.role === 'owner' || user?.role === 'team_leader';
+  const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   // For members, find their own assignment status
   const myAssignment = assignees.find(a => a.user_id === user?.id);

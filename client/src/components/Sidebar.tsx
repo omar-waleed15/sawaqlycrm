@@ -26,12 +26,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: '/dashboard',          label: 'Dashboard',        icon: LayoutDashboard, allowedRoles: ['owner', 'team_leader', 'sales', 'member'] },
-  { href: '/dashboard/tasks',    label: 'All Tasks',        icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'member'] },
+  { href: '/dashboard',          label: 'Dashboard',        icon: LayoutDashboard, allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
+  { href: '/dashboard/tasks',    label: 'All Tasks',        icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'member', 'moderation', 'account_manager'] },
   { href: '/dashboard/team',     label: 'Team',             icon: Users,           allowedRoles: ['owner'] },
   { href: '/dashboard/finance',  label: 'Finance & Clients',icon: Briefcase,       allowedRoles: ['owner', 'sales'] },
-  { href: '/dashboard/ideas',    label: 'Content Ideas',    icon: Lightbulb,       allowedRoles: ['owner', 'team_leader'] },
-  { href: '/dashboard/calendar', label: 'Calendar',         icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'sales', 'member'] },
+  { href: '/dashboard/ideas',    label: 'Content Ideas',    icon: Lightbulb,       allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager'] },
+  { href: '/dashboard/calendar', label: 'Calendar',         icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
   { href: '/dashboard/settings', label: 'Settings',         icon: Settings,        allowedRoles: ['owner', 'team_leader'] },
 ];
 
