@@ -291,25 +291,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {task.status === 'in_progress' && (
                 <>
-                  {/* Progress Note */}
-                  <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm">📝 Progress Update</CardTitle></CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-3">Update the admin on how the task is going.</p>
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          className="flex-1"
-                          placeholder="What are you working on right now?"
-                          value={progressNote}
-                          onChange={e => setProgressNote(e.target.value)}
-                        />
-                        <Button variant="outline" onClick={handleUpdateProgressNote} disabled={updatingProgressNote}>
-                          {updatingProgressNote ? <Loader2 className="size-4 animate-spin" /> : 'Save Update'}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
                   {/* Submission */}
                   <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">📤 Submit Your Work</CardTitle></CardHeader>
