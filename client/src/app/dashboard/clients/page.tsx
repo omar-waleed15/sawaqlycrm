@@ -512,8 +512,7 @@ export default function ClientsDashboardPage() {
                                       {p.description && (
                                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{p.description}</p>
                                       )}
-                                      <div className="flex justify-between items-center text-xs text-muted-foreground pt-2 border-t">
-                                        <span>Budget: <span className="font-bold text-foreground">{formatCurrency(p.budget)}</span></span>
+                                      <div className="flex justify-end items-center text-xs text-muted-foreground pt-2 border-t">
                                         <span className="flex items-center gap-1"><Calendar className="size-3" /> {p.end_date ? formatDate(p.end_date) : 'N/A'}</span>
                                       </div>
                                     </div>
@@ -629,7 +628,6 @@ export default function ClientsDashboardPage() {
                         <tr>
                           <th>Project Name</th>
                           <th>Client Link</th>
-                          <th>Budget</th>
                           <th>Status</th>
                           <th>Timeline</th>
                           <th className="text-right">Actions</th>
@@ -647,9 +645,6 @@ export default function ClientsDashboardPage() {
                               <td>
                                 <div className="text-sm font-semibold">{p.client?.name || 'Unknown Client'}</div>
                                 {p.client?.company && <div className="text-xs text-muted-foreground">{p.client.company}</div>}
-                              </td>
-                              <td className="font-bold text-indigo-600 dark:text-indigo-400">
-                                {formatCurrency(p.budget)}
                               </td>
                               <td>
                                 <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.className}`}>
@@ -763,7 +758,7 @@ export default function ClientsDashboardPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c_start_date">Contract Start Date</Label>
+              <Label htmlFor="c_start_date">Start Date</Label>
               <Input
                 id="c_start_date"
                 type="date"
@@ -860,34 +855,22 @@ export default function ClientsDashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_status">Status</Label>
-              <Select
-                value={projectForm.status}
-                onValueChange={v => setProjectForm({ ...projectForm, status: v as Project['status'] })}
-              >
-                <SelectTrigger id="p_status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="planning">📝 Planning</SelectItem>
-                  <SelectItem value="active">⚡ Active</SelectItem>
-                  <SelectItem value="on_hold">🔄 On Hold</SelectItem>
-                  <SelectItem value="completed">✅ Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_budget">Project Budget ($)</Label>
-              <Input
-                id="p_budget"
-                type="number"
-                placeholder="5000"
-                value={projectForm.budget}
-                onChange={e => setProjectForm({ ...projectForm, budget: e.target.value })}
-              />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="p_status">Status</Label>
+            <Select
+              value={projectForm.status}
+              onValueChange={v => setProjectForm({ ...projectForm, status: v as Project['status'] })}
+            >
+              <SelectTrigger id="p_status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planning">📝 Planning</SelectItem>
+                <SelectItem value="active">⚡ Active</SelectItem>
+                <SelectItem value="on_hold">🔄 On Hold</SelectItem>
+                <SelectItem value="completed">✅ Completed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
