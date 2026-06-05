@@ -619,67 +619,109 @@ export default function ClientsDashboardPage() {
                 />
               </div>
 
-              {/* Projects Table */}
-              <Card>
-                <CardContent className="p-0">
-                  <div className="table-responsive">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Project Name</th>
-                          <th>Client Link</th>
-                          <th>Status</th>
-                          <th>Timeline</th>
-                          <th className="text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredProjects.map(p => {
-                          const cfg = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
-                          return (
-                            <tr key={p.id}>
-                              <td>
-                                <div className="font-semibold text-foreground">{p.name}</div>
-                                {p.description && <div className="text-xs text-muted-foreground truncate max-w-xs">{p.description}</div>}
-                              </td>
-                              <td>
-                                <div className="text-sm font-semibold">{p.client?.name || 'Unknown Client'}</div>
-                                {p.client?.company && <div className="text-xs text-muted-foreground">{p.client.company}</div>}
-                              </td>
-                              <td>
-                                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.className}`}>
-                                  {cfg.label}
-                                </span>
-                              </td>
-                              <td className="text-xs text-muted-foreground">
-                                <div>Start: {formatDate(p.start_date)}</div>
-                                <div>End: {formatDate(p.end_date)}</div>
-                              </td>
-                              <td className="text-right">
-                                <div className="flex gap-2 justify-end">
-                                  <Button size="sm" variant="outline" onClick={() => { resetProjectForm(p); setProjectModalOpen(true); }}>
-                                    <Edit className="size-3.5" />
-                                  </Button>
-                                  <Button size="sm" variant="destructive" onClick={() => handleDeleteProject(p.id, p.name)}>
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {filteredProjects.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="text-center py-10 text-muted-foreground italic">
-                              No projects matching query.
-                            </td>
-                          </tr>
+              {/* Projects Grid Card View */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProjects.map(p => {
+                  const cfg = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
+                  
+                  // Calculate dynamic visual timeline progress if dates exist
+                  let progressPercent = 0;
+                  if (p.status === 'completed') {
+                    progressPercent = 100;
+                  } else if (p.start_date && p.end_date) {
+                    const start = new Date(p.start_date).getTime();
+                    const end = new Date(p.end_date).getTime();
+                    const now = new Date().getTime();
+                    if (now > start && end > start) {
+                      progressPercent = Math.min(Math.round(((now - start) / (end - start)) * 100), 95);
+                    } else if (now >= end) {
+                      progressPercent = 95;
+                    }
+                  } else if (p.status === 'active') {
+                    progressPercent = 35; // Default representative progress
+                  }
+
+                  return (
+                    <Card key={p.id} className="relative overflow-hidden group hover:shadow-md transition-all duration-200 border border-border flex flex-col">
+                      {/* Top border colored accent line */}
+                      <div className={`h-1.5 w-full ${
+                        p.status === 'planning' ? 'bg-slate-400' :
+                        p.status === 'active' ? 'bg-indigo-500' :
+                        p.status === 'on_hold' ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`} />
+
+                      <CardContent className="p-5 flex flex-col gap-4 flex-1">
+                        {/* Header: Title and status badge */}
+                        <div className="flex justify-between items-start gap-4">
+                          <h3 className="font-bold text-sm text-foreground leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {p.name}
+                          </h3>
+                          <Badge className={`${cfg.className} shrink-0 text-[10px] px-2 py-0`}>{cfg.label}</Badge>
+                        </div>
+
+                        {/* Description */}
+                        {p.description ? (
+                          <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed flex-1">
+                            {p.description}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/40 italic flex-1">
+                            No project description provided.
+                          </p>
                         )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+
+                        {/* Client details box */}
+                        <div className="bg-muted/30 border border-border/50 rounded-lg p-3 flex items-center gap-3">
+                          <div className="size-8 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                            {p.client?.name ? p.client.name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Client Partner</div>
+                            <div className="text-xs font-semibold text-foreground truncate">{p.client?.name || 'Unknown Client'}</div>
+                            {p.client?.company && <div className="text-[10px] text-muted-foreground truncate">{p.client.company}</div>}
+                          </div>
+                        </div>
+
+                        {/* Timeline */}
+                        <div className="flex flex-col gap-2 pt-2 border-t border-border/60">
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                            <span className="flex items-center gap-1"><Calendar className="size-3 text-indigo-500" /> {p.start_date ? formatDate(p.start_date) : 'N/A'}</span>
+                            <span>—</span>
+                            <span className="flex items-center gap-1 font-semibold text-foreground"><Calendar className="size-3 text-rose-500" /> {p.end_date ? formatDate(p.end_date) : 'N/A'}</span>
+                          </div>
+                          {p.start_date && p.end_date && (
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  p.status === 'completed' ? 'bg-emerald-500' :
+                                  p.status === 'on_hold' ? 'bg-amber-500' : 'bg-indigo-500'
+                                }`}
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2 justify-end pt-3 border-t border-border/60 mt-2">
+                          <Button size="sm" variant="outline" onClick={() => { resetProjectForm(p); setProjectModalOpen(true); }} className="h-8 text-xs">
+                            <Edit className="size-3 mr-1.5" /> Edit
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteProject(p.id, p.name)} className="h-8 text-xs">
+                            <Trash2 className="size-3 mr-1.5" /> Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {filteredProjects.length === 0 && (
+                <div className="text-center py-10 border border-dashed rounded-lg text-muted-foreground text-sm">
+                  No projects matching query.
+                </div>
+              )}
             </div>
           )}
         </>
