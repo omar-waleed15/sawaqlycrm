@@ -96,7 +96,7 @@ export default function FinanceDashboardPage() {
   const [installmentsEnabled, setInstallmentsEnabled] = useState(false);
   const [installmentRows, setInstallmentRows] = useState<{ amount: string; due_date: string; note: string; id?: string; paid?: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'pipeline' | 'clients' | 'projects' | 'contracts' | 'expenses'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'pipeline' | 'contracts' | 'expenses'>('overview');
   const [selectedPipelineStage, setSelectedPipelineStage] = useState<PipelineStage>('new_lead');
 
   // Analytics states
@@ -1712,8 +1712,6 @@ export default function FinanceDashboardPage() {
           { id: 'overview', label: '📊 Dashboard Overview' },
           { id: 'analytics', label: '📊 Financial Analytics' },
           { id: 'pipeline', label: '🎯 Sales Pipeline' },
-          { id: 'clients', label: '👥 Clients Manager' },
-          { id: 'projects', label: '🚀 Projects Manager' },
           { id: 'contracts', label: '💼 Contracts & Subscriptions' },
           { id: 'expenses', label: '💸 Expenses & Salaries' },
         ].map(tab => (
@@ -1756,7 +1754,7 @@ export default function FinanceDashboardPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Recent Clients</h3>
-                <button onClick={() => setActiveTab('clients')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                <button onClick={() => router.push('/dashboard/clients')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
                   View All
                 </button>
               </div>
@@ -1791,7 +1789,7 @@ export default function FinanceDashboardPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Running Projects</h3>
-                <button onClick={() => setActiveTab('projects')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                <button onClick={() => router.push('/dashboard/clients')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
                   View All
                 </button>
               </div>
@@ -2279,290 +2277,7 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      {/* 3. CLIENTS MANAGER TAB */}
-      {activeTab === 'clients' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* ── Top Action Bar ── */}
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', boxShadow: 'var(--shadow-sm)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}>🔍</span>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Search clients by name, company, email..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                style={{ paddingLeft: 38, marginBottom: 0 }}
-              />
-            </div>
-            <button className="btn btn-primary" onClick={() => { resetClientForm(undefined, 'won'); setClientModalOpen(true); }}>
-              ＋ Add Client
-            </button>
-          </div>
-
-          {/* Table */}
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
-                    <th style={{ padding: '12px 16px' }}>Client Name</th>
-                    <th style={{ padding: '12px 16px' }}>Company</th>
-                    <th style={{ padding: '12px 16px' }}>Email</th>
-                    <th style={{ padding: '12px 16px' }}>Phone</th>
-                    <th style={{ padding: '12px 16px' }}>Status</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredWonClients.map(c => {
-                    const clientProjects = projects.filter(p => p.client_id === c.id);
-                    const todoCount = clientProjects.filter(p => p.status === 'planning').length;
-                    const inProgressCount = clientProjects.filter(p => p.status === 'active').length;
-                    const revisionCount = clientProjects.filter(p => p.status === 'on_hold').length;
-                    const completedCount = clientProjects.filter(p => p.status === 'completed').length;
-
-                    return (
-                      <Fragment key={c.id}>
-                        <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafbfc'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                          <td style={{ padding: '16px 16px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              <span style={{ fontWeight: 600 }}>{c.name}</span>
-                              {clientProjects.length > 0 && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-                                  {todoCount > 0 && (
-                                    <span style={{ background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: 4, fontSize: '0.6875rem', fontWeight: 600 }}>
-                                      📝 {todoCount} To Do
-                                    </span>
-                                  )}
-                                  {inProgressCount > 0 && (
-                                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '1px 6px', borderRadius: 4, fontSize: '0.6875rem', fontWeight: 600 }}>
-                                      ⚡ {inProgressCount} In Progress
-                                    </span>
-                                  )}
-                                  {revisionCount > 0 && (
-                                    <span style={{ background: '#fff7ed', color: '#c2410c', padding: '1px 6px', borderRadius: 4, fontSize: '0.6875rem', fontWeight: 600 }}>
-                                      🔄 {revisionCount} Revision
-                                    </span>
-                                  )}
-                                  {completedCount > 0 && (
-                                    <span style={{ background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: 4, fontSize: '0.6875rem', fontWeight: 600 }}>
-                                      ✅ {completedCount} Completed
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              {clientProjects.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedClientId(expandedClientId === c.id ? null : c.id);
-                                  }}
-                                  style={{
-                                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                                    padding: '2px 8px', borderRadius: 12, fontSize: '0.6875rem', fontWeight: 600,
-                                    backgroundColor: expandedClientId === c.id ? 'var(--color-primary-light)' : 'var(--color-bg)',
-                                    color: expandedClientId === c.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                                    border: '1px solid var(--color-border)',
-                                    cursor: 'pointer',
-                                    marginTop: 4,
-                                    width: 'fit-content'
-                                  }}
-                                >
-                                  💼 {clientProjects.length} {clientProjects.length === 1 ? 'Project' : 'Projects'} {expandedClientId === c.id ? '▲' : '▼'}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ padding: '16px 16px' }}>{c.company || '—'}</td>
-                          <td style={{ padding: '16px 16px' }}>{c.email || '—'}</td>
-                          <td style={{ padding: '16px 16px' }}>{c.phone || '—'}</td>
-                          <td style={{ padding: '16px 16px' }}>
-                            <span className={`badge ${c.status === 'active' ? 'badge-completed' : 'badge-todo'}`}>
-                              {c.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '16px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button className="btn btn-secondary btn-sm" onClick={() => { resetClientForm(c, 'won'); setClientModalOpen(true); }}>Edit</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteClient(c.id, c.name)}>Delete</button>
-                            </div>
-                          </td>
-                        </tr>
-                        {expandedClientId === c.id && clientProjects.length > 0 && (
-                          <tr style={{ background: 'var(--color-bg)' }}>
-                            <td colSpan={6} style={{ padding: '12px 24px' }}>
-                              <div style={{
-                                border: '1px solid var(--color-border)',
-                                borderRadius: 'var(--radius-md)',
-                                padding: 16,
-                                background: 'var(--color-surface)',
-                                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
-                              }}>
-                                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                                  Client Projects Status Breakdown
-                                </h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                                  {clientProjects.map((p) => {
-                                    const statusConfig = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
-                                    return (
-                                      <div
-                                        key={p.id}
-                                        style={{
-                                          border: '1px solid var(--color-border)',
-                                          borderRadius: 'var(--radius-sm)',
-                                          padding: 12,
-                                          background: 'var(--color-surface)',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: 8,
-                                          transition: 'all 0.2s',
-                                          borderLeft: `4px solid ${statusConfig.accent}`,
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                          <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>
-                                            {p.name}
-                                          </span>
-                                          <span style={{
-                                            fontSize: '0.75rem',
-                                            fontWeight: 700,
-                                            padding: '2px 8px',
-                                            borderRadius: 12,
-                                            background: statusConfig.bg,
-                                            color: statusConfig.color,
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: 4
-                                          }}>
-                                            {statusConfig.label}
-                                          </span>
-                                        </div>
-                                        
-                                        {p.description && (
-                                          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-                                            {p.description}
-                                          </p>
-                                        )}
-
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 8, marginTop: 4 }}>
-                                          <span>Budget: <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(p.budget)}</span></span>
-                                          <span>
-                                            📅 {p.start_date ? formatDate(p.start_date) : 'N/A'} - {p.end_date ? formatDate(p.end_date) : 'N/A'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                  {filteredWonClients.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)' }}>No closed clients match the query.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. PROJECTS MANAGER TAB */}
-      {activeTab === 'projects' && (
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
-          {/* Actions panel */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}>🔍</span>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Search projects by name or client..."
-                value={projectSearch}
-                onChange={e => setProjectSearch(e.target.value)}
-                style={{ paddingLeft: 38, marginBottom: 0 }}
-              />
-            </div>
-            <button className="btn btn-primary" onClick={() => { resetProjectForm(); setProjectModalOpen(true); }} disabled={clients.filter(c => c.pipeline_stage === 'won').length === 0}>
-              ＋ Add Project
-            </button>
-          </div>
-
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
-                  <th style={{ padding: '12px 16px' }}>Project Name</th>
-                  <th style={{ padding: '12px 16px' }}>Client</th>
-                  <th style={{ padding: '12px 16px' }}>Budget</th>
-                  <th style={{ padding: '12px 16px' }}>Status</th>
-                  <th style={{ padding: '12px 16px' }}>Start Date</th>
-                  <th style={{ padding: '12px 16px' }}>End Date</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProjectsList.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafbfc'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                    <td style={{ padding: '16px 16px', fontWeight: 600 }}>{p.name}</td>
-                    <td style={{ padding: '16px 16px' }}>
-                      <div>{p.client?.name}</div>
-                      {p.client?.company && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{p.client.company}</div>}
-                    </td>
-                    <td style={{ padding: '16px 16px', fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(p.budget)}</td>
-                    <td style={{ padding: '16px 16px' }}>
-                      {(() => {
-                        const statusConfig = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
-                        return (
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '3px 10px',
-                            borderRadius: 20,
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            backgroundColor: statusConfig.bg,
-                            color: statusConfig.color,
-                            border: `1px solid ${statusConfig.accent}80`
-                          }}>
-                            {statusConfig.label}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td style={{ padding: '16px 16px' }}>{formatDate(p.start_date)}</td>
-                    <td style={{ padding: '16px 16px' }}>{formatDate(p.end_date)}</td>
-                    <td style={{ padding: '16px 16px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => { resetProjectForm(p); setProjectModalOpen(true); }}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(p.id, p.name)}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredProjectsList.length === 0 && (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)' }}>
-                      {clients.length === 0 ? 'Create a client first before managing projects.' : 'No projects match your query.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Clients & Projects tabs are moved to standalone Clients page */}
 
       {/* 5. CONTRACTS TAB */}
       {activeTab === 'contracts' && (

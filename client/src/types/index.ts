@@ -98,6 +98,9 @@ export interface Client {
   pipeline_stage: 'new_lead' | 'contacted' | 'meeting_scheduled' | 'proposal_sent' | 'negotiation' | 'won' | 'lost';
   sales_rep_id?: string;
   meeting_date?: string;
+  start_date?: string;
+  address?: string;
+  content_plan_link?: string;
   created_at: string;
 }
 

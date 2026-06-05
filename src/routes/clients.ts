@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrSales } from '../middleware/roleCheck';
+import { ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
 
 const router = Router();
 
 // GET /api/clients — List all clients
-router.get('/', authMiddleware, ownerOrSales, async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, error } = await supabaseAdmin
       .from('clients')
@@ -25,8 +25,8 @@ router.get('/', authMiddleware, ownerOrSales, async (_req: AuthRequest, res: Res
 });
 
 // POST /api/clients — Create a new client
-router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, company, email, phone, status, pipeline_stage } = req.body;
+router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link } = req.body;
 
   if (!name) {
     res.status(400).json({ error: 'Client name is required' });
@@ -43,6 +43,9 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
         phone: phone || null,
         status: status || 'active',
         pipeline_stage: pipeline_stage || 'new_lead',
+        start_date: start_date || null,
+        address: address || null,
+        content_plan_link: content_plan_link || null,
       })
       .select()
       .single();
@@ -59,9 +62,9 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
 });
 
 // PUT /api/clients/:id — Update a client
-router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { name, company, email, phone, status, pipeline_stage } = req.body;
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link } = req.body;
 
   try {
     const updates: Record<string, any> = {};
@@ -71,6 +74,9 @@ router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: R
     if (phone !== undefined) updates.phone = phone;
     if (status !== undefined) updates.status = status;
     if (pipeline_stage !== undefined) updates.pipeline_stage = pipeline_stage;
+    if (start_date !== undefined) updates.start_date = start_date || null;
+    if (address !== undefined) updates.address = address || null;
+    if (content_plan_link !== undefined) updates.content_plan_link = content_plan_link || null;
 
     const { data, error } = await supabaseAdmin
       .from('clients')
@@ -91,7 +97,7 @@ router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: R
 });
 
 // DELETE /api/clients/:id — Delete a client
-router.delete('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   try {
