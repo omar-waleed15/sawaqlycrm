@@ -34,7 +34,8 @@ export default function SettingsPage() {
     const checkHealth = async () => {
       const start = Date.now();
       try {
-        const res = await fetch('http://localhost:4000/api/health');
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+        const res = await fetch(`${apiBase}/health`);
         if (res.ok) {
           setBackendHealth('online');
           setLatency(Date.now() - start);
