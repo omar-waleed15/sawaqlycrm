@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -17,7 +18,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, X } from 'lucide-react';
+
+function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+}
 
 export default function CreateTaskPage() {
   const { user } = useAuth();
@@ -31,11 +36,13 @@ export default function CreateTaskPage() {
     description: '',
     priority: 'medium',
     due_date: '',
-    assignee_id: '',
     drive_link: '',
     content_type: '',
     content_description: '',
   });
+
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [assigneePickerId, setAssigneePickerId] = useState('');
 
   useEffect(() => {
     if (user?.role !== 'owner' && user?.role !== 'team_leader') {
@@ -53,6 +60,19 @@ export default function CreateTaskPage() {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
+  const addAssignee = () => {
+    if (assigneePickerId && !assigneeIds.includes(assigneePickerId)) {
+      setAssigneeIds(prev => [...prev, assigneePickerId]);
+      setAssigneePickerId('');
+    }
+  };
+
+  const removeAssignee = (uid: string) => {
+    setAssigneeIds(prev => prev.filter(id => id !== uid));
+  };
+
+  const unassignedMembers = members.filter(m => !assigneeIds.includes(m.id));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -64,10 +84,10 @@ export default function CreateTaskPage() {
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
         due_date: form.due_date || undefined,
-        assignee_id: form.assignee_id || undefined,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
+        assignee_ids: assigneeIds.length > 0 ? assigneeIds : undefined,
       });
       router.push(`/dashboard/tasks/${data.task.id}`);
     } catch (err: unknown) {
@@ -82,7 +102,7 @@ export default function CreateTaskPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-header-title">Create Task</h1>
-          <p className="page-header-subtitle">Add a new task and assign it to a team member</p>
+          <p className="page-header-subtitle">Add a new task and assign it to team members</p>
         </div>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="size-4" />
@@ -200,20 +220,60 @@ export default function CreateTaskPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="assignee_id">Assign To</Label>
-                <Select value={form.assignee_id} onValueChange={v => handleSelectChange('assignee_id', v || '')}>
-                  <SelectTrigger id="assignee_id">
-                    <SelectValue placeholder="— Unassigned —" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name} ({m.role})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Multi-Assignee Picker */}
+              <div className="border-t border-border pt-4">
+                <Label className="mb-2 block">👥 Assign To</Label>
+
+                {/* Selected assignees as chips */}
+                {assigneeIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {assigneeIds.map(uid => {
+                      const m = members.find(u => u.id === uid);
+                      if (!m) return null;
+                      return (
+                        <Badge
+                          key={uid}
+                          variant="secondary"
+                          className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
+                        >
+                          <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                            {getInitials(m.name)}
+                          </div>
+                          {m.name}
+                          <button
+                            type="button"
+                            onClick={() => removeAssignee(uid)}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add assignee picker */}
+                <div className="flex gap-2">
+                  <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="— Select a member to add —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unassignedMembers.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name} ({m.role})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
+                    <Plus className="size-4" /> Add
+                  </Button>
+                </div>
+                {assigneeIds.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1.5">No members assigned yet. Add at least one member.</p>
+                )}
               </div>
 
               <div className="flex gap-3 justify-end pt-1 border-t border-border">

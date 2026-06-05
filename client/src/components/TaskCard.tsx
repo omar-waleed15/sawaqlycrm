@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Task } from '@/types';
+import { Task, TaskAssignee } from '@/types';
 import { PriorityBadge, StatusBadge } from './Badges';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
@@ -25,8 +26,10 @@ function formatDate(dateStr?: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function isOverdue(dateStr?: string, status?: string): boolean {
-  if (!dateStr || status === 'completed') return false;
+function isOverdue(dateStr?: string, assignees?: TaskAssignee[]): boolean {
+  if (!dateStr) return false;
+  const allCompleted = assignees?.every(a => a.status === 'completed');
+  if (allCompleted) return false;
   return new Date(dateStr) < new Date(new Date().toDateString());
 }
 
@@ -37,8 +40,16 @@ function getInitials(name: string): string {
 export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const overdue = isOverdue(task.due_date, task.status);
+  const assignees = task.task_assignees || [];
+  const overdue = isOverdue(task.due_date, assignees);
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader';
+
+  // For members, find their own assignment status
+  const myAssignment = assignees.find(a => a.user_id === user?.id);
+
+  const completedCount = assignees.filter(a => a.status === 'completed').length;
+  const submittedCount = assignees.filter(a => a.status === 'submitted').length;
+  const totalAssignees = assignees.length;
 
   const handleClick = () => {
     if (onScheduleClick) {
@@ -58,7 +69,16 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
     >
       <CardHeader className="pb-2 flex-row items-start justify-between gap-3">
         <h3 className="text-sm font-semibold text-foreground leading-snug flex-1">{task.title}</h3>
-        <StatusBadge status={task.status} />
+        {/* For members: show their own status. For admins: show progress */}
+        {!isOwner && myAssignment ? (
+          <StatusBadge status={myAssignment.status} />
+        ) : totalAssignees > 0 ? (
+          <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
+            {completedCount}/{totalAssignees} done
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
+        )}
       </CardHeader>
 
       <CardContent className="pt-0 flex flex-col gap-3">
@@ -68,15 +88,10 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
           </p>
         )}
 
-        {/* Progress Update for Admin */}
-        {isOwner && task.progress_note && (
-          <div className="bg-blue-50 border-l-2 border-blue-400 rounded px-3 py-2 text-xs text-blue-800">
-            <span className="font-bold text-blue-700 flex items-center gap-1 mb-1">
-              ⚡ Latest Progress Update
-            </span>
-            <p className="italic line-clamp-2 leading-relaxed">
-              &ldquo;{task.progress_note}&rdquo;
-            </p>
+        {/* Submission progress for admin */}
+        {isOwner && submittedCount > 0 && (
+          <div className="bg-violet-50 border-l-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 font-semibold">
+            📤 {submittedCount} submission{submittedCount !== 1 ? 's' : ''} pending review
           </div>
         )}
 
@@ -103,14 +118,32 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
         </div>
 
         <div className="flex items-center justify-between pt-1 border-t border-border">
+          {/* Stacked avatar group */}
           <div className="flex items-center gap-1.5">
-            {task.assignee ? (
-              <>
-                <div className="size-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                  {getInitials(task.assignee.name)}
+            {totalAssignees > 0 ? (
+              <div className="flex items-center">
+                <div className="flex -space-x-2">
+                  {assignees.slice(0, 3).map(a => (
+                    <div
+                      key={a.id}
+                      className="size-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0 border-2 border-white"
+                      title={a.user?.name}
+                    >
+                      {a.user ? getInitials(a.user.name) : '?'}
+                    </div>
+                  ))}
                 </div>
-                <span className="text-xs text-muted-foreground font-medium">{task.assignee.name}</span>
-              </>
+                {totalAssignees > 3 && (
+                  <span className="text-[10px] text-muted-foreground font-semibold ml-1.5">
+                    +{totalAssignees - 3}
+                  </span>
+                )}
+                {totalAssignees <= 2 && (
+                  <span className="text-xs text-muted-foreground font-medium ml-2">
+                    {assignees.map(a => a.user?.name).filter(Boolean).join(', ')}
+                  </span>
+                )}
+              </div>
             ) : (
               <span className="text-xs text-muted-foreground">Unassigned</span>
             )}

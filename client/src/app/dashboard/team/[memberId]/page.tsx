@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { tasksApi, usersApi } from '@/lib/api';
-import { Task, User } from '@/types';
+import { Task, TaskAssignee, TaskStatus, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,14 @@ function formatDate(dateStr?: string): string {
 function isOverdue(dateStr?: string, status?: string): boolean {
   if (!dateStr || status === 'completed') return false;
   return new Date(dateStr) < new Date(new Date().toDateString());
+}
+
+function getMemberAssignment(task: Task, memberId: string): TaskAssignee | undefined {
+  return task.task_assignees?.find(a => a.user_id === memberId);
+}
+
+function getMemberStatus(task: Task, memberId: string): TaskStatus {
+  return (getMemberAssignment(task, memberId)?.status || 'todo') as TaskStatus;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: string; accentClass: string; bgClass: string; textClass: string }> = {
@@ -113,12 +121,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
   const stats = {
     total: tasks.length,
-    todo: tasks.filter(t => t.status === 'todo').length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    submitted: tasks.filter(t => t.status === 'submitted').length,
-    revision: tasks.filter(t => t.status === 'revision').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    overdue: tasks.filter(t => isOverdue(t.due_date, t.status)).length,
+    todo: tasks.filter(t => getMemberStatus(t, memberId) === 'todo').length,
+    inProgress: tasks.filter(t => getMemberStatus(t, memberId) === 'in_progress').length,
+    submitted: tasks.filter(t => getMemberStatus(t, memberId) === 'submitted').length,
+    revision: tasks.filter(t => getMemberStatus(t, memberId) === 'revision').length,
+    completed: tasks.filter(t => getMemberStatus(t, memberId) === 'completed').length,
+    overdue: tasks.filter(t => isOverdue(t.due_date, getMemberStatus(t, memberId))).length,
   };
 
   const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
@@ -150,7 +158,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
   const filteredTasks = activeStatus === 'all'
     ? getProcessedTasks(tasks)
-    : getProcessedTasks(tasks.filter(t => t.status === activeStatus));
+    : getProcessedTasks(tasks.filter(t => getMemberStatus(t, memberId) === activeStatus));
 
   const filterTabs = [
     { key: 'all', label: 'All Tasks', count: tasks.length },
@@ -358,8 +366,9 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
         /* LIST VIEW */
         <div className="flex flex-col gap-3">
           {filteredTasks.map(task => {
-            const overdue = isOverdue(task.due_date, task.status);
-            const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
+            const mStatus = getMemberStatus(task, memberId);
+            const overdue = isOverdue(task.due_date, mStatus);
+            const statusConfig = STATUS_CONFIG[mStatus] || STATUS_CONFIG.todo;
 
             return (
               <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
@@ -368,7 +377,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                     {/* Badges & Date Header */}
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <StatusBadge status={task.status} />
+                        <StatusBadge status={mStatus} />
                         <PriorityBadge priority={task.priority} />
                         {overdue && (
                           <Badge variant="destructive" className="text-[10px] gap-1 font-semibold">
@@ -394,28 +403,28 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                     </div>
 
                     {/* Meta Updates (Submissions, revisions, progress) */}
-                    {(task.progress_note || task.submission_link || (task.feedback && task.status === 'revision')) && (
+                    {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback); })() && (
                       <div className="border-t border-dashed pt-3 mt-1 flex flex-col gap-2.5">
-                        {/* Member Progress Update */}
-                        {task.progress_note && (
+                        {/* Member Completion Note */}
+                        {getMemberAssignment(task, memberId)?.completion_note && (
                           <div className="flex items-start gap-2.5 bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-blue-900">
                             <Zap className="size-4 text-blue-500 shrink-0 mt-0.5" />
                             <div>
-                              <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">Latest Update</div>
-                              <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{task.progress_note}&rdquo;</p>
+                              <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">Final Thoughts</div>
+                              <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{getMemberAssignment(task, memberId)?.completion_note}&rdquo;</p>
                             </div>
                           </div>
                         )}
 
                         {/* Work Submission */}
-                        {task.submission_link && (
+                        {getMemberAssignment(task, memberId)?.submission_link && (
                           <div className="flex items-center justify-between gap-3 bg-green-50/50 border border-green-100 rounded-lg p-3 text-green-900 flex-wrap">
                             <div className="flex items-center gap-2">
                               <Upload className="size-4 text-green-500 shrink-0" />
                               <span className="text-xs font-semibold">Work has been submitted</span>
                             </div>
                             <a
-                              href={task.submission_link}
+                              href={getMemberAssignment(task, memberId)?.submission_link}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
@@ -427,12 +436,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                         )}
 
                         {/* Admin Revision Feedback */}
-                        {task.feedback && task.status === 'revision' && (
+                        {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
                           <div className="flex items-start gap-2.5 bg-orange-50/50 border border-orange-100 rounded-lg p-3 text-orange-950">
                             <RefreshCw className="size-4 text-orange-500 shrink-0 mt-0.5" />
                             <div>
                               <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">Revision Required</div>
-                              <p className="text-xs mt-0.5 leading-relaxed">{task.feedback}</p>
+                              <p className="text-xs mt-0.5 leading-relaxed">{getMemberAssignment(task, memberId)?.feedback}</p>
                             </div>
                           </div>
                         )}
@@ -449,7 +458,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
         <div className="flex gap-4 overflow-x-auto pb-4 items-start scrollbar-thin select-none">
           {['todo', 'in_progress', 'submitted', 'revision', 'completed'].map(statusKey => {
             const columnConfig = STATUS_CONFIG[statusKey];
-            const columnTasks = filteredTasks.filter(t => t.status === statusKey);
+            const columnTasks = filteredTasks.filter(t => getMemberStatus(t, memberId) === statusKey);
 
             return (
               <div
@@ -495,23 +504,23 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                               </div>
 
                               {/* Small Indicators for updates */}
-                              {(task.progress_note || task.submission_link || task.feedback) && (
+                              {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback || ma?.completion_note); })() && (
                                 <div className="flex gap-1.5 border-t border-dashed pt-2 mt-1">
-                                  {task.progress_note && (
-                                    <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title="Has progress note">
-                                      ⚡
-                                    </Badge>
-                                  )}
-                                  {task.submission_link && (
-                                    <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title="Has submission">
-                                      📤
-                                    </Badge>
-                                  )}
-                                  {task.feedback && task.status === 'revision' && (
-                                    <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title="Revision notes present">
-                                      🔄
-                                    </Badge>
-                                  )}
+                                   {getMemberAssignment(task, memberId)?.completion_note && (
+                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title="Has completion note">
+                                       💭
+                                     </Badge>
+                                   )}
+                                   {getMemberAssignment(task, memberId)?.submission_link && (
+                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title="Has submission">
+                                       📤
+                                     </Badge>
+                                   )}
+                                   {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
+                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title="Revision notes present">
+                                       🔄
+                                     </Badge>
+                                   )}
                                 </div>
                               )}
                             </CardContent>

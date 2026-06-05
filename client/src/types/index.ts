@@ -12,26 +12,40 @@ export interface User {
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'todo' | 'in_progress' | 'submitted' | 'revision' | 'completed';
 
+export interface TaskAssignee {
+  id: string;
+  task_id: string;
+  user_id: string;
+  user?: User;
+  status: TaskStatus;
+  submission_link?: string;
+  completion_note?: string;
+  feedback?: string;
+  assigned_at: string;
+  updated_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   priority: Priority;
-  status: TaskStatus;
+  status?: TaskStatus;           // legacy — per-assignee now
   due_date?: string;
-  submission_link?: string;
-  feedback?: string;
-  progress_note?: string;
+  submission_link?: string;      // legacy
+  feedback?: string;             // legacy
+  progress_note?: string;        // legacy
   drive_link?: string;
   content_type?: string;
   content_description?: string;
   publish_date?: string;
   publish_notes?: string;
-  completion_note?: string;
+  completion_note?: string;      // legacy
   creator_id: string;
-  assignee_id?: string;
+  assignee_id?: string;          // legacy — use task_assignees
   creator?: User;
-  assignee?: User;
+  assignee?: User;               // legacy
+  task_assignees?: TaskAssignee[];
   attachments?: Attachment[];
   comments?: Comment[];
   created_at: string;

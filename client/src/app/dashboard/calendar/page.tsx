@@ -66,6 +66,17 @@ export default function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'sales';
+  const isTaskAdmin = user?.role === 'owner' || user?.role === 'team_leader';
+
+  const isTaskCompleted = (t: Task) => {
+    const assignees = t.task_assignees || [];
+    if (assignees.length === 0) return false;
+    if (!isTaskAdmin) {
+      const myAssignee = assignees.find(a => a.user_id === user?.id);
+      return myAssignee ? myAssignee.status === 'completed' : false;
+    }
+    return assignees.every(a => a.status === 'completed');
+  };
 
   // Load data
   useEffect(() => {
@@ -256,8 +267,8 @@ export default function CalendarPage() {
         
         if (dayEvents) {
           totalTasksDue += dayEvents.tasks.length;
-          completedTasks += dayEvents.tasks.filter(t => t.status === 'completed').length;
-          urgentTasks += dayEvents.tasks.filter(t => t.priority === 'urgent' && t.status !== 'completed').length;
+          completedTasks += dayEvents.tasks.filter(t => isTaskCompleted(t)).length;
+          urgentTasks += dayEvents.tasks.filter(t => t.priority === 'urgent' && !isTaskCompleted(t)).length;
           
           if (isOwner) {
             dayEvents.payments.forEach(p => {
@@ -279,7 +290,7 @@ export default function CalendarPage() {
       completionRate,
       urgentTasks
     };
-  }, [calendarCells, eventsByDay, isOwner]);
+  }, [calendarCells, eventsByDay, isOwner, isTaskAdmin, user]);
 
   const selectedDayEvents = useMemo(() => {
     if (!selectedDate) return { tasks: [], payments: [], publications: [] };
@@ -476,7 +487,7 @@ export default function CalendarPage() {
                         <div
                           key={`task-${task.id}`}
                           className={`text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            task.status === 'completed'
+                            isTaskCompleted(task)
                               ? 'bg-purple-50 border-purple-200 text-purple-700 line-through opacity-70'
                               : isUrgent
                               ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
@@ -594,24 +605,44 @@ export default function CalendarPage() {
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                           <h4 className="font-bold text-xs truncate max-w-[200px]">{task.title}</h4>
                           <PriorityBadge priority={task.priority} />
-                          <StatusBadge status={task.status} />
+                          {isTaskAdmin ? (
+                            task.task_assignees && task.task_assignees.length > 0 ? (
+                              <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
+                                {task.task_assignees.filter(a => a.status === 'completed').length}/{task.task_assignees.length} done
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
+                            )
+                          ) : (
+                            <StatusBadge status={task.task_assignees?.find(a => a.user_id === user?.id)?.status || 'todo'} />
+                          )}
                         </div>
                         {task.description && (
                           <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                             {task.description}
                           </p>
                         )}
-                        <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground mt-2">
-                          {task.assignee ? (
-                            <span>👤 Assigned to: {task.assignee.name}</span>
+                        <div className="flex flex-col gap-1.5 mt-2">
+                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-wrap">
+                            {task.content_type && (
+                              <>
+                                <span>🎬 {task.content_type}</span>
+                                <span>•</span>
+                              </>
+                            )}
+                            <span>👥 Assignees:</span>
+                          </div>
+                          {task.task_assignees && task.task_assignees.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {task.task_assignees.map(a => (
+                                <div key={a.id} className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded text-[10px]">
+                                  <span className="font-semibold text-foreground">{a.user?.name || 'Unknown'}</span>
+                                  <StatusBadge status={a.status} className="scale-90 origin-left" />
+                                </div>
+                              ))}
+                            </div>
                           ) : (
-                            <span>👤 Unassigned</span>
-                          )}
-                          {task.content_type && (
-                            <>
-                              <span>•</span>
-                              <span>🎬 {task.content_type}</span>
-                            </>
+                            <span className="text-[10px] text-muted-foreground italic">No members assigned</span>
                           )}
                         </div>
                       </div>

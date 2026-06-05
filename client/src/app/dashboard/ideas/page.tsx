@@ -62,7 +62,8 @@ const emptyForm = {
 };
 
 const emptyPushForm = {
-  assignee_id: '',
+  assignee_ids: [] as string[],
+  assignee_picker_id: '',
   due_date: '',
   priority: 'medium',
 };
@@ -205,7 +206,12 @@ export default function IdeasPage() {
 
   const openPush = (idea: ContentIdea) => {
     setPushTarget(idea);
-    setPushForm({ ...emptyPushForm });
+    setPushForm({
+      assignee_ids: [],
+      assignee_picker_id: '',
+      due_date: '',
+      priority: 'medium',
+    });
     setPushError('');
     setPushSuccess(false);
   };
@@ -216,10 +222,28 @@ export default function IdeasPage() {
     setPushSuccess(false);
   };
 
+  const addPushAssignee = () => {
+    const { assignee_picker_id, assignee_ids } = pushForm;
+    if (assignee_picker_id && !assignee_ids.includes(assignee_picker_id)) {
+      setPushForm(prev => ({
+        ...prev,
+        assignee_ids: [...prev.assignee_ids, assignee_picker_id],
+        assignee_picker_id: '',
+      }));
+    }
+  };
+
+  const removePushAssignee = (uid: string) => {
+    setPushForm(prev => ({
+      ...prev,
+      assignee_ids: prev.assignee_ids.filter(id => id !== uid),
+    }));
+  };
+
   const handlePushToTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pushTarget) return;
-    if (!pushForm.assignee_id) { setPushError('Please select who will handle this task'); return; }
+    if (pushForm.assignee_ids.length === 0) { setPushError('Please assign at least one member to this task'); return; }
     if (!pushForm.due_date)    { setPushError('Please set a deadline for the task'); return; }
 
     setPushing(true);
@@ -230,7 +254,7 @@ export default function IdeasPage() {
         description: pushTarget.description || undefined,
         priority: pushForm.priority as 'low' | 'medium' | 'high' | 'urgent',
         due_date: pushForm.due_date,
-        assignee_id: pushForm.assignee_id,
+        assignee_ids: pushForm.assignee_ids,
         drive_link: pushTarget.drive_link || undefined,
         content_type: pushTarget.content_type || undefined,
         content_description: pushTarget.content_description || undefined,
@@ -693,19 +717,50 @@ export default function IdeasPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="push-assignee">👤 Assign To *</Label>
-                  <Select value={pushForm.assignee_id} onValueChange={v => setPushForm(p => ({ ...p, assignee_id: v || '' }))}>
-                    <SelectTrigger id="push-assignee">
-                      <SelectValue placeholder="Select team member…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(u => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name} — {u.role === 'owner' ? 'Admin' : u.role === 'team_leader' ? 'Leader' : u.role === 'sales' ? 'Sales' : 'Member'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="push-assignee">👥 Assign To *</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={pushForm.assignee_picker_id}
+                      onValueChange={v => setPushForm(p => ({ ...p, assignee_picker_id: v || '' }))}
+                    >
+                      <SelectTrigger id="push-assignee" className="flex-1">
+                        <SelectValue placeholder="Select team member…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users
+                          .filter(u => !pushForm.assignee_ids.includes(u.id))
+                          .map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name} — {u.role === 'owner' ? 'Admin' : u.role === 'team_leader' ? 'Leader' : u.role === 'sales' ? 'Sales' : 'Member'}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" onClick={addPushAssignee} variant="outline" className="shrink-0">
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {/* Selected Assignees Chips */}
+                  {pushForm.assignee_ids.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {pushForm.assignee_ids.map(uid => {
+                        const member = users.find(u => u.id === uid);
+                        return (
+                          <div key={uid} className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                            <span>{member?.name || 'Unknown'}</span>
+                            <button
+                              type="button"
+                              onClick={() => removePushAssignee(uid)}
+                              className="text-indigo-400 hover:text-indigo-600 transition-colors text-[10px] ml-0.5"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">

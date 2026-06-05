@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 interface PriorityBadgeProps {
   priority: Priority;
+  className?: string;
 }
 
 const priorityConfig: Record<Priority, { label: string; className: string }> = {
@@ -22,10 +23,10 @@ const priorityDot: Record<Priority, string> = {
   low:    'bg-green-500',
 };
 
-export function PriorityBadge({ priority }: PriorityBadgeProps) {
+export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
   const config = priorityConfig[priority] || priorityConfig.medium;
   return (
-    <Badge variant="outline" className={cn('gap-1.5 font-semibold text-xs', config.className)}>
+    <Badge variant="outline" className={cn('gap-1.5 font-semibold text-xs', config.className, className)}>
       <span className={cn('size-1.5 rounded-full', priorityDot[priority] || priorityDot.medium)} />
       {config.label}
     </Badge>
@@ -34,6 +35,7 @@ export function PriorityBadge({ priority }: PriorityBadgeProps) {
 
 interface StatusBadgeProps {
   status: TaskStatus;
+  className?: string;
 }
 
 const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
@@ -44,10 +46,10 @@ const statusConfig: Record<TaskStatus, { label: string; className: string }> = {
   completed:   { label: 'Completed',      className: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100' },
 };
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = statusConfig[status] || statusConfig.todo;
   return (
-    <Badge variant="outline" className={cn('font-semibold text-xs', config.className)}>
+    <Badge variant="outline" className={cn('font-semibold text-xs', config.className, className)}>
       {config.label}
     </Badge>
   );

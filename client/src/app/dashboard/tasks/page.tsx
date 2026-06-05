@@ -262,7 +262,11 @@ export default function TasksPage() {
 
               <div className="px-6 py-5 flex flex-col gap-4">
                 <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                  {schedulingTask.assignee && <span>👤 {schedulingTask.assignee.name}</span>}
+                  {schedulingTask.task_assignees && schedulingTask.task_assignees.length > 0 ? (
+                    <span>👥 {schedulingTask.task_assignees.map(a => a.user?.name).filter(Boolean).join(', ')}</span>
+                  ) : (
+                    <span>👤 Unassigned</span>
+                  )}
                   {schedulingTask.content_type && <span>🎬 {schedulingTask.content_type}</span>}
                 </div>
 

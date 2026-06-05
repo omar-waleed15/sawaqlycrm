@@ -95,11 +95,17 @@ export const tasksApi = {
   daily: () => request<{ tasks: import('@/types').Task[] }>('/tasks/daily'),
   stats: () => request<{ stats: import('@/types').DashboardStats }>('/tasks/stats'),
   get: (id: string) => request<{ task: import('@/types').Task }>(`/tasks/${id}`),
-  create: (data: Partial<import('@/types').Task>) =>
+  create: (data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) =>
     request<{ task: import('@/types').Task }>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<import('@/types').Task>) =>
+  update: (id: string, data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) =>
     request<{ task: import('@/types').Task }>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  addAssignee: (taskId: string, userId: string) =>
+    request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
+  removeAssignee: (taskId: string, userId: string) =>
+    request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'DELETE' }),
+  updateAssignee: (taskId: string, userId: string, data: { status?: string; feedback?: string }) =>
+    request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 // Comments
