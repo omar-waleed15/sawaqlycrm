@@ -471,16 +471,27 @@ export default function CalendarPage() {
                   
                   <div className="flex flex-col gap-1 overflow-hidden flex-1 pb-1">
                     {/* Payments */}
-                    {isOwner && displayPayments.map(({ contract, amount }) => (
-                      <div
-                        key={`pay-${contract.id}-${amount}`}
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-green-700 truncate flex items-center gap-0.5"
-                        title={`Payment due: $${amount} - ${contract.name}`}
-                      >
-                        <DollarSign className="size-2 shrink-0" />
-                        <span>{formatCurrency(amount)}</span>
-                      </div>
-                    ))}
+                    {isOwner && displayPayments.map(({ contract, amount }) => {
+                      // Check if any installment for this day is paid
+                      const dateStr2 = getLocalDateString(cell.date);
+                      const isPaid = contract.installments?.some(
+                        inst => inst.due_date?.split('T')[0] === dateStr2 && inst.paid
+                      ) || false;
+                      return (
+                        <div
+                          key={`pay-${contract.id}-${amount}`}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
+                            isPaid
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                              : 'bg-green-50 border-green-200 text-green-700'
+                          }`}
+                          title={`Payment ${isPaid ? '(Paid)' : '(Due)'}: $${amount} - ${contract.name}`}
+                        >
+                          {isPaid ? <CheckCircle2 className="size-2.5 shrink-0" /> : <DollarSign className="size-2 shrink-0" />}
+                          <span className={isPaid ? 'line-through opacity-70' : ''}>{formatCurrency(amount)}</span>
+                        </div>
+                      );
+                    })}
 
                     {/* Meetings */}
                     {isOwner && displayMeetings.map(client => (
@@ -495,36 +506,45 @@ export default function CalendarPage() {
                     ))}
 
                     {/* Publications */}
-                    {displayPublications.map(task => (
-                      <div
-                        key={`pub-${task.id}`}
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-700 truncate flex items-center gap-0.5"
-                        title={`Publish: ${task.title}`}
-                      >
-                        <Megaphone className="size-2 shrink-0" />
-                        <span>{task.title}</span>
-                      </div>
-                    ))}
+                    {displayPublications.map(task => {
+                      const pubCompleted = isTaskCompleted(task);
+                      return (
+                        <div
+                          key={`pub-${task.id}`}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
+                            pubCompleted
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                              : 'bg-sky-50 border-sky-200 text-sky-700'
+                          }`}
+                          title={`Publish${pubCompleted ? ' (Done)' : ''}: ${task.title}`}
+                        >
+                          {pubCompleted ? <CheckCircle2 className="size-2.5 shrink-0" /> : <Megaphone className="size-2 shrink-0" />}
+                          <span className={pubCompleted ? 'line-through opacity-70' : ''}>{task.title}</span>
+                        </div>
+                      );
+                    })}
 
                     {/* Tasks */}
                     {displayTasks.map(task => {
                       const isUrgent = task.priority === 'urgent';
                       const isHigh = task.priority === 'high';
+                      const completed = isTaskCompleted(task);
                       return (
                         <div
                           key={`task-${task.id}`}
                           className={`text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            isTaskCompleted(task)
-                              ? 'bg-purple-50 border-purple-200 text-purple-700 line-through opacity-70'
+                            completed
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
                               : isUrgent
                               ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
                               : isHigh
                               ? 'bg-orange-50 border-orange-200 text-orange-700'
                               : 'bg-muted border-border text-muted-foreground'
                           }`}
-                          title={`Task: ${task.title}`}
+                          title={`Task${completed ? ' (Done)' : ''}: ${task.title}`}
                         >
-                          <span>☑ {task.title}</span>
+                          {completed ? <CheckCircle2 className="size-2.5 shrink-0" /> : <span>☐</span>}
+                          <span className={completed ? 'line-through opacity-70' : ''}>{task.title}</span>
                         </div>
                       );
                     })}
@@ -560,23 +580,35 @@ export default function CalendarPage() {
                 
                 {selectedDayEvents.payments.length > 0 ? (
                   <div className="flex flex-col gap-2">
-                    {selectedDayEvents.payments.map(({ contract, amount }) => (
-                      <div key={contract.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
-                        <div className="overflow-hidden">
-                          <h4 className="font-bold text-xs truncate">{contract.name}</h4>
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
-                            <span className="font-semibold text-green-600">{formatCurrency(amount)}</span>
-                            <span>•</span>
-                            <span className="truncate">Client: {contract.client?.name || 'N/A'}</span>
-                            <span>•</span>
-                            <span className="capitalize">{CYCLE_LABELS[contract.billing_cycle] || contract.billing_cycle}</span>
+                    {selectedDayEvents.payments.map(({ contract, amount }) => {
+                      const dateStr3 = selectedDate ? getLocalDateString(selectedDate) : '';
+                      const isPaid = contract.installments?.some(
+                        inst => inst.due_date?.split('T')[0] === dateStr3 && inst.paid
+                      ) || false;
+                      return (
+                        <div key={contract.id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border bg-card ${
+                          isPaid ? 'border-l-4 border-l-emerald-500' : ''
+                        }`}>
+                          <div className="overflow-hidden flex-1">
+                            <div className="flex items-center gap-2">
+                              {isPaid && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
+                              <h4 className={`font-bold text-xs truncate ${isPaid ? 'line-through text-muted-foreground' : ''}`}>{contract.name}</h4>
+                              {isPaid && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Paid</Badge>}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
+                              <span className="font-semibold text-green-600">{formatCurrency(amount)}</span>
+                              <span>•</span>
+                              <span className="truncate">Client: {contract.client?.name || 'N/A'}</span>
+                              <span>•</span>
+                              <span className="capitalize">{CYCLE_LABELS[contract.billing_cycle] || contract.billing_cycle}</span>
+                            </div>
                           </div>
+                          <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/finance'); }} className="h-7 text-xs font-semibold shrink-0">
+                            Manage
+                          </Button>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/finance'); }} className="h-7 text-xs font-semibold shrink-0">
-                          Manage
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No payments scheduled on this date.</p>
@@ -637,29 +669,37 @@ export default function CalendarPage() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
                 <Megaphone className="size-3.5 text-sky-500" /> Publications Scheduled ({selectedDayEvents.publications.length})
               </h3>
-              
               {selectedDayEvents.publications.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {selectedDayEvents.publications.map(task => (
-                    <div key={task.id} className="p-3 rounded-lg border border-l-4 border-l-sky-500 bg-card flex items-start justify-between gap-3">
-                      <div className="flex-1 overflow-hidden">
-                        <h4 className="font-bold text-xs">{task.title}</h4>
-                        {task.description && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                            {task.description}
-                          </p>
-                        )}
-                        {task.publish_notes && (
-                          <div className="bg-sky-50/50 border border-sky-100 rounded-md p-2 text-[10px] text-sky-800 italic mt-2">
-                            📝 {task.publish_notes}
+                  {selectedDayEvents.publications.map(task => {
+                    const pubDone = isTaskCompleted(task);
+                    return (
+                      <div key={task.id} className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
+                        pubDone ? 'border-l-emerald-500' : 'border-l-sky-500'
+                      }`}>
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            {pubDone && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
+                            <h4 className={`font-bold text-xs ${pubDone ? 'line-through text-muted-foreground' : ''}`}>{task.title}</h4>
+                            {pubDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Done</Badge>}
                           </div>
-                        )}
+                          {task.description && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
+                              {task.description}
+                            </p>
+                          )}
+                          {task.publish_notes && (
+                            <div className="bg-sky-50/50 border border-sky-100 rounded-md p-2 text-[10px] text-sky-800 italic mt-2">
+                              📝 {task.publish_notes}
+                            </div>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
+                          View
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
-                        View
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No publications scheduled on this date.</p>
@@ -671,61 +711,71 @@ export default function CalendarPage() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
                 <ClipboardList className="size-3.5 text-indigo-500" /> Tasks Deadlines ({selectedDayEvents.tasks.length})
               </h3>
-              
               {selectedDayEvents.tasks.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {selectedDayEvents.tasks.map(task => (
-                    <div key={task.id} className="p-3 rounded-lg border bg-card flex items-start justify-between gap-3">
-                      <div className="flex-1 overflow-hidden">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <h4 className="font-bold text-xs truncate max-w-[200px]">{task.title}</h4>
-                          <PriorityBadge priority={task.priority} />
-                          {isTaskAdmin ? (
-                            task.task_assignees && task.task_assignees.length > 0 ? (
-                              <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
-                                {task.task_assignees.filter(a => a.status === 'completed').length}/{task.task_assignees.length} done
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
-                            )
-                          ) : (
-                            <StatusBadge status={task.task_assignees?.find(a => a.user_id === user?.id)?.status || 'todo'} />
-                          )}
-                        </div>
-                        {task.description && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                            {task.description}
-                          </p>
-                        )}
-                        <div className="flex flex-col gap-1.5 mt-2">
-                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-wrap">
-                            {task.content_type && (
-                              <>
-                                <span>🎬 {task.content_type}</span>
-                                <span>•</span>
-                              </>
+                  {selectedDayEvents.tasks.map(task => {
+                    const taskDone = isTaskCompleted(task);
+                    return (
+                      <div key={task.id} className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
+                        taskDone ? 'border-l-4 border-l-emerald-500' : ''
+                      }`}>
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            {taskDone && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
+                            <h4 className={`font-bold text-xs truncate max-w-[200px] ${taskDone ? 'line-through text-muted-foreground' : ''}`}>{task.title}</h4>
+                            {taskDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Completed</Badge>}
+                            {!taskDone && <PriorityBadge priority={task.priority} />}
+                            {!taskDone && (
+                              isTaskAdmin ? (
+                                task.task_assignees && task.task_assignees.length > 0 ? (
+                                  <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
+                                    {task.task_assignees.filter(a => a.status === 'completed').length}/{task.task_assignees.length} done
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
+                                )
+                              ) : (
+                                <StatusBadge status={task.task_assignees?.find(a => a.user_id === user?.id)?.status || 'todo'} />
+                              )
                             )}
-                            <span>👥 Assignees:</span>
                           </div>
-                          {task.task_assignees && task.task_assignees.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {task.task_assignees.map(a => (
-                                <div key={a.id} className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded text-[10px]">
-                                  <span className="font-semibold text-foreground">{a.user?.name || 'Unknown'}</span>
-                                  <StatusBadge status={a.status} className="scale-90 origin-left" />
+                          {task.description && !taskDone && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                              {task.description}
+                            </p>
+                          )}
+                          {!taskDone && (
+                            <div className="flex flex-col gap-1.5 mt-2">
+                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-wrap">
+                                {task.content_type && (
+                                  <>
+                                    <span>🎬 {task.content_type}</span>
+                                    <span>•</span>
+                                  </>
+                                )}
+                                <span>👥 Assignees:</span>
+                              </div>
+                              {task.task_assignees && task.task_assignees.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {task.task_assignees.map(a => (
+                                    <div key={a.id} className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded text-[10px]">
+                                      <span className="font-semibold text-foreground">{a.user?.name || 'Unknown'}</span>
+                                      <StatusBadge status={a.status} className="scale-90 origin-left" />
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground italic">No members assigned</span>
+                              )}
                             </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground italic">No members assigned</span>
                           )}
                         </div>
+                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
+                          Open
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
-                        Open
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No task deadlines due on this date.</p>
