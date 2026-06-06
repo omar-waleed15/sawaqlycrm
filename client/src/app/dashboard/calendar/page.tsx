@@ -603,9 +603,11 @@ export default function CalendarPage() {
                               <span className="capitalize">{CYCLE_LABELS[contract.billing_cycle] || contract.billing_cycle}</span>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/finance'); }} className="h-7 text-xs font-semibold shrink-0">
-                            Manage
-                          </Button>
+                          {user?.role === 'owner' && (
+                            <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/finance'); }} className="h-7 text-xs font-semibold shrink-0">
+                              Manage
+                            </Button>
+                          )}
                         </div>
                       );
                     })}

@@ -81,7 +81,7 @@ export default function FinanceDashboardPage() {
 
   // Navigation Guard
   useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'sales') {
+    if (user && user.role !== 'owner') {
       router.replace('/dashboard');
     }
   }, [user, router]);
