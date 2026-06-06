@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, usersApi, clientsApi } from '@/lib/api';
-import { User, Client } from '@/types';
+import { tasksApi, usersApi, projectsApi } from '@/lib/api';
+import { User, Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +28,7 @@ export default function CreateTaskPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [members, setMembers] = useState<User[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -40,7 +40,7 @@ export default function CreateTaskPage() {
     drive_link: '',
     content_type: '',
     content_description: '',
-    client_id: '',
+    project_id: '',
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -52,7 +52,7 @@ export default function CreateTaskPage() {
       return;
     }
     usersApi.list().then(data => setMembers(data.users)).catch(console.error);
-    clientsApi.list().then(data => setClients(data.clients)).catch(console.error);
+    projectsApi.list().then(data => setProjects(data.projects)).catch(console.error);
   }, [user, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -90,7 +90,7 @@ export default function CreateTaskPage() {
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
-        client_id: (form.client_id && form.client_id !== 'none') ? form.client_id : undefined,
+        project_id: (form.project_id && form.project_id !== 'none') ? form.project_id : undefined,
         assignee_ids: assigneeIds.length > 0 ? assigneeIds : undefined,
       });
       router.push(`/dashboard/tasks/${data.task.id}`);
@@ -225,16 +225,16 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="client_id">Link to Client</Label>
-                <Select value={form.client_id} onValueChange={v => handleSelectChange('client_id', v || '')}>
-                  <SelectTrigger id="client_id">
-                    <SelectValue placeholder="— Select Client (Optional) —" />
+                <Label htmlFor="project_id">Link to Project</Label>
+                <Select value={form.project_id} onValueChange={v => handleSelectChange('project_id', v || '')}>
+                  <SelectTrigger id="project_id">
+                    <SelectValue placeholder="— Select Project (Optional) —" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None (Internal / No Client)</SelectItem>
-                    {clients.map(c => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} {c.company ? `(${c.company})` : ''}
+                    <SelectItem value="none">None (Internal / No Project)</SelectItem>
+                    {projects.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} {p.client ? `— ${p.client.name}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

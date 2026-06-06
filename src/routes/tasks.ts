@@ -171,7 +171,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
 
 // POST /api/tasks — Create a new task (owner, team leader or sales)
 router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date, client_id } = req.body;
+  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date, client_id, project_id } = req.body;
 
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
@@ -195,6 +195,7 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
         content_description: content_description || null,
         publish_date: publish_date || null,
         client_id: client_id || null,
+        project_id: project_id || null,
       })
       .select('*')
       .single();
@@ -309,7 +310,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (admin) {
       // Admin: update shared task fields
-      const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id } = req.body;
+      const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id } = req.body;
 
       const updates: Record<string, unknown> = {};
       if (title !== undefined) updates.title = title;
@@ -322,6 +323,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (publish_date !== undefined) updates.publish_date = publish_date;
       if (publish_notes !== undefined) updates.publish_notes = publish_notes;
       if (client_id !== undefined) updates.client_id = client_id || null;
+      if (project_id !== undefined) updates.project_id = project_id || null;
       updates.updated_at = new Date().toISOString();
 
       const { error: updateError } = await supabaseAdmin

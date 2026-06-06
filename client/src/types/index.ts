@@ -44,6 +44,7 @@ export interface Task {
   creator_id: string;
   assignee_id?: string;          // legacy — use task_assignees
   client_id?: string;
+  project_id?: string;
   creator?: User;
   assignee?: User;               // legacy
   task_assignees?: TaskAssignee[];
@@ -101,6 +102,16 @@ export interface Client {
   start_date?: string;
   address?: string;
   content_plan_link?: string;
+  num_posts?: number;
+  num_reels?: number;
+  num_stories?: number;
+  num_photos?: number;
+  other_deliverables?: string;
+  done_posts?: number;
+  done_reels?: number;
+  done_stories?: number;
+  done_photos?: number;
+  done_other?: boolean;
   created_at: string;
 }
 

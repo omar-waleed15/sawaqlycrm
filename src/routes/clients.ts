@@ -26,7 +26,7 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async 
 
 // POST /api/clients — Create a new client
 router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link } = req.body;
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
 
   if (!name) {
     res.status(400).json({ error: 'Client name is required' });
@@ -46,6 +46,16 @@ router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async
         start_date: start_date || null,
         address: address || null,
         content_plan_link: content_plan_link || null,
+        num_posts: num_posts ?? 0,
+        num_reels: num_reels ?? 0,
+        num_stories: num_stories ?? 0,
+        num_photos: num_photos ?? 0,
+        other_deliverables: other_deliverables || null,
+        done_posts: done_posts ?? 0,
+        done_reels: done_reels ?? 0,
+        done_stories: done_stories ?? 0,
+        done_photos: done_photos ?? 0,
+        done_other: done_other ?? false,
       })
       .select()
       .single();
@@ -64,7 +74,7 @@ router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async
 // PUT /api/clients/:id — Update a client
 router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link } = req.body;
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
 
   try {
     const updates: Record<string, any> = {};
@@ -77,6 +87,16 @@ router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, asy
     if (start_date !== undefined) updates.start_date = start_date || null;
     if (address !== undefined) updates.address = address || null;
     if (content_plan_link !== undefined) updates.content_plan_link = content_plan_link || null;
+    if (num_posts !== undefined) updates.num_posts = num_posts;
+    if (num_reels !== undefined) updates.num_reels = num_reels;
+    if (num_stories !== undefined) updates.num_stories = num_stories;
+    if (num_photos !== undefined) updates.num_photos = num_photos;
+    if (other_deliverables !== undefined) updates.other_deliverables = other_deliverables || null;
+    if (done_posts !== undefined) updates.done_posts = done_posts;
+    if (done_reels !== undefined) updates.done_reels = done_reels;
+    if (done_stories !== undefined) updates.done_stories = done_stories;
+    if (done_photos !== undefined) updates.done_photos = done_photos;
+    if (done_other !== undefined) updates.done_other = done_other;
 
     const { data, error } = await supabaseAdmin
       .from('clients')
