@@ -65,8 +65,7 @@ const PIPELINE_STAGES: {
   { key: 'new_lead',         label: 'New Lead',          emoji: '🌱', color: '#475569', bg: '#f8fafc', border: '#cbd5e1' },
   { key: 'contacted',        label: 'Contacted',         emoji: '📞', color: '#1d4ed8', bg: '#eff6ff', border: '#93c5fd' },
   { key: 'meeting_scheduled',label: 'Meeting Scheduled', emoji: '📅', color: '#4f46e5', bg: '#eef2ff', border: '#a5b4fc' },
-  { key: 'proposal_sent',    label: 'Proposal Sent',     emoji: '📄', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
-  { key: 'negotiation',      label: 'Negotiation',       emoji: '🤝', color: '#b45309', bg: '#fffbeb', border: '#fcd34d' },
+  { key: 'meeting_done',     label: 'Meeting Done',      emoji: '🤝', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
   { key: 'won',              label: 'Won',               emoji: '🏆', color: '#15803d', bg: '#f0fdf4', border: '#86efac' },
   { key: 'lost',             label: 'Lost',              emoji: '❌', color: '#be123c', bg: '#fff1f2', border: '#fda4af' },
 ];
@@ -850,7 +849,7 @@ export default function FinanceDashboardPage() {
   };
 
   // Stage movement handlers
-  const ACTIVE_STAGES: PipelineStage[] = ['new_lead', 'contacted', 'meeting_scheduled', 'proposal_sent', 'negotiation'];
+  const ACTIVE_STAGES: PipelineStage[] = ['new_lead', 'contacted', 'meeting_scheduled', 'meeting_done'];
 
   const handleMoveStage = async (client: Client, direction: 'forward' | 'backward') => {
     const currentIndex = ACTIVE_STAGES.indexOf(client.pipeline_stage);
@@ -867,9 +866,9 @@ export default function FinanceDashboardPage() {
         }
       } else if (client.pipeline_stage === 'won' && direction === 'backward') {
         // Optimistic update
-        setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'negotiation' } : c));
+        setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'meeting_done' } : c));
         try {
-          await clientsApi.update(client.id, { pipeline_stage: 'negotiation' });
+          await clientsApi.update(client.id, { pipeline_stage: 'meeting_done' });
           loadData(true);
         } catch (err) {
           loadData(true);
@@ -2147,9 +2146,9 @@ export default function FinanceDashboardPage() {
                               cursor: 'pointer', fontSize: '0.75rem', padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 4,
                               fontWeight: 600
                             }}
-                            title="Move back to Negotiation"
+                            title="Move back to Meeting Done"
                           >
-                            ◀ <span style={{ fontSize: '0.6875rem' }}>Move back to Negotiation</span>
+                            ◀ <span style={{ fontSize: '0.6875rem' }}>Move back to Meeting Done</span>
                           </button>
                         </div>
                       </div>
@@ -2217,7 +2216,7 @@ export default function FinanceDashboardPage() {
                               background: 'none', border: 'none', color: 'var(--color-primary)',
                               cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px'
                             }}
-                            title={c.pipeline_stage === 'negotiation' ? 'Close as Won' : 'Move stage forward'}
+                            title={c.pipeline_stage === 'meeting_done' ? 'Close as Won' : 'Move stage forward'}
                           >
                             ▶
                           </button>

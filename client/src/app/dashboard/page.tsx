@@ -43,8 +43,7 @@ const PIPELINE_STAGES: {
   { key: 'new_lead',          label: 'New Lead',       colorClass: 'bg-slate-400', dotColor: '#94a3b8' },
   { key: 'contacted',         label: 'Contacted',      colorClass: 'bg-blue-500', dotColor: '#3b82f6' },
   { key: 'meeting_scheduled', label: 'Meeting Set',    colorClass: 'bg-indigo-500', dotColor: '#6366f1' },
-  { key: 'proposal_sent',     label: 'Proposal Sent',  colorClass: 'bg-purple-500', dotColor: '#a855f7' },
-  { key: 'negotiation',       label: 'Negotiation',    colorClass: 'bg-amber-500', dotColor: '#f59e0b' },
+  { key: 'meeting_done',      label: 'Meeting Done',   colorClass: 'bg-purple-500', dotColor: '#a855f7' },
   { key: 'won',               label: 'Won',            colorClass: 'bg-green-500', dotColor: '#10b981' },
   { key: 'lost',              label: 'Lost',           colorClass: 'bg-rose-500', dotColor: '#f43f5e' },
 ];

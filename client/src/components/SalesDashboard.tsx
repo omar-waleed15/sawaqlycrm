@@ -43,8 +43,7 @@ function formatCurrency(amount: number): string {
 const OUTCOMES = [
   { value: 'contacted', label: '📞 Contacted' },
   { value: 'meeting_scheduled', label: '📅 Meeting Scheduled' },
-  { value: 'proposal_sent', label: '📄 Proposal Sent' },
-  { value: 'negotiation', label: '🤝 Negotiation' },
+  { value: 'meeting_done', label: '🤝 Meeting Done' },
   { value: 'won', label: '🏆 Won (Close Deal)' },
   { value: 'lost', label: '❌ Lost' },
 ];
@@ -53,8 +52,7 @@ const PIPELINE_STAGE_CONFIG: Record<string, { label: string; color: string; bg: 
   new_lead:          { label: 'New Lead',       color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
   contacted:         { label: 'Contacted',      color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200' },
   meeting_scheduled: { label: 'Meeting Scheduled', color: 'text-indigo-700', bg: 'bg-indigo-100 border-indigo-200' },
-  proposal_sent:     { label: 'Proposal Sent',  color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200' },
-  negotiation:       { label: 'Negotiation',    color: 'text-amber-700', bg: 'bg-amber-100 border-amber-200' },
+  meeting_done:      { label: 'Meeting Done',    color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200' },
   won:               { label: 'Won',            color: 'text-green-700', bg: 'bg-green-100 border-green-200' },
   lost:              { label: 'Lost',           color: 'text-rose-700', bg: 'bg-rose-100 border-rose-200' },
 };
@@ -321,15 +319,16 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   // Dashboard Stats Calculations
   const targetAmount = data?.target?.target_amount || 0;
   const currentRevenue = data?.achievements?.collectedRevenue || 0;
-  const achievementRate = targetAmount > 0 ? Math.round((currentRevenue / targetAmount) * 100) : 0;
+  const currentMeetingsDone = data?.achievements?.totalMeetingsDone || 0;
+  const achievementRate = targetAmount > 0 ? Math.round((currentMeetingsDone / targetAmount) * 100) : 0;
   
   // Performance Analysis insights
   const salesAnalysis = () => {
-    if (targetAmount === 0) return { text: 'No sales quota target set for this month yet.', type: 'info' };
+    if (targetAmount === 0) return { text: 'No sales meetings target set for this month yet.', type: 'info' };
     if (achievementRate >= 100) return { text: 'Phenomenal job! You have surpassed your target quota for this month! 🏆', type: 'success' };
     if (achievementRate >= 75) return { text: 'Excellent progress! You are close to hitting your monthly goal. Just a few more calls!', type: 'success' };
-    if (achievementRate >= 40) return { text: 'Steady achievements. Focus on active negotiations to close outstanding deals.', type: 'warning' };
-    return { text: 'Increase call volume and follow up on pending proposals to push conversions forward.', type: 'danger' };
+    if (achievementRate >= 40) return { text: 'Steady achievements. Focus on scheduling and completing meetings to close outstanding deals.', type: 'warning' };
+    return { text: 'Increase call volume and follow up on contacted leads to push conversions forward.', type: 'danger' };
   };
   const analysis = salesAnalysis();
 
@@ -340,7 +339,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         {/* Personal Target */}
         <Card className="relative overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Monthly Target Progress</span>
+            <span className="text-sm font-medium text-muted-foreground">Monthly Meetings Progress</span>
             <TrendingUp className="size-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
@@ -352,7 +351,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
               />
             </div>
             <p className="text-[10px] text-muted-foreground mt-2 font-semibold">
-              {formatCurrency(currentRevenue)} / {formatCurrency(targetAmount)}
+              {currentMeetingsDone} / {targetAmount} meetings
             </p>
           </CardContent>
         </Card>
@@ -373,18 +372,18 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           </CardContent>
         </Card>
 
-        {/* Active Negotiations */}
+        {/* Meetings Completed */}
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Active Negotiations</span>
-            <Phone className="size-4 text-amber-500" />
+            <span className="text-sm font-medium text-muted-foreground">Meetings Completed</span>
+            <Calendar className="size-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-amber-600">
-              {data?.achievements?.totalDealsNegotiating || 0}
+              {data?.achievements?.totalMeetingsDone || 0}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-              Warm leads in discussion
+              Leads with completed meetings
             </p>
           </CardContent>
         </Card>
@@ -544,7 +543,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground/50 italic py-2 pl-2">
-                            No follow-up calls or negotiation log notes have been registered for this prospect.
+                            No follow-up calls or meeting notes have been registered for this prospect.
                           </p>
                         )}
                       </div>
@@ -559,7 +558,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                 <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📞</div>
                 <h3 className="font-semibold text-base mb-1">Your Phone List is Empty</h3>
                 <p className="text-xs text-muted-foreground max-w-sm mb-4">
-                  Upload new prospective deals and keep calling prospects to start deal negotiations.
+                  Upload new prospective deals and keep calling prospects to schedule meetings.
                 </p>
                 {!salesRepId && (
                   <Button onClick={handleOpenAddLead} size="sm">
@@ -718,7 +717,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                     <SelectContent>
                       <SelectItem value="new_lead">🌱 New Lead (Not Called Yet)</SelectItem>
                       <SelectItem value="contacted">📞 Contacted (Called)</SelectItem>
-                      <SelectItem value="negotiation">🤝 Negotiation Started</SelectItem>
+                      <SelectItem value="meeting_scheduled">📅 Meeting Scheduled</SelectItem>
+                      <SelectItem value="meeting_done">🤝 Meeting Done</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -792,7 +792,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
             <Label htmlFor="call-notes">Private Comments / Follow-up Notes</Label>
             <Textarea
               id="call-notes"
-              placeholder="Type comments about call outcome, negotiations, requirements, or thoughts on the deal..."
+              placeholder="Type comments about call outcome, meetings, requirements, or thoughts on the deal..."
               value={callForm.notes}
               onChange={e => setCallForm(p => ({ ...p, notes: e.target.value }))}
               rows={4}

@@ -333,16 +333,15 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                 />
               </div>
               <div className="flex-1 w-full space-y-1.5">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Quota Amount ($)</label>
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Meetings</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
                   <Input
                     type="number"
                     min="0"
-                    placeholder="e.g. 10000"
+                    placeholder="e.g. 15"
                     value={salesTarget}
                     onChange={e => setSalesTarget(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="pl-6 h-9 text-xs"
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>

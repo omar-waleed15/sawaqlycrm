@@ -82,14 +82,14 @@ router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, 
     const activeLeads = (clients || []).filter(c => !['won', 'lost'].includes(c.pipeline_stage));
     const historicalDeals = (clients || []).filter(c => ['won', 'lost'].includes(c.pipeline_stage));
     const totalDealsWon = (clients || []).filter(c => c.pipeline_stage === 'won').length;
-    const totalDealsNegotiating = (clients || []).filter(c => c.pipeline_stage === 'negotiation').length;
+    const totalMeetingsDone = (clients || []).filter(c => c.pipeline_stage === 'meeting_done').length;
 
     res.json({
       target: targetData || null,
       achievements: {
         mrr: Math.round(mrr * 100) / 100,
         totalDealsWon,
-        totalDealsNegotiating,
+        totalMeetingsDone,
         collectedRevenue: Math.round(collectedRevenue * 100) / 100,
       },
       phoneList: activeLeads,
