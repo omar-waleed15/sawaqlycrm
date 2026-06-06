@@ -828,81 +828,83 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           {/* STEP 1: Contract details */}
           {closeWonStep === 1 && (
             <div className="flex flex-col gap-4 py-1">
-              <div className="bg-green-50/50 border border-green-100 p-3 rounded-lg text-xs font-medium text-green-950">
-                🎉 Congratulations! Let&apos;s finalize the contract details. The client will be logged in the client manager automatically.
-              </div>
+              <div className="max-h-[50vh] overflow-y-auto pr-1.5 flex flex-col gap-4 py-1">
+                <div className="bg-green-50/50 border border-green-100 p-3 rounded-lg text-xs font-medium text-green-950">
+                  🎉 Congratulations! Let&apos;s finalize the contract details. The client will be logged in the client manager automatically.
+                </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="won-contract-name">Contract Name *</Label>
-                <Input
-                  id="won-contract-name"
-                  placeholder="e.g. Monthly Content Marketing Contract"
-                  value={closeWonForm.contractName}
-                  onChange={e => setCloseWonForm(p => ({ ...p, contractName: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="won-amount">Deal Value ($) *</Label>
+                  <Label htmlFor="won-contract-name">Contract Name *</Label>
                   <Input
-                    id="won-amount"
-                    type="number"
-                    placeholder="e.g. 5000"
-                    value={closeWonForm.amount}
-                    onChange={e => setCloseWonForm(p => ({ ...p, amount: e.target.value }))}
+                    id="won-contract-name"
+                    placeholder="e.g. Monthly Content Marketing Contract"
+                    value={closeWonForm.contractName}
+                    onChange={e => setCloseWonForm(p => ({ ...p, contractName: e.target.value }))}
                     required
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="won-billing">Billing Type</Label>
-                  <Select
-                    value={closeWonForm.is_recurring ? 'recurring' : 'one_time'}
-                    onValueChange={v => setCloseWonForm(p => ({ ...p, is_recurring: v === 'recurring' }))}
-                  >
-                    <SelectTrigger id="won-billing">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="recurring">🔁 Recurring Revenue</SelectItem>
-                      <SelectItem value="one_time">💰 One-Time / Single Pay</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {closeWonForm.is_recurring && (
-                <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="won-cycle">Billing Cycle</Label>
+                    <Label htmlFor="won-amount">Deal Value ($) *</Label>
+                    <Input
+                      id="won-amount"
+                      type="number"
+                      placeholder="e.g. 5000"
+                      value={closeWonForm.amount}
+                      onChange={e => setCloseWonForm(p => ({ ...p, amount: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="won-billing">Billing Type</Label>
                     <Select
-                      value={closeWonForm.billing_cycle}
-                      onValueChange={v => setCloseWonForm(p => ({ ...p, billing_cycle: v || 'monthly' }))}
+                      value={closeWonForm.is_recurring ? 'recurring' : 'one_time'}
+                      onValueChange={v => setCloseWonForm(p => ({ ...p, is_recurring: v === 'recurring' }))}
                     >
-                      <SelectTrigger id="won-cycle">
+                      <SelectTrigger id="won-billing">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
+                        <SelectItem value="recurring">🔁 Recurring Revenue</SelectItem>
+                        <SelectItem value="one_time">💰 One-Time / Single Pay</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="won-renewal">First Renewal Date</Label>
-                    <Input
-                      id="won-renewal"
-                      type="date"
-                      value={closeWonForm.renewal_date}
-                      onChange={e => setCloseWonForm(p => ({ ...p, renewal_date: e.target.value }))}
-                    />
-                  </div>
                 </div>
-              )}
+
+                {closeWonForm.is_recurring && (
+                  <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="won-cycle">Billing Cycle</Label>
+                      <Select
+                        value={closeWonForm.billing_cycle}
+                        onValueChange={v => setCloseWonForm(p => ({ ...p, billing_cycle: v || 'monthly' }))}
+                      >
+                        <SelectTrigger id="won-cycle">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="yearly">Yearly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="won-renewal">First Renewal Date</Label>
+                      <Input
+                        id="won-renewal"
+                        type="date"
+                        value={closeWonForm.renewal_date}
+                        onChange={e => setCloseWonForm(p => ({ ...p, renewal_date: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end pt-3 border-t">
                 <Button type="button" onClick={() => setCloseWonStep(2)} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
@@ -915,176 +917,178 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           {/* STEP 2: Kickoff Task specs */}
           {closeWonStep === 2 && (
             <div className="flex flex-col gap-4 py-1">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="task-title">Kickoff Task Title *</Label>
-                <Input
-                  id="task-title"
-                  placeholder="e.g. Kickoff Content Reel"
-                  value={closeWonForm.taskTitle}
-                  onChange={e => setCloseWonForm(p => ({ ...p, taskTitle: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="task-description">Kickoff Task Description</Label>
-                <Textarea
-                  id="task-description"
-                  placeholder="Add content outline or instructions for the creative team to begin production..."
-                  value={closeWonForm.taskDescription}
-                  onChange={e => setCloseWonForm(p => ({ ...p, taskDescription: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="max-h-[50vh] overflow-y-auto pr-1.5 flex flex-col gap-4 py-1">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-priority">Task Priority</Label>
-                  <Select
-                    value={closeWonForm.taskPriority}
-                    onValueChange={v => setCloseWonForm(p => ({ ...p, taskPriority: v || 'medium' }))}
-                  >
-                    <SelectTrigger id="task-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">🟢 Low</SelectItem>
-                      <SelectItem value="medium">🟡 Medium</SelectItem>
-                      <SelectItem value="high">🟠 High</SelectItem>
-                      <SelectItem value="urgent">🔴 Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-due">Task Deadline *</Label>
+                  <Label htmlFor="task-title">Kickoff Task Title *</Label>
                   <Input
-                    id="task-due"
-                    type="date"
-                    value={closeWonForm.taskDueDate}
-                    onChange={e => setCloseWonForm(p => ({ ...p, taskDueDate: e.target.value }))}
+                    id="task-title"
+                    placeholder="e.g. Kickoff Content Reel"
+                    value={closeWonForm.taskTitle}
+                    onChange={e => setCloseWonForm(p => ({ ...p, taskTitle: e.target.value }))}
                     required
                   />
                 </div>
-              </div>
 
-              {/* Content Assets */}
-              <div className="border-t border-border pt-4">
-                <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">🎥 Content Assets & Details</h4>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="task-description">Kickoff Task Description</Label>
+                  <Textarea
+                    id="task-description"
+                    placeholder="Add content outline or instructions for the creative team to begin production..."
+                    value={closeWonForm.taskDescription}
+                    onChange={e => setCloseWonForm(p => ({ ...p, taskDescription: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="task-content-type">Content Type</Label>
+                    <Label htmlFor="task-priority">Task Priority</Label>
                     <Select
-                      value={closeWonForm.taskContentType}
-                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskContentType: v || 'other' }))}
+                      value={closeWonForm.taskPriority}
+                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskPriority: v || 'medium' }))}
                     >
-                      <SelectTrigger id="task-content-type">
-                        <SelectValue placeholder="— Select Content Type —" />
+                      <SelectTrigger id="task-priority">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="post">Post</SelectItem>
-                        <SelectItem value="story">Story</SelectItem>
-                        <SelectItem value="reel">Reel</SelectItem>
-                        <SelectItem value="photos">Photos</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="low">🟢 Low</SelectItem>
+                        <SelectItem value="medium">🟡 Medium</SelectItem>
+                        <SelectItem value="high">🟠 High</SelectItem>
+                        <SelectItem value="urgent">🔴 Urgent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="task-drive-link">Google Drive Link</Label>
+                    <Label htmlFor="task-due">Task Deadline *</Label>
                     <Input
-                      id="task-drive-link"
-                      type="url"
-                      placeholder="https://drive.google.com/..."
-                      value={closeWonForm.taskDriveLink}
-                      onChange={e => setCloseWonForm(p => ({ ...p, taskDriveLink: e.target.value }))}
+                      id="task-due"
+                      type="date"
+                      value={closeWonForm.taskDueDate}
+                      onChange={e => setCloseWonForm(p => ({ ...p, taskDueDate: e.target.value }))}
+                      required
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5 mt-3">
-                  <Label htmlFor="task-content-desc">Content Details</Label>
-                  <Textarea
-                    id="task-content-desc"
-                    placeholder="Specify caption, hashtags, sizing, or reference guidelines..."
-                    value={closeWonForm.taskContentDescription}
-                    onChange={e => setCloseWonForm(p => ({ ...p, taskContentDescription: e.target.value }))}
-                    rows={2}
-                  />
-                </div>
-              </div>
-
-              {/* Project & Assignees */}
-              <div className="border-t border-border pt-4 flex flex-col gap-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">📂 Project Link & Assignees</h4>
-                
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-project-id">Link to Project</Label>
-                  <Select
-                    value={closeWonForm.taskProjectId || 'new'}
-                    onValueChange={v => setCloseWonForm(p => ({ ...p, taskProjectId: v || 'new' }))}
-                  >
-                    <SelectTrigger id="task-project-id">
-                      <SelectValue placeholder="🆕 Auto-create New Project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">🆕 Auto-create New Project</SelectItem>
-                      {projects.filter(p => p.client_id === selectedLead?.id).map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          📂 {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="mb-1 block">👥 Assign To</Label>
-                  {closeWonForm.taskAssigneeIds.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {closeWonForm.taskAssigneeIds.map(uid => {
-                        const m = members.find(u => u.id === uid);
-                        if (!m) return null;
-                        return (
-                          <Badge
-                            key={uid}
-                            variant="secondary"
-                            className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
-                          >
-                            <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
-                              {getInitials(m.name)}
-                            </div>
-                            {m.name}
-                            <button
-                              type="button"
-                              onClick={() => removeAssignee(uid)}
-                              className="ml-1 hover:text-destructive transition-colors"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
+                {/* Content Assets */}
+                <div className="border-t border-border pt-4">
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">🎥 Content Assets & Details</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="task-content-type">Content Type</Label>
+                      <Select
+                        value={closeWonForm.taskContentType}
+                        onValueChange={v => setCloseWonForm(p => ({ ...p, taskContentType: v || 'other' }))}
+                      >
+                        <SelectTrigger id="task-content-type">
+                          <SelectValue placeholder="— Select Content Type —" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="post">Post</SelectItem>
+                          <SelectItem value="story">Story</SelectItem>
+                          <SelectItem value="reel">Reel</SelectItem>
+                          <SelectItem value="photos">Photos</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
 
-                  <div className="flex gap-2">
-                    <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="— Select a member to add —" />
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="task-drive-link">Google Drive Link</Label>
+                      <Input
+                        id="task-drive-link"
+                        type="url"
+                        placeholder="https://drive.google.com/..."
+                        value={closeWonForm.taskDriveLink}
+                        onChange={e => setCloseWonForm(p => ({ ...p, taskDriveLink: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 mt-3">
+                    <Label htmlFor="task-content-desc">Content Details</Label>
+                    <Textarea
+                      id="task-content-desc"
+                      placeholder="Specify caption, hashtags, sizing, or reference guidelines..."
+                      value={closeWonForm.taskContentDescription}
+                      onChange={e => setCloseWonForm(p => ({ ...p, taskContentDescription: e.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+
+                {/* Project & Assignees */}
+                <div className="border-t border-border pt-4 flex flex-col gap-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">📂 Project Link & Assignees</h4>
+                  
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="task-project-id">Link to Project</Label>
+                    <Select
+                      value={closeWonForm.taskProjectId || 'new'}
+                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskProjectId: v || 'new' }))}
+                    >
+                      <SelectTrigger id="task-project-id">
+                        <SelectValue placeholder="🆕 Auto-create New Project" />
                       </SelectTrigger>
                       <SelectContent>
-                        {unassignedMembers.map(m => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name} ({m.role})
+                        <SelectItem value="new">🆕 Auto-create New Project</SelectItem>
+                        {projects.filter(p => p.client_id === selectedLead?.id).map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            📂 {p.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
-                      <Plus className="size-4" /> Add
-                    </Button>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label className="mb-1 block">👥 Assign To</Label>
+                    {closeWonForm.taskAssigneeIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {closeWonForm.taskAssigneeIds.map(uid => {
+                          const m = members.find(u => u.id === uid);
+                          if (!m) return null;
+                          return (
+                            <Badge
+                              key={uid}
+                              variant="secondary"
+                              className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
+                            >
+                              <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                                {getInitials(m.name)}
+                              </div>
+                              {m.name}
+                              <button
+                                type="button"
+                                onClick={() => removeAssignee(uid)}
+                                className="ml-1 hover:text-destructive transition-colors"
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="— Select a member to add —" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unassignedMembers.map(m => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name} ({m.role})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
+                        <Plus className="size-4" /> Add
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
