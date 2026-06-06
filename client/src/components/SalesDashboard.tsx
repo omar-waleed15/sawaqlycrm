@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { salesApi, attachmentsApi } from '@/lib/api';
-import { SalesDashboardData, Client, SalesCallLog } from '@/types';
+import { salesApi, attachmentsApi, usersApi, projectsApi } from '@/lib/api';
+import { SalesDashboardData, Client, SalesCallLog, User, Project } from '@/types';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,8 +103,35 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     taskDueDate: '',
     taskContentType: 'reel',
     taskContentDescription: '',
+    taskDriveLink: '',
+    taskProjectId: '',
+    taskAssigneeIds: [] as string[],
   });
-  const [reelFile, setReelFile] = useState<File | null>(null);
+
+  const [assigneePickerId, setAssigneePickerId] = useState('');
+  const [members, setMembers] = useState<User[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  const addAssignee = () => {
+    if (!assigneePickerId) return;
+    setCloseWonForm(p => {
+      if (p.taskAssigneeIds.includes(assigneePickerId)) return p;
+      return { ...p, taskAssigneeIds: [...p.taskAssigneeIds, assigneePickerId] };
+    });
+    setAssigneePickerId('');
+  };
+
+  const removeAssignee = (uid: string) => {
+    setCloseWonForm(p => ({
+      ...p,
+      taskAssigneeIds: p.taskAssigneeIds.filter(id => id !== uid)
+    }));
+  };
+
+  const getInitials = (nameStr: string) =>
+    nameStr.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const unassignedMembers = members.filter(m => !closeWonForm.taskAssigneeIds.includes(m.id));
 
   const fetchDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -120,6 +147,14 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
 
   useEffect(() => {
     fetchDashboard();
+    
+    usersApi.list()
+      .then(res => setMembers(res.users || []))
+      .catch(err => console.error('Failed to load team members:', err));
+      
+    projectsApi.list()
+      .then(res => setProjects(res.projects || []))
+      .catch(err => console.error('Failed to load projects:', err));
   }, [fetchDashboard]);
 
   const toggleLeadExpanded = (leadId: string) => {
@@ -209,7 +244,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         contractName: `${selectedLead.company || selectedLead.name} - Contract`,
         taskDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       }));
-      setReelFile(null);
       setErrorMsg('');
       setCloseWonModalOpen(true);
       return;
@@ -257,20 +291,13 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           dueDate: closeWonForm.taskDueDate || undefined,
           contentType: closeWonForm.taskContentType || undefined,
           contentDescription: closeWonForm.taskContentDescription || undefined,
+          driveLink: closeWonForm.taskDriveLink || undefined,
+          projectId: closeWonForm.taskProjectId === 'new' ? undefined : closeWonForm.taskProjectId || undefined,
+          assigneeIds: closeWonForm.taskAssigneeIds.length > 0 ? closeWonForm.taskAssigneeIds : undefined,
         }];
       }
 
-      const res = await salesApi.closeWon(selectedLead.id, payload);
-
-      // 2. Upload reel/file if selected
-      if (reelFile && res.tasks && res.tasks.length > 0) {
-        const createdTaskId = res.tasks[0].id;
-        try {
-          await attachmentsApi.upload(createdTaskId, reelFile);
-        } catch (uploadErr) {
-          console.error('Failed to upload kickoff reel attachment:', uploadErr);
-        }
-      }
+      await salesApi.closeWon(selectedLead.id, payload);
 
       setCloseWonModalOpen(false);
       setSelectedLead(null);
@@ -796,8 +823,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
             <span className={closeWonStep === 1 ? 'text-indigo-600' : ''}>1. Contract Spec</span>
             <ArrowRight className="size-3" />
             <span className={closeWonStep === 2 ? 'text-indigo-600' : ''}>2. Setup Task</span>
-            <ArrowRight className="size-3" />
-            <span className={closeWonStep === 3 ? 'text-indigo-600' : ''}>3. Upload Reel</span>
           </div>
 
           {/* STEP 1: Contract details */}
@@ -943,48 +968,129 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                 </div>
               </div>
 
-              <div className="flex justify-between pt-3 border-t">
-                <Button type="button" variant="outline" onClick={() => setCloseWonStep(1)}>Back</Button>
-                <Button type="button" onClick={() => setCloseWonStep(3)} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-                  Next Step <ArrowRight className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Upload Reel */}
-          {closeWonStep === 3 && (
-            <div className="flex flex-col gap-4 py-1">
-              <div className="flex flex-col gap-1.5">
-                <Label>Upload First Content Reel (Video / Media File)</Label>
-                <div className="border-2 border-dashed border-border rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2 hover:bg-muted/10 transition-colors relative">
-                  <Upload className="size-8 text-muted-foreground animate-bounce-slow" />
-                  <div className="text-xs font-bold text-foreground">
-                    {reelFile ? reelFile.name : 'Choose a Video file to upload'}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {reelFile ? `${(reelFile.size / (1024 * 1024)).toFixed(2)} MB` : 'MP4, MOV, or other media (Max 20MB)'}
-                  </div>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={e => setReelFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  {reelFile && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setReelFile(null); }}
-                      className="absolute top-2 right-2 text-muted-foreground hover:text-rose-500 bg-card border rounded-full p-1"
+              {/* Content Assets */}
+              <div className="border-t border-border pt-4">
+                <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">🎥 Content Assets & Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="task-content-type">Content Type</Label>
+                    <Select
+                      value={closeWonForm.taskContentType}
+                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskContentType: v || 'other' }))}
                     >
-                      <X className="size-3" />
-                    </button>
-                  )}
+                      <SelectTrigger id="task-content-type">
+                        <SelectValue placeholder="— Select Content Type —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="post">Post</SelectItem>
+                        <SelectItem value="story">Story</SelectItem>
+                        <SelectItem value="reel">Reel</SelectItem>
+                        <SelectItem value="photos">Photos</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="task-drive-link">Google Drive Link</Label>
+                    <Input
+                      id="task-drive-link"
+                      type="url"
+                      placeholder="https://drive.google.com/..."
+                      value={closeWonForm.taskDriveLink}
+                      onChange={e => setCloseWonForm(p => ({ ...p, taskDriveLink: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 mt-3">
+                  <Label htmlFor="task-content-desc">Content Details</Label>
+                  <Textarea
+                    id="task-content-desc"
+                    placeholder="Specify caption, hashtags, sizing, or reference guidelines..."
+                    value={closeWonForm.taskContentDescription}
+                    onChange={e => setCloseWonForm(p => ({ ...p, taskContentDescription: e.target.value }))}
+                    rows={2}
+                  />
                 </div>
               </div>
 
-              <div className="flex justify-between pt-3 border-t">
-                <Button type="button" variant="outline" onClick={() => setCloseWonStep(2)} disabled={submitting}>Back</Button>
+              {/* Project & Assignees */}
+              <div className="border-t border-border pt-4 flex flex-col gap-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">📂 Project Link & Assignees</h4>
+                
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="task-project-id">Link to Project</Label>
+                  <Select
+                    value={closeWonForm.taskProjectId || 'new'}
+                    onValueChange={v => setCloseWonForm(p => ({ ...p, taskProjectId: v || 'new' }))}
+                  >
+                    <SelectTrigger id="task-project-id">
+                      <SelectValue placeholder="🆕 Auto-create New Project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">🆕 Auto-create New Project</SelectItem>
+                      {projects.filter(p => p.client_id === selectedLead?.id).map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          📂 {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="mb-1 block">👥 Assign To</Label>
+                  {closeWonForm.taskAssigneeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {closeWonForm.taskAssigneeIds.map(uid => {
+                        const m = members.find(u => u.id === uid);
+                        if (!m) return null;
+                        return (
+                          <Badge
+                            key={uid}
+                            variant="secondary"
+                            className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
+                          >
+                            <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                              {getInitials(m.name)}
+                            </div>
+                            {m.name}
+                            <button
+                              type="button"
+                              onClick={() => removeAssignee(uid)}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="— Select a member to add —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unassignedMembers.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name} ({m.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
+                      <Plus className="size-4" /> Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-3 border-t mt-2">
+                <Button type="button" variant="outline" onClick={() => setCloseWonStep(1)} disabled={submitting}>Back</Button>
                 <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
                   {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
                   🚀 Complete Close Won

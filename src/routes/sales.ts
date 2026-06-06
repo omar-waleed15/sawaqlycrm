@@ -391,6 +391,8 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
             due_date: t.dueDate || null,
             content_type: t.contentType || null,
             content_description: t.contentDescription || null,
+            drive_link: t.driveLink || null,
+            project_id: t.projectId || project.id,
             creator_id: salesRepId,
             client_id: leadId,
           })
@@ -398,10 +400,15 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
           .single();
 
         if (!taskErr && task) {
-          // Add default assignee to the task assignees (reps can assign themselves or leave unassigned)
-          await supabaseAdmin
-            .from('task_assignees')
-            .insert({ task_id: task.id, user_id: salesRepId, status: 'todo' });
+          const assigneesToInsert = (Array.isArray(t.assigneeIds) && t.assigneeIds.length > 0)
+            ? t.assigneeIds
+            : [salesRepId];
+
+          for (const uid of assigneesToInsert) {
+            await supabaseAdmin
+              .from('task_assignees')
+              .insert({ task_id: task.id, user_id: uid, status: 'todo' });
+          }
 
           createdTasks.push(task);
         }
