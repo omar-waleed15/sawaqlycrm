@@ -6,7 +6,7 @@ const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const router = (0, express_1.Router)();
 // GET /api/projects — List all projects (with client details)
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (_req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (_req, res) => {
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('projects')
@@ -26,7 +26,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (_req, re
     }
 });
 // POST /api/projects — Create a new project
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
     const { client_id, name, description, status, budget, start_date, end_date } = req.body;
     if (!name || !client_id) {
         res.status(400).json({ error: 'Project name and Client are required' });
@@ -70,7 +70,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, re
     }
 });
 // PUT /api/projects/:id — Update a project
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
     const { id } = req.params;
     const { client_id, name, description, status, budget, start_date, end_date } = req.body;
     try {
@@ -119,7 +119,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, 
     }
 });
 // DELETE /api/projects/:id — Delete a project
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
     const { id } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin

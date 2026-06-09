@@ -29,7 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Trash2
+  Trash2,
+  Target
 } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
@@ -41,11 +42,11 @@ function formatCurrency(amount: number): string {
 }
 
 const OUTCOMES = [
-  { value: 'contacted', label: '📞 Contacted' },
-  { value: 'meeting_scheduled', label: '📅 Meeting Scheduled' },
-  { value: 'meeting_done', label: '🤝 Meeting Done' },
-  { value: 'won', label: '🏆 Won (Close Deal)' },
-  { value: 'lost', label: '❌ Lost' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'meeting_scheduled', label: 'Meeting Scheduled' },
+  { value: 'meeting_done', label: 'Meeting Done' },
+  { value: 'won', label: 'Won (Close Deal)' },
+  { value: 'lost', label: 'Lost' },
 ];
 
 const PIPELINE_STAGE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -109,6 +110,55 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   const [assigneePickerId, setAssigneePickerId] = useState('');
   const [members, setMembers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Target quota configuration states
+  const [salesTarget, setSalesTarget] = useState<number | ''>('');
+  const [targetMonth, setTargetMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
+  const [fetchingTarget, setFetchingTarget] = useState(false);
+  const [savingTarget, setSavingTarget] = useState(false);
+  const [targetMessage, setTargetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchTarget = useCallback(async (mId: string, month: string) => {
+    setFetchingTarget(true);
+    try {
+      const res = await salesApi.getTarget(mId, month);
+      if (res.target) {
+        setSalesTarget(res.target.target_amount);
+      } else {
+        setSalesTarget('');
+      }
+    } catch (err) {
+      console.error('Failed to fetch sales target:', err);
+    } finally {
+      setFetchingTarget(false);
+    }
+  }, []);
+
+  const handleSaveTarget = async () => {
+    if (!salesRepId) return;
+    setSavingTarget(true);
+    setTargetMessage(null);
+    try {
+      const amount = salesTarget === '' ? 0 : Number(salesTarget);
+      await salesApi.setTarget(salesRepId, targetMonth, amount);
+      setTargetMessage({ type: 'success', text: 'Target updated successfully!' });
+      setTimeout(() => setTargetMessage(null), 3000);
+      fetchDashboard(true);
+    } catch (err: any) {
+      setTargetMessage({ type: 'error', text: err.message || 'Failed to update target' });
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
+  useEffect(() => {
+    if (salesRepId) {
+      fetchTarget(salesRepId, targetMonth);
+    }
+  }, [salesRepId, targetMonth, fetchTarget]);
 
   const addAssignee = () => {
     if (!assigneePickerId) return;
@@ -325,7 +375,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   // Performance Analysis insights
   const salesAnalysis = () => {
     if (targetAmount === 0) return { text: 'No sales meetings target set for this month yet.', type: 'info' };
-    if (achievementRate >= 100) return { text: 'Phenomenal job! You have surpassed your target quota for this month! 🏆', type: 'success' };
+    if (achievementRate >= 100) return { text: 'Phenomenal job! You have surpassed your target quota for this month!', type: 'success' };
     if (achievementRate >= 75) return { text: 'Excellent progress! You are close to hitting your monthly goal. Just a few more calls!', type: 'success' };
     if (achievementRate >= 40) return { text: 'Steady achievements. Focus on scheduling and completing meetings to close outstanding deals.', type: 'warning' };
     return { text: 'Increase call volume and follow up on contacted leads to push conversions forward.', type: 'danger' };
@@ -340,13 +390,12 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         <Card className="relative overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <span className="text-sm font-medium text-muted-foreground">Monthly Meetings Progress</span>
-            <TrendingUp className="size-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold">{achievementRate}%</div>
+            <div className="text-2xl font-extrabold text-foreground">{achievementRate}%</div>
             <div className="w-full bg-muted rounded-full h-1.5 mt-2">
               <div 
-                className={`h-full rounded-full ${achievementRate >= 75 ? 'bg-green-500' : achievementRate >= 40 ? 'bg-yellow-500' : 'bg-rose-500'}`} 
+                className="h-full rounded-full bg-indigo-600" 
                 style={{ width: `${Math.min(achievementRate, 100)}%` }} 
               />
             </div>
@@ -360,10 +409,9 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <span className="text-sm font-medium text-muted-foreground">Personal Closed Revenue</span>
-            <DollarSign className="size-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-green-600">
+            <div className="text-2xl font-extrabold text-foreground">
               {formatCurrency(currentRevenue)}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
@@ -376,10 +424,9 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <span className="text-sm font-medium text-muted-foreground">Meetings Completed</span>
-            <Calendar className="size-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-amber-600">
+            <div className="text-2xl font-extrabold text-foreground">
               {data?.achievements?.totalMeetingsDone || 0}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
@@ -392,10 +439,9 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <span className="text-sm font-medium text-muted-foreground">Closed Deals Won</span>
-            <CheckCircle2 className="size-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-extrabold text-purple-600">
+            <div className="text-2xl font-extrabold text-foreground">
               {data?.achievements?.totalDealsWon || 0}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
@@ -405,29 +451,95 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         </Card>
       </div>
 
-      {/* ── Quota Goal Intelligence Card ─────────────────────────────────────── */}
-      <Card className="border bg-indigo-50/15 dark:bg-indigo-950/5 relative overflow-hidden">
-        <div className="absolute right-[-10px] bottom-[-15px] opacity-[0.05] text-[90px] select-none pointer-events-none">💡</div>
-        <CardContent className="pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg shrink-0 ${
-              analysis.type === 'success' ? 'bg-green-50 text-green-600 dark:bg-green-950/20' : 
-              analysis.type === 'warning' ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/20'
-            }`}>
-              <Sparkles className="size-5" />
-            </div>
+      {/* ── Quota Goal / Target Setup Card ─────────────────────────────────────── */}
+      {salesRepId ? (
+        <Card className="border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Intelligence</h4>
-              <p className="text-xs font-semibold mt-0.5 leading-relaxed">{analysis.text}</p>
+              <h3 className="text-sm font-bold tracking-tight">Sales Performance Target</h3>
+              <p className="text-[11px] text-muted-foreground">Configure monthly sales target quotas for this representative.</p>
             </div>
-          </div>
-          {!salesRepId && (
-            <Button onClick={handleOpenAddLead} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shrink-0">
-              <Plus className="size-4" /> Upload Prospective Deal
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="pt-0 pb-5 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row items-end gap-4 max-w-2xl">
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Month</label>
+                <Input
+                  type="month"
+                  value={targetMonth}
+                  onChange={e => setTargetMonth(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Meetings</label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 15"
+                    value={salesTarget}
+                    onChange={e => setSalesTarget(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 w-full sm:w-auto">
+                <Button
+                  onClick={handleSaveTarget}
+                  disabled={savingTarget || fetchingTarget}
+                  className="w-full sm:w-auto h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                >
+                  {savingTarget ? (
+                    <span className="flex items-center gap-1.5 justify-center">
+                      <Loader2 className="size-3 animate-spin" /> Saving...
+                    </span>
+                  ) : 'Update Target'}
+                </Button>
+              </div>
+            </div>
+
+            {fetchingTarget && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 animate-pulse">
+                <Loader2 className="size-3 animate-spin text-indigo-500" /> Loading monthly quota data...
+              </div>
+            )}
+
+            {targetMessage && (
+              <div className={`mt-3 text-xs p-2.5 rounded-lg border ${
+                targetMessage.type === 'success' 
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400' 
+                  : 'bg-rose-50 border-rose-100 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400'
+              }`}>
+                {targetMessage.text}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border bg-indigo-50/15 dark:bg-indigo-950/5 relative overflow-hidden">
+          <div className="absolute right-[-10px] bottom-[-15px] opacity-[0.05] text-[90px] select-none pointer-events-none">💡</div>
+          <CardContent className="pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg shrink-0 ${
+                analysis.type === 'success' ? 'bg-green-50 text-green-600 dark:bg-green-950/20' : 
+                analysis.type === 'warning' ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/20'
+              }`}>
+                <Sparkles className="size-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Intelligence</h4>
+                <p className="text-xs font-semibold mt-0.5 leading-relaxed">{analysis.text}</p>
+              </div>
+            </div>
+            {!salesRepId && (
+              <Button onClick={handleOpenAddLead} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shrink-0">
+                <Plus className="size-4" /> Upload Prospective Deal
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Tabs & Lead Management Lists ──────────────────────────────────────── */}
       <div className="space-y-4">
@@ -438,7 +550,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
               activeTab === 'leads' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            📞 Phone List & Active Deals ({data?.phoneList?.length || 0})
+            Phone List & Active Deals ({data?.phoneList?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('closed')}
@@ -446,7 +558,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
               activeTab === 'closed' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            🏆 History & Achievements ({data?.historicalDeals?.length || 0})
+            History & Achievements ({data?.historicalDeals?.length || 0})
           </button>
         </div>
 
@@ -468,7 +580,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           <h3 className="font-bold text-sm text-foreground truncate max-w-[200px]">{lead.name}</h3>
                           {lead.company && (
                             <span className="text-[10px] font-bold text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
-                              🏢 {lead.company}
+                              {lead.company}
                             </span>
                           )}
                           <Badge variant="outline" className={`text-[9px] py-0.5 font-bold uppercase ${stageCfg.bg} ${stageCfg.color}`}>
@@ -482,7 +594,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           {lead.email && <span>• {lead.email}</span>}
                           {lead.meeting_date && (
                             <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/20 px-2 py-0.5 rounded text-[10px]">
-                              📅 Meeting: {new Date(lead.meeting_date).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                              Meeting: {new Date(lead.meeting_date).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
                             </span>
                           )}
                         </div>
@@ -555,7 +667,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           ) : (
             <Card className="border-dashed py-14 text-center">
               <CardContent className="flex flex-col items-center">
-                <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📞</div>
+                <div className="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-3"><Phone className="size-6" /></div>
                 <h3 className="font-semibold text-base mb-1">Your Phone List is Empty</h3>
                 <p className="text-xs text-muted-foreground max-w-sm mb-4">
                   Upload new prospective deals and keep calling prospects to schedule meetings.
@@ -584,7 +696,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           <h3 className="font-bold text-sm text-foreground">{lead.name}</h3>
                           {lead.company && (
                             <span className="text-[10px] font-bold text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
-                              🏢 {lead.company}
+                              {lead.company}
                             </span>
                           )}
                           <Badge variant="outline" className={`text-[9px] py-0.5 font-bold uppercase ${stageCfg.bg} ${stageCfg.color}`}>
@@ -615,7 +727,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           ) : (
             <Card className="border-dashed py-14 text-center">
               <CardContent className="flex flex-col items-center">
-                <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">🏆</div>
+                <div className="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-3"><CheckCircle2 className="size-6" /></div>
                 <h3 className="font-semibold text-base mb-1">No Historical Deals</h3>
                 <p className="text-xs text-muted-foreground max-w-sm">
                   Deals you close as Won or Lost will show up in this history sheet. Start calling to win deals!
@@ -627,7 +739,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       </div>
 
       {/* ── Modal: Add Prospective Lead ─────────────────────────────────────── */}
-      <Modal isOpen={leadModalOpen} onClose={() => setLeadModalOpen(false)} title="🌱 Add Prospective Deals" maxWidth={768}>
+      <Modal isOpen={leadModalOpen} onClose={() => setLeadModalOpen(false)} title="Add Prospective Deals" maxWidth={768}>
         <form onSubmit={handleCreateLead} className="flex flex-col gap-4">
           {errorMsg && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
@@ -715,10 +827,10 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                       <SelectValue placeholder="Select status..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="new_lead">🌱 New Lead (Not Called Yet)</SelectItem>
-                      <SelectItem value="contacted">📞 Contacted (Called)</SelectItem>
-                      <SelectItem value="meeting_scheduled">📅 Meeting Scheduled</SelectItem>
-                      <SelectItem value="meeting_done">🤝 Meeting Done</SelectItem>
+                      <SelectItem value="new_lead">New Lead (Not Called Yet)</SelectItem>
+                      <SelectItem value="contacted">Contacted (Called)</SelectItem>
+                      <SelectItem value="meeting_scheduled">Meeting Scheduled</SelectItem>
+                      <SelectItem value="meeting_done">Meeting Done</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -749,7 +861,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       </Modal>
 
       {/* ── Modal: Log Call Outcome ────────────────────────────────────────── */}
-      <Modal isOpen={callModalOpen} onClose={() => setCallModalOpen(false)} title={`📞 Log Call: ${selectedLead?.name}`}>
+      <Modal isOpen={callModalOpen} onClose={() => setCallModalOpen(false)} title={`Log Call: ${selectedLead?.name}`}>
         <form onSubmit={handleLogCall} className="flex flex-col gap-4">
           {errorMsg && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
@@ -810,7 +922,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       </Modal>
 
       {/* ── Modal: Close Won Deal Wizard ───────────────────────────────────── */}
-      <Modal isOpen={closeWonModalOpen} onClose={() => setCloseWonModalOpen(false)} title="🏆 Close Deal Won: Setup Kickoff">
+      <Modal isOpen={closeWonModalOpen} onClose={() => setCloseWonModalOpen(false)} title="Close Deal Won: Setup Kickoff">
         <form onSubmit={handleCloseWonSubmit} className="flex flex-col gap-4">
           {errorMsg && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
@@ -867,8 +979,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="recurring">🔁 Recurring Revenue</SelectItem>
-                        <SelectItem value="one_time">💰 One-Time / Single Pay</SelectItem>
+                        <SelectItem value="recurring">Recurring Revenue</SelectItem>
+                        <SelectItem value="one_time">One-Time / Single Pay</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -951,10 +1063,10 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">🟢 Low</SelectItem>
-                        <SelectItem value="medium">🟡 Medium</SelectItem>
-                        <SelectItem value="high">🟠 High</SelectItem>
-                        <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -973,7 +1085,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
 
                 {/* Content Assets */}
                 <div className="border-t border-border pt-4">
-                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">🎥 Content Assets & Details</h4>
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">Content Assets & Details</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="task-content-type">Content Type</Label>
@@ -1020,7 +1132,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
 
                 {/* Project & Assignees */}
                 <div className="border-t border-border pt-4 flex flex-col gap-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">📂 Project Link & Assignees</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project Link & Assignees</h4>
                   
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="task-project-id">Link to Project</Label>
@@ -1029,13 +1141,13 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                       onValueChange={v => setCloseWonForm(p => ({ ...p, taskProjectId: v || 'new' }))}
                     >
                       <SelectTrigger id="task-project-id">
-                        <SelectValue placeholder="🆕 Auto-create New Project" />
+                        <SelectValue placeholder="Auto-create New Project" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="new">🆕 Auto-create New Project</SelectItem>
+                        <SelectItem value="new">Auto-create New Project</SelectItem>
                         {projects.filter(p => p.client_id === selectedLead?.id).map(p => (
                           <SelectItem key={p.id} value={p.id}>
-                            📂 {p.name}
+                            {p.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1043,7 +1155,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <Label className="mb-1 block">👥 Assign To</Label>
+                    <Label className="mb-1 block">Assign To</Label>
                     {closeWonForm.taskAssigneeIds.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-2">
                         {closeWonForm.taskAssigneeIds.map(uid => {

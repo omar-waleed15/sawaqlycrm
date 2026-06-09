@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { Task, TaskAssignee } from '@/types';
-import { PriorityBadge, StatusBadge } from './Badges';
+import { PriorityBadge } from './Badges';
 import { useAuth } from '@/lib/auth';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -13,12 +13,7 @@ interface TaskCardProps {
   onScheduleClick?: (task: Task) => void;
 }
 
-const priorityAccents: Record<string, string> = {
-  urgent: 'border-l-rose-500',
-  high:   'border-l-orange-500',
-  medium: 'border-l-yellow-400',
-  low:    'border-l-green-500',
-};
+
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
@@ -44,10 +39,6 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
   const overdue = isOverdue(task.due_date, assignees);
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
-  // For members, find their own assignment status
-  const myAssignment = assignees.find(a => a.user_id === user?.id);
-
-  const completedCount = assignees.filter(a => a.status === 'completed').length;
   const submittedCount = assignees.filter(a => a.status === 'submitted').length;
   const totalAssignees = assignees.length;
 
@@ -61,101 +52,125 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
 
   return (
     <Card
-      className={cn(
-        'cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 border-l-4 slide-up',
-        priorityAccents[task.priority] || 'border-l-indigo-500'
-      )}
+      className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 slide-up"
       onClick={handleClick}
     >
-      <CardHeader className="pb-2 flex-row items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-foreground leading-snug flex-1">{task.title}</h3>
-        {/* For members: show their own status. For admins: show progress */}
-        {!isOwner && myAssignment ? (
-          <StatusBadge status={myAssignment.status} />
-        ) : totalAssignees > 0 ? (
-          <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
-            {completedCount}/{totalAssignees} done
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
-        )}
-      </CardHeader>
-
-      <CardContent className="pt-0 flex flex-col gap-3">
-        {task.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-            {task.description}
-          </p>
-        )}
-
-        {/* Submission progress for admin */}
-        {isOwner && submittedCount > 0 && (
-          <div className="bg-violet-50 border-l-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 font-semibold">
-            📤 {submittedCount} submission{submittedCount !== 1 ? 's' : ''} pending review
+      <CardContent className="p-4 flex flex-col gap-4">
+        {/* Top/Content Section */}
+        <div className="flex items-start justify-between gap-4">
+          {/* Left: Title & Description */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-foreground leading-snug break-words">
+              {task.title}
+            </h3>
+            {task.description && (
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mt-1.5 break-words">
+                {task.description}
+              </p>
+            )}
           </div>
-        )}
 
-        {/* Publish Date Badge */}
-        <div className="border-t border-dashed border-border pt-2">
-          {task.publish_date ? (
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
-              📢 Publish: {formatDate(task.publish_date)}
-            </span>
-          ) : onScheduleClick ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted border border-dashed border-border rounded px-2 py-0.5">
-              🗓️ Click to schedule
-            </span>
-          ) : null}
-          {task.publish_date && task.publish_notes && (
-            <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed mt-1">
-              📝 {task.publish_notes}
-            </p>
-          )}
+          {/* Right: Priority & Due Date */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0 select-none">
+            <div className="flex items-center gap-1.5">
+              {task.content_type && (
+                <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
+                  📦 {task.content_type}
+                </Badge>
+              )}
+              <PriorityBadge priority={task.priority} />
+            </div>
+            {task.due_date && (
+              <div className={cn('flex items-center gap-1 text-[11px] select-none shrink-0', overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground')}>
+                <span>📅</span>
+                <span>{overdue ? 'Overdue · ' : ''}{formatDate(task.due_date)}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <PriorityBadge priority={task.priority} />
-        </div>
+        {/* Secondary Widgets Section */}
+        {(isOwner && submittedCount > 0) || task.publish_date ? (
+          <div className="flex flex-col gap-2 empty:hidden">
+            {/* Submission progress for admin */}
+            {isOwner && submittedCount > 0 && (
+              <div className="bg-violet-50 dark:bg-violet-950/20 border-l-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 dark:text-violet-300 font-semibold">
+                📤 {submittedCount} submission{submittedCount !== 1 ? 's' : ''} pending review
+              </div>
+            )}
 
-        <div className="flex items-center justify-between pt-1 border-t border-border">
-          {/* Stacked avatar group */}
-          <div className="flex items-center gap-1.5">
+            {/* Publish Date Badge */}
+            {task.publish_date && (
+              <div className="flex flex-col gap-1 border-t border-dashed border-border pt-2">
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded px-2 py-0.5 w-fit">
+                  📢 Publish: {formatDate(task.publish_date)}
+                </span>
+                {task.publish_notes && (
+                  <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed mt-0.5 pl-1">
+                    📝 {task.publish_notes}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {/* Bottom/Footer Section */}
+        <div className="flex items-center justify-between pt-3 border-t border-border mt-1">
+          {/* Creator Profile */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">From:</span>
+            <span className="text-xs text-muted-foreground font-medium truncate" title={task.creator?.name || 'Unknown'}>
+              {task.creator?.name || 'Unknown'}
+            </span>
+          </div>
+
+
+          {/* Assignees stacked avatar group */}
+          <div className="flex items-center shrink-0">
             {totalAssignees > 0 ? (
               <div className="flex items-center">
-                <div className="flex -space-x-2">
+                <div className="flex -space-x-1.5">
                   {assignees.slice(0, 3).map(a => (
-                    <div
-                      key={a.id}
-                      className="size-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0 border-2 border-white"
-                      title={a.user?.name}
-                    >
-                      {a.user ? getInitials(a.user.name) : '?'}
-                    </div>
+                    a.user?.avatar_url ? (
+                      <img
+                        key={a.id}
+                        src={a.user.avatar_url}
+                        alt={a.user.name}
+                        className="size-6 rounded-full object-cover shrink-0 border-2 border-white dark:border-slate-900"
+                        title={a.user.name}
+                      />
+                    ) : (
+                      <div
+                        key={a.id}
+                        className="size-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0 border-2 border-white dark:border-slate-900 uppercase"
+                        title={a.user?.name || 'Assigned Member'}
+                      >
+                        {a.user ? getInitials(a.user.name) : '?'}
+                      </div>
+                    )
                   ))}
                 </div>
                 {totalAssignees > 3 && (
-                  <span className="text-[10px] text-muted-foreground font-semibold ml-1.5">
+                  <span className="text-[10px] text-muted-foreground font-semibold ml-1 select-none">
                     +{totalAssignees - 3}
-                  </span>
-                )}
-                {totalAssignees <= 2 && (
-                  <span className="text-xs text-muted-foreground font-medium ml-2">
-                    {assignees.map(a => a.user?.name).filter(Boolean).join(', ')}
                   </span>
                 )}
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">Unassigned</span>
+              <span className="text-xs text-muted-foreground select-none">Unassigned</span>
             )}
           </div>
-
-          {task.due_date && (
-            <div className={cn('flex items-center gap-1 text-xs', overdue ? 'text-rose-600 font-semibold' : 'text-muted-foreground')}>
-              <span>📅</span>
-              {overdue ? 'Overdue · ' : ''}{formatDate(task.due_date)}
-            </div>
-          )}
         </div>
+
+        {/* Schedule Action Button */}
+        {onScheduleClick && !task.publish_date && (
+          <div className="mt-3 pt-3 border-t border-dashed border-border">
+            <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-md py-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors">
+              🗓️ Click to schedule
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

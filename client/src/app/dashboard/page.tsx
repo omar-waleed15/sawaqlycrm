@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, clientsApi, contractsApi } from '@/lib/api';
-import { DashboardStats, Task, Client, FinanceStats } from '@/types';
+import { tasksApi, contractsApi } from '@/lib/api';
+import { DashboardStats, Task, FinanceStats } from '@/types';
 import TaskCard from '@/components/TaskCard';
 import SalesDashboard from '@/components/SalesDashboard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,19 +34,7 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-const PIPELINE_STAGES: {
-  key: Client['pipeline_stage'];
-  label: string;
-  colorClass: string;
-  dotColor: string;
-}[] = [
-  { key: 'new_lead',          label: 'New Lead',       colorClass: 'bg-slate-400', dotColor: '#94a3b8' },
-  { key: 'contacted',         label: 'Contacted',      colorClass: 'bg-blue-500', dotColor: '#3b82f6' },
-  { key: 'meeting_scheduled', label: 'Meeting Set',    colorClass: 'bg-indigo-500', dotColor: '#6366f1' },
-  { key: 'meeting_done',      label: 'Meeting Done',   colorClass: 'bg-purple-500', dotColor: '#a855f7' },
-  { key: 'won',               label: 'Won',            colorClass: 'bg-green-500', dotColor: '#10b981' },
-  { key: 'lost',              label: 'Lost',           colorClass: 'bg-rose-500', dotColor: '#f43f5e' },
-];
+// PIPELINE_STAGES removed
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -64,7 +52,6 @@ export default function DashboardPage() {
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [financeStats, setFinanceStats] = useState<FinanceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -85,26 +72,13 @@ export default function DashboardPage() {
   // Load owner/sales analytics data
   useEffect(() => {
     if (!showFinanceAndClients) { setAnalyticsLoading(false); return; }
-    Promise.all([
-      clientsApi.list(),
-      contractsApi.stats(),
-    ]).then(([clientsData, financeData]) => {
-      setClients(clientsData.clients);
+    contractsApi.stats().then((financeData) => {
       setFinanceStats(financeData.stats);
     }).catch(console.error)
       .finally(() => setAnalyticsLoading(false));
   }, [showFinanceAndClients]);
 
-  // Pipeline calculations
-  const totalClients = clients.length;
-  const wonCount = clients.filter(c => c.pipeline_stage === 'won').length;
-  const conversionRate = totalClients > 0 ? Math.round((wonCount / totalClients) * 100) : 0;
-
-  const pipelineBreakdown = PIPELINE_STAGES.map(stage => {
-    const count = clients.filter(c => c.pipeline_stage === stage.key).length;
-    const percentage = totalClients > 0 ? Math.round((count / totalClients) * 100) : 0;
-    return { ...stage, count, percentage };
-  });
+  // Pipeline calculations removed
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -183,9 +157,6 @@ export default function DashboardPage() {
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <span className="text-sm font-medium text-muted-foreground">Total Tasks</span>
-                  <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400">
-                    <ClipboardList className="size-4" />
-                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-extrabold">{stats.total}</div>
@@ -199,9 +170,6 @@ export default function DashboardPage() {
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <span className="text-sm font-medium text-muted-foreground">In Progress</span>
-                  <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400">
-                    <Zap className="size-4" />
-                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-extrabold">{stats.inProgress}</div>
@@ -215,12 +183,9 @@ export default function DashboardPage() {
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <span className="text-sm font-medium text-muted-foreground">Completed</span>
-                  <div className="p-1.5 rounded-lg bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400">
-                    <CheckCircle2 className="size-4" />
-                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-extrabold text-green-600">{stats.completed}</div>
+                  <div className="text-3xl font-extrabold text-violet-600">{stats.completed}</div>
                   <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
                     Tasks successfully delivered
                   </p>
@@ -233,13 +198,6 @@ export default function DashboardPage() {
               }`}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <span className="text-sm font-medium text-muted-foreground">Overdue Tasks</span>
-                  <div className={`p-1.5 rounded-lg ${
-                    stats.overdue > 0
-                      ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
-                    <AlertTriangle className="size-4" />
-                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className={`text-3xl font-extrabold ${stats.overdue > 0 ? 'text-rose-600' : ''}`}>
@@ -255,84 +213,14 @@ export default function DashboardPage() {
 
           {/* DETAILS SECTION */}
           {showFinanceAndClients ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="w-full">
               
-              {/* Column 1: Client Analytics */}
+              {/* Column: Finance Analytics */}
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="border-b pb-4 flex flex-row items-center justify-between gap-4">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="size-4 text-indigo-500" /> Client Pipeline
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-0.5">Conversion funnel from leads to clients</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge variant="outline" className="text-[10px] font-bold py-0.5 px-2">
-                      {totalClients} Total
-                    </Badge>
-                    <Badge variant="secondary" className="text-[10px] font-bold py-0.5 px-2 text-green-600 bg-green-50 dark:bg-green-950/25 border-green-200">
-                      {wonCount} Won
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pt-5">
-                  <div className="flex flex-col gap-2.5 mb-6">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-muted-foreground">Lead Conversion Rate</span>
-                      <span className="text-green-600 flex items-center gap-1">
-                        <TrendingUp className="size-3.5" /> {conversionRate}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-muted border rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full transition-all duration-1000"
-                        style={{ width: `${conversionRate}%` }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {totalClients > 0 ? (
-                    <div className="flex flex-col gap-3">
-                      {pipelineBreakdown.map(stage => (
-                        <div key={stage.key} className="relative flex flex-col gap-1.5 p-2 rounded-lg border bg-muted/20">
-                          {/* Inner percentage fill indicator */}
-                          <div 
-                            className={`absolute left-0 top-0 bottom-0 opacity-[0.08] rounded-l-md ${stage.colorClass}`}
-                            style={{ width: `${stage.percentage}%` }}
-                          />
-                          <div className="flex items-center justify-between text-xs font-medium z-10">
-                            <div className="flex items-center gap-2">
-                              <span 
-                                className="size-2 rounded-full shrink-0" 
-                                style={{ backgroundColor: stage.dotColor }}
-                              />
-                              <span className="font-bold text-foreground">{stage.label}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-muted-foreground text-[11px] font-bold">
-                              <span>{stage.count} account{stage.count !== 1 ? 's' : ''}</span>
-                              <Badge variant="outline" className="text-[9px] py-0 h-4">
-                                {stage.percentage}%
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-xs text-muted-foreground italic">
-                      No client relationships registered. Get started in the CRM panel.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Column 2: Finance Analytics */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="border-b pb-4 flex flex-row items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <DollarSign className="size-4 text-green-500" /> Revenue & Billing
+                      <DollarSign className="size-4 text-indigo-500" /> Revenue & Billing
                     </CardTitle>
                     <CardDescription className="text-xs mt-0.5">Recurring billing and active project stats</CardDescription>
                   </div>
@@ -345,9 +233,8 @@ export default function DashboardPage() {
                   {financeStats ? (
                     <>
                       {/* MRR Hero */}
-                      <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 text-white rounded-xl p-5 shadow-sm relative overflow-hidden">
-                        <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.06] text-[120px] select-none pointer-events-none">💰</div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">Monthly Recurring Revenue</span>
+                      <div className="bg-slate-50 dark:bg-slate-900/50 border border-border text-foreground rounded-xl p-5 shadow-sm relative overflow-hidden">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Recurring Revenue</span>
                         <div className="text-3xl font-extrabold tracking-tight mt-1">
                           {formatCurrency(financeStats.monthlyRevenue)}
                         </div>
@@ -369,7 +256,7 @@ export default function DashboardPage() {
                           <div className={`p-2 rounded-lg shrink-0 ${
                             financeStats.upcomingRenewalsCount > 0
                               ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/20 dark:text-orange-400'
-                              : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
+                              : 'bg-slate-50 text-slate-600 dark:bg-slate-900/20 dark:text-slate-400'
                           }`}>
                             {financeStats.upcomingRenewalsCount > 0 ? <Clock className="size-4 animate-spin-slow" /> : <CheckCircle2 className="size-4" />}
                           </div>
@@ -392,8 +279,8 @@ export default function DashboardPage() {
                           <Link href="/dashboard/finance" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-7 text-[11px] font-bold py-1 px-3 shrink-0")}>Review</Link>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 p-3 border border-l-4 border-l-green-500 bg-green-50/10 dark:bg-green-950/5 rounded-lg text-green-900 dark:text-green-300">
-                          <CheckCircle2 className="size-4 text-green-500 shrink-0" />
+                        <div className="flex items-center gap-2 p-3 border border-l-4 border-l-indigo-500 bg-indigo-50/10 dark:bg-indigo-950/5 rounded-lg text-indigo-900 dark:text-indigo-300">
+                          <CheckCircle2 className="size-4 text-indigo-500 shrink-0" />
                           <span className="text-xs font-medium">All accounts are fully paid and in good standing.</span>
                         </div>
                       )}
@@ -433,7 +320,7 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <div className="text-center py-10 text-xs text-muted-foreground italic">
-                      🎉 You have no urgent or high-priority tasks pending. Nice work!
+                      You have no urgent or high-priority tasks pending. Nice work!
                     </div>
                   )}
                 </CardContent>
@@ -461,7 +348,9 @@ export default function DashboardPage() {
             </div>
           ) : (
             <Card className="border-dashed py-12 text-center flex flex-col items-center justify-center">
-              <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📋</div>
+              <div className="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-3">
+                <ClipboardList className="size-6" />
+              </div>
               <h3 className="font-semibold text-base mb-1">No tasks assigned</h3>
               <p className="text-xs text-muted-foreground max-w-sm mb-4">
                 {isTaskAdmin ? 'Create your first task assignment to begin tracking work.' : 'There are currently no tasks allocated to your account.'}

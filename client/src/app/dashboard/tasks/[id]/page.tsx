@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, commentsApi, usersApi } from '@/lib/api';
+import { tasksApi, commentsApi } from '@/lib/api';
 import { Task, TaskAssignee, Comment, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Button } from '@/components/ui/button';
@@ -16,13 +16,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, UserPlus, X, Clock } from 'lucide-react';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock } from 'lucide-react';
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'No due date';
@@ -72,16 +73,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [submittingLink, setSubmittingLink] = useState(false);
   const [completionNote, setCompletionNote] = useState('');
 
-  // Admin: add assignee
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [showAddAssignee, setShowAddAssignee] = useState(false);
-  const [addingAssignee, setAddingAssignee] = useState(false);
-  const [newAssigneeId, setNewAssigneeId] = useState('');
 
-  // Admin: per-assignee actions
-  const [updatingAssigneeId, setUpdatingAssigneeId] = useState<string | null>(null);
-  const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
-  const [showRevisionFor, setShowRevisionFor] = useState<string | null>(null);
 
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -106,12 +98,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         setCompletionNote(myA.completion_note || '');
       }
 
-      // Initialize revision feedback map
-      const fbMap: Record<string, string> = {};
-      taskData.task.task_assignees?.forEach(a => {
-        fbMap[a.user_id] = a.feedback || '';
-      });
-      setRevisionFeedback(fbMap);
+
     } catch {
       router.replace('/dashboard/tasks');
     } finally {
@@ -121,9 +108,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     loadTask();
-    if (isOwner) {
-      usersApi.list().then(data => setAllUsers(data.users)).catch(console.error);
-    }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -175,52 +160,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     finally { setStatusUpdating(false); }
   };
 
-  // Admin: approve a specific assignee
-  const handleApproveAssignee = async (userId: string) => {
-    setUpdatingAssigneeId(userId);
-    try {
-      const data = await tasksApi.updateAssignee(id, userId, { status: 'completed' });
-      setTask(data.task);
-    } catch (err) { console.error(err); }
-    finally { setUpdatingAssigneeId(null); }
-  };
 
-  // Admin: request revision for a specific assignee
-  const handleRequestRevision = async (userId: string) => {
-    const fb = revisionFeedback[userId]?.trim();
-    if (!fb) return;
-    setUpdatingAssigneeId(userId);
-    try {
-      const data = await tasksApi.updateAssignee(id, userId, { status: 'revision', feedback: fb });
-      setTask(data.task);
-      setShowRevisionFor(null);
-    } catch (err) { console.error(err); }
-    finally { setUpdatingAssigneeId(null); }
-  };
-
-  // Admin: add assignee
-  const handleAddAssignee = async () => {
-    if (!newAssigneeId) return;
-    setAddingAssignee(true);
-    try {
-      const data = await tasksApi.addAssignee(id, newAssigneeId);
-      setTask(data.task);
-      setNewAssigneeId('');
-      setShowAddAssignee(false);
-    } catch (err) { console.error(err); }
-    finally { setAddingAssignee(false); }
-  };
-
-  // Admin: remove assignee
-  const handleRemoveAssignee = async (userId: string) => {
-    if (!confirm('Remove this member from the task?')) return;
-    setUpdatingAssigneeId(userId);
-    try {
-      const data = await tasksApi.removeAssignee(id, userId);
-      setTask(data.task);
-    } catch (err) { console.error(err); }
-    finally { setUpdatingAssigneeId(null); }
-  };
 
   // Admin: delete task
   const handleDelete = async () => {
@@ -243,8 +183,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const assignees = task.task_assignees || [];
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && assignees.some(a => a.status !== 'completed');
-  const assignedUserIds = assignees.map(a => a.user_id);
-  const unassignedUsers = allUsers.filter(u => !assignedUserIds.includes(u.id));
+
 
   // Compute summary
   const totalAssignees = assignees.length;
@@ -278,9 +217,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         <div className="task-detail-main flex flex-col gap-4">
           {/* Title & Badges */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
               <div className="flex flex-wrap gap-2">
                 <PriorityBadge priority={task.priority} />
+
                 {isOverdue && (
                   <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">⚠ Overdue</Badge>
                 )}
@@ -295,6 +235,47 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   </Badge>
                 )}
               </div>
+              {(task.drive_link || task.content_description) && (
+                <Dialog>
+                  <DialogTrigger
+                    render={
+                      <Button variant="outline" size="sm" className="shrink-0 gap-1.5 font-medium text-xs">
+                        🎥 Content Details
+                      </Button>
+                    }
+                  />
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-indigo-700 font-bold text-lg">
+                        🎥 Content Details &amp; Assets
+                      </DialogTitle>
+                      <DialogDescription>
+                        Guidelines and files attached to this task.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4 py-2">
+                      {task.drive_link && (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-sm font-semibold text-muted-foreground font-medium">Google Drive Attachments:</span>
+                          <a href={task.drive_link} target="_blank" rel="noopener noreferrer">
+                            <Button className="w-full justify-center gap-1.5">
+                              📁 Open Google Drive ↗
+                            </Button>
+                          </a>
+                        </div>
+                      )}
+                      {task.content_description && (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-sm font-semibold text-muted-foreground font-medium">Content Guidelines:</span>
+                          <p className="text-sm text-foreground whitespace-pre-wrap bg-muted px-3 py-2.5 rounded-md border border-border leading-relaxed">
+                            {task.content_description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </CardHeader>
             <CardContent>
               <h1 className="text-2xl font-extrabold tracking-tight mb-3">{task.title}</h1>
@@ -305,40 +286,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </CardContent>
           </Card>
-
-          {/* Content Assets */}
-          {(task.content_type || task.drive_link || task.content_description) && (
-            <Card className="border-l-4 border-l-indigo-500">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm text-indigo-700">🎥 Content Details &amp; Assets</CardTitle>
-                  {task.content_type && (
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 uppercase text-[10px] tracking-wide">
-                      📦 {task.content_type}
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                {task.drive_link && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-muted-foreground">Google Drive Attachments:</span>
-                    <a href={task.drive_link} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm">📁 Open Google Drive ↗</Button>
-                    </a>
-                  </div>
-                )}
-                {task.content_description && (
-                  <div>
-                    <span className="text-sm font-semibold text-muted-foreground block mb-1">Content Guidelines:</span>
-                    <p className="text-sm text-foreground whitespace-pre-wrap bg-muted px-3 py-2.5 rounded-md border border-border">
-                      {task.content_description}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* ============================================================ */}
           {/* MEMBER VIEW: Own Assignment Panel */}
@@ -468,162 +415,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             </>
           )}
 
-          {/* ============================================================ */}
-          {/* ADMIN VIEW: Per-Assignee Submission Panels */}
-          {/* ============================================================ */}
-          {isOwner && assignees.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">👥 Assignee Submissions ({completedCount}/{totalAssignees} completed)</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {assignees.map((assignee) => {
-                  const aUser = assignee.user;
-                  const isUpdating = updatingAssigneeId === assignee.user_id;
 
-                  return (
-                    <div key={assignee.id} className="border rounded-lg p-4 bg-card relative">
-                      {/* Header: avatar + name + status + remove button */}
-                      <div className="flex items-center justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar className="size-8">
-                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-bold">
-                              {aUser ? getInitials(aUser.name) : '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="text-sm font-semibold">{aUser?.name || 'Unknown'}</div>
-                            <div className="text-[11px] text-muted-foreground">{aUser?.email}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={assignee.status} />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemoveAssignee(assignee.user_id)}
-                            disabled={isUpdating}
-                            title="Remove assignee"
-                          >
-                            <X className="size-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Submission link */}
-                      {assignee.submission_link && (
-                        <div className="flex items-center gap-2 mb-2 bg-green-50 border border-green-200 rounded-md px-3 py-2">
-                          <CheckCircle2 className="size-4 text-green-600 shrink-0" />
-                          <span className="text-xs font-semibold text-green-700">Submitted:</span>
-                          <a href={assignee.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline truncate">
-                            {assignee.submission_link} ↗
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Completion note */}
-                      {assignee.completion_note && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 mb-2">
-                          <span className="text-xs font-semibold text-emerald-700 block mb-0.5">💭 Final Thoughts:</span>
-                          <p className="text-xs text-emerald-900 whitespace-pre-wrap italic">&ldquo;{assignee.completion_note}&rdquo;</p>
-                        </div>
-                      )}
-
-                      {/* Feedback shown if in revision */}
-                      {assignee.feedback && assignee.status === 'revision' && (
-                        <div className="bg-orange-50 border border-orange-200 rounded-md px-3 py-2 mb-2">
-                          <span className="text-xs font-semibold text-orange-700 block mb-0.5">🔄 Your Revision Feedback:</span>
-                          <p className="text-xs text-orange-900 whitespace-pre-wrap">{assignee.feedback}</p>
-                        </div>
-                      )}
-
-                      {/* Admin actions for submitted status */}
-                      {assignee.status === 'submitted' && (
-                        <div className="border-t border-border pt-3 mt-2">
-                          {showRevisionFor !== assignee.user_id ? (
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleApproveAssignee(assignee.user_id)} disabled={isUpdating}>
-                                {isUpdating ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                                Approve
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => setShowRevisionFor(assignee.user_id)} disabled={isUpdating}>
-                                <RotateCcw className="size-4" /> Request Revision
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-2">
-                              <Label className="text-xs">Revision Feedback</Label>
-                              <Textarea
-                                placeholder="Provide detailed feedback..."
-                                value={revisionFeedback[assignee.user_id] || ''}
-                                onChange={e => setRevisionFeedback(prev => ({ ...prev, [assignee.user_id]: e.target.value }))}
-                                rows={2}
-                              />
-                              <div className="flex gap-2 justify-end">
-                                <Button variant="outline" size="sm" onClick={() => setShowRevisionFor(null)}>Cancel</Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleRequestRevision(assignee.user_id)}
-                                  disabled={isUpdating || !revisionFeedback[assignee.user_id]?.trim()}
-                                >
-                                  Send Feedback
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* No submission yet */}
-                      {!assignee.submission_link && assignee.status !== 'completed' && assignee.status !== 'submitted' && (
-                        <p className="text-xs text-muted-foreground italic mt-1">
-                          {assignee.status === 'todo' ? 'Not started yet' : assignee.status === 'in_progress' ? 'Working on it...' : 'Awaiting resubmission'}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Admin: Add Another Assignee */}
-          {isOwner && (
-            <Card>
-              <CardContent className="pt-5">
-                {!showAddAssignee ? (
-                  <Button variant="outline" className="w-full" onClick={() => setShowAddAssignee(true)}>
-                    <UserPlus className="size-4" /> Assign Another Member
-                  </Button>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <Label>Select a member to assign</Label>
-                    <div className="flex gap-2">
-                      <Select value={newAssigneeId} onValueChange={val => setNewAssigneeId(val || '')}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="— Select Member —" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {unassignedUsers.map(u => (
-                            <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button onClick={handleAddAssignee} disabled={addingAssignee || !newAssigneeId}>
-                        {addingAssignee ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-                        Add
-                      </Button>
-                      <Button variant="outline" onClick={() => { setShowAddAssignee(false); setNewAssigneeId(''); }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* ============================================================ */}
           {/* SHARED CHAT */}
@@ -704,6 +496,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {formatDate(task.due_date)}
                 </span>
               </div>
+              {task.content_type && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Format</span>
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 uppercase text-[10px] tracking-wide font-medium w-fit">
+                    📦 {task.content_type}
+                  </Badge>
+                </div>
+              )}
 
               <Separator />
 

@@ -15,7 +15,7 @@ const upload = (0, multer_1.default)({
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
 });
 // POST /api/tasks/:taskId/attachments — Upload attachment (owner only)
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, upload.single('file'), async (req, res) => {
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSales, upload.single('file'), async (req, res) => {
     const { taskId } = req.params;
     if (!req.file) {
         res.status(400).json({ error: 'No file provided' });

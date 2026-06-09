@@ -293,37 +293,38 @@ export default function IdeasPage() {
         {(['good', 'medium', 'bad'] as ContentRating[]).map(r => {
           const cfg = RATING_CONFIG[r];
           const active = filterRating === r;
+          const dotColor = r === 'good' ? 'bg-green-500' : r === 'medium' ? 'bg-yellow-500' : 'bg-red-500';
           return (
             <button
               key={r}
               onClick={() => setFilterRating(active ? 'all' : r)}
-              className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all hover:shadow-sm ${
+              className={`flex flex-col p-4 rounded-xl border text-left transition-all ${
                 active
-                  ? `${cfg.bgClass} ${cfg.borderClass} ring-2 ring-primary/20`
-                  : 'bg-card border-border hover:bg-muted/30'
+                  ? 'bg-primary/5 border-primary ring-1 ring-primary/20'
+                  : 'bg-card border-border hover:bg-muted/10'
               }`}
             >
-              <span className="text-2xl shrink-0">{cfg.emoji}</span>
-              <div>
-                <div className="text-xl font-bold">{countByRating(r)}</div>
-                <div className="text-xs text-muted-foreground font-medium">{cfg.label} Ideas</div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1">
+                <span className={`size-2 rounded-full ${dotColor}`} />
+                {cfg.label} Ideas
               </div>
+              <div className="text-2xl font-bold text-foreground">{countByRating(r)}</div>
             </button>
           );
         })}
         <button
           onClick={() => setFilterRating('all')}
-          className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all hover:shadow-sm ${
+          className={`flex flex-col p-4 rounded-xl border text-left transition-all ${
             filterRating === 'all'
-              ? 'bg-primary/5 border-primary/20 ring-2 ring-primary/10'
-              : 'bg-card border-border hover:bg-muted/30'
+              ? 'bg-primary/5 border-primary ring-1 ring-primary/20'
+              : 'bg-card border-border hover:bg-muted/10'
           }`}
         >
-          <span className="text-2xl shrink-0">📋</span>
-          <div>
-            <div className="text-xl font-bold">{ideas.length}</div>
-            <div className="text-xs text-muted-foreground font-medium">All Ideas</div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1">
+            <span className="size-2 rounded-full bg-indigo-500" />
+            All Concepts
           </div>
+          <div className="text-2xl font-bold text-foreground">{ideas.length}</div>
         </button>
       </div>
 
@@ -374,33 +375,34 @@ export default function IdeasPage() {
             return (
               <Card
                 key={idea.id}
-                className="flex flex-col h-full hover:shadow-md transition-all duration-200 border-t-4"
-                style={{ borderTopColor: cfg.colorClass.includes('text-green') ? '#22c55e' : cfg.colorClass.includes('text-yellow') ? '#eab308' : '#ef4444' }}
+                className="flex flex-col h-full hover:shadow-md transition-all duration-200"
               >
-                <CardContent className="p-5 flex flex-col h-full gap-4">
-                  {/* Top row: type tag + rating */}
-                  <div className="flex items-center justify-between gap-3">
-                    {idea.content_type ? (
-                      <Badge variant="outline" className="text-[10px] py-0.5 px-2 font-semibold">
-                        {CONTENT_TYPE_ICONS[idea.content_type] || '✨'} {idea.content_type}
-                      </Badge>
-                    ) : <div />}
+                <CardContent className="p-6 flex flex-col h-full gap-4">
+                  {/* Top row: Title on left, Rating on right */}
+                  <div className="flex items-start justify-between gap-4">
+                    <h3
+                      className="font-bold text-base hover:text-primary transition-colors cursor-pointer leading-snug line-clamp-2 flex-1"
+                      onClick={() => setViewIdea(idea)}
+                    >
+                      {idea.title}
+                    </h3>
                     <button
                       onClick={() => cycleRating(idea)}
-                      className={`text-[10px] font-bold py-0.5 px-2 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1 ${cfg.bgClass} ${cfg.colorClass} ${cfg.borderClass}`}
+                      className={`text-[10px] font-bold py-0.5 px-2 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1 shrink-0 ${cfg.bgClass} ${cfg.colorClass} ${cfg.borderClass}`}
                       title="Click to cycle rating"
                     >
                       {cfg.emoji} {cfg.label}
                     </button>
                   </div>
 
-                  {/* Title */}
-                  <h3
-                    className="font-bold text-base hover:text-primary transition-colors cursor-pointer leading-snug line-clamp-2"
-                    onClick={() => setViewIdea(idea)}
-                  >
-                    {idea.title}
-                  </h3>
+                  {/* Type tag under title/rating row */}
+                  {idea.content_type && (
+                    <div className="flex items-center">
+                      <Badge variant="outline" className="text-[10px] py-0.5 px-2 font-semibold">
+                        {CONTENT_TYPE_ICONS[idea.content_type] || '✨'} {idea.content_type}
+                      </Badge>
+                    </div>
+                  )}
 
                   {/* Description */}
                   {idea.description && (

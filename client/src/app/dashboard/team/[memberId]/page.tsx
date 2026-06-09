@@ -4,15 +4,16 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, usersApi, salesApi } from '@/lib/api';
+import { tasksApi, usersApi } from '@/lib/api';
 import { Task, TaskAssignee, TaskStatus, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import SalesDashboard from '@/components/SalesDashboard';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -31,7 +32,6 @@ import {
   Zap,
   Upload,
   RefreshCw,
-  Target,
 } from 'lucide-react';
 
 function getInitials(name: string): string {
@@ -92,46 +92,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'title'>('dueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const [salesTarget, setSalesTarget] = useState<number | ''>('');
-  const [targetMonth, setTargetMonth] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-  });
-  const [fetchingTarget, setFetchingTarget] = useState(false);
-  const [savingTarget, setSavingTarget] = useState(false);
-  const [targetMessage, setTargetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const fetchTarget = async (mId: string, month: string) => {
-    setFetchingTarget(true);
-    try {
-      const res = await salesApi.getTarget(mId, month);
-      if (res.target) {
-        setSalesTarget(res.target.target_amount);
-      } else {
-        setSalesTarget('');
-      }
-    } catch (err) {
-      console.error('Failed to fetch sales target:', err);
-    } finally {
-      setFetchingTarget(false);
-    }
-  };
-
-  const handleSaveTarget = async () => {
-    if (!member) return;
-    setSavingTarget(true);
-    setTargetMessage(null);
-    try {
-      const amount = salesTarget === '' ? 0 : Number(salesTarget);
-      await salesApi.setTarget(member.id, targetMonth, amount);
-      setTargetMessage({ type: 'success', text: 'Target updated successfully!' });
-      setTimeout(() => setTargetMessage(null), 3000);
-    } catch (err: any) {
-      setTargetMessage({ type: 'error', text: err.message || 'Failed to update target' });
-    } finally {
-      setSavingTarget(false);
-    }
-  };
 
   useEffect(() => {
     if (user && user.role !== 'owner') {
@@ -160,11 +121,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     load();
   }, [memberId, user, router]);
 
-  useEffect(() => {
-    if (member && member.role === 'sales') {
-      fetchTarget(member.id, targetMonth);
-    }
-  }, [member?.id, member?.role, targetMonth]);
+
 
   if (user?.role !== 'owner') return null;
 
@@ -177,8 +134,6 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     completed: tasks.filter(t => getMemberStatus(t, memberId) === 'completed').length,
     overdue: tasks.filter(t => isOverdue(t.due_date, getMemberStatus(t, memberId))).length,
   };
-
-  const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
   const getProcessedTasks = (taskList: Task[]) => {
     return taskList
@@ -242,142 +197,23 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
         <span className="text-foreground font-semibold">{member.name}</span>
       </div>
 
-      {/* Hero Profile Card */}
-      <Card className="overflow-hidden border-border/80 shadow-md mb-8">
-        <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row items-center gap-6 justify-between">
-            {/* Left: Avatar & Info */}
-            <div className="flex items-center gap-4 flex-wrap text-center md:text-left justify-center md:justify-start">
-              <Avatar className="size-16 ring-4 ring-indigo-50 shadow-lg">
-                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-extrabold text-xl">
-                  {getInitials(member.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
-                  <h1 className="text-xl font-bold tracking-tight">{member.name}</h1>
-                  <Badge variant={member.role === 'owner' ? 'destructive' : 'default'} className="text-[10px] py-0.5 px-2">
-                    {member.role === 'owner' ? 'Admin' : 'Team Member'}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">✉ {member.email}</p>
-              </div>
-            </div>
-
-            {/* Right: Completion Metric */}
-            <div className="bg-muted/40 border rounded-xl p-4 min-w-[160px] text-center">
-              <div className="text-3xl font-extrabold text-indigo-600">
-                {completionRate}%
-              </div>
-              <div className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mt-1">
-                Completion Rate
-              </div>
-              <div className="bg-muted border rounded-full h-2 mt-2.5 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all duration-1000"
-                  style={{ width: `${completionRate}%` }}
-                />
-              </div>
-            </div>
+      {/* Profile Header */}
+      <div className="flex items-center gap-4 mb-8">
+        <Avatar className="size-14 ring-4 ring-indigo-50 shadow-lg shrink-0">
+          <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-extrabold text-lg">
+            {getInitials(member.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold tracking-tight">{member.name}</h1>
+            <Badge variant={member.role === 'owner' ? 'destructive' : 'default'} className="text-[10px] py-0.5 px-2">
+              {member.role === 'owner' ? 'Admin' : member.role === 'sales' ? 'Sales' : 'Team Member'}
+            </Badge>
           </div>
-
-          {/* Mini Stats Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 border-t border-dashed mt-6 pt-4 text-center">
-            {[
-              { label: 'Total Tasks', value: stats.total, textClass: 'text-foreground', bgClass: 'bg-muted/30' },
-              { label: 'To Do', value: stats.todo, textClass: 'text-slate-600', bgClass: 'bg-slate-50' },
-              { label: 'In Progress', value: stats.inProgress, textClass: 'text-blue-600', bgClass: 'bg-blue-50/40' },
-              { label: 'Submitted', value: stats.submitted, textClass: 'text-green-600', bgClass: 'bg-green-50/40' },
-              { label: 'Needs Revision', value: stats.revision, textClass: 'text-orange-600', bgClass: 'bg-orange-50/40' },
-              { label: 'Completed', value: stats.completed, textClass: 'text-purple-600', bgClass: 'bg-purple-50/40' },
-              { label: 'Overdue', value: stats.overdue, textClass: 'text-rose-600', bgClass: 'bg-rose-50/50' },
-            ].map(s => (
-              <div key={s.label} className={`p-3 rounded-lg border border-border/40 ${s.value > 0 ? s.bgClass : 'bg-transparent'}`}>
-                <div className={`text-xl font-bold ${s.value > 0 ? s.textClass : 'text-muted-foreground/60'}`}>
-                  {s.value}
-                </div>
-                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mt-1 truncate">
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sales Target Card */}
-      {member.role === 'sales' && (
-        <Card className="border-border/80 shadow-sm mb-8 overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400">
-                <Target className="size-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold tracking-tight">Sales Performance Target</h2>
-                <p className="text-[11px] text-muted-foreground">Configure monthly sales target quotas for this representative.</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0 pb-5">
-            <div className="flex flex-col sm:flex-row items-end gap-4 max-w-2xl">
-              <div className="flex-1 w-full space-y-1.5">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Month</label>
-                <Input
-                  type="month"
-                  value={targetMonth}
-                  onChange={e => setTargetMonth(e.target.value)}
-                  className="h-9 text-xs"
-                />
-              </div>
-              <div className="flex-1 w-full space-y-1.5">
-                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Target Meetings</label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 15"
-                    value={salesTarget}
-                    onChange={e => setSalesTarget(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="h-9 text-xs"
-                  />
-                </div>
-              </div>
-              <div className="shrink-0 w-full sm:w-auto">
-                <Button
-                  onClick={handleSaveTarget}
-                  disabled={savingTarget || fetchingTarget}
-                  className="w-full sm:w-auto h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                >
-                  {savingTarget ? (
-                    <span className="flex items-center gap-1.5 justify-center">
-                      <RefreshCw className="size-3 animate-spin" /> Saving...
-                    </span>
-                  ) : 'Update Target'}
-                </Button>
-              </div>
-            </div>
-
-            {fetchingTarget && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 animate-pulse">
-                <RefreshCw className="size-3 animate-spin text-emerald-500" /> Loading monthly quota data...
-              </div>
-            )}
-
-            {targetMessage && (
-              <div className={`mt-3 text-xs p-2.5 rounded-lg border ${
-                targetMessage.type === 'success' 
-                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400' 
-                  : 'bg-rose-50 border-rose-100 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400'
-              }`}>
-                {targetMessage.text}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          <p className="text-xs text-muted-foreground mt-0.5">Email: {member.email}</p>
+        </div>
+      </div>
 
       {/* Sales Dashboard for Admin viewing representative stats & finance */}
       {member.role === 'sales' && (
@@ -390,7 +226,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
       {/* Search, Filter & Switch View Panel */}
       <Card className="mb-6 shadow-sm border-border/80">
-        <CardContent className="p-4 flex flex-col gap-4">
+        <CardContent className="p-6 flex flex-col gap-6">
           {/* Top Panel Controls */}
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
             {/* Search Input */}
@@ -453,7 +289,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
           {/* Bottom tabs for list filtering */}
           {viewMode === 'list' && (
-            <div className="flex gap-2 flex-wrap border-t border-dashed pt-3">
+            <div className="flex gap-2 flex-wrap pt-1">
               {filterTabs.map(tab => {
                 const isActive = activeStatus === tab.key;
                 return (
@@ -477,195 +313,198 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
 
-      {/* Main Content Area */}
-      {filteredTasks.length === 0 ? (
-        <Card className="border-dashed shadow-none py-12 flex flex-col items-center justify-center text-center">
-          <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📋</div>
-          <h3 className="font-semibold text-base mb-1">No tasks found</h3>
-          <p className="text-xs text-muted-foreground max-w-sm px-4">
-            {searchQuery
-              ? 'Try modifying your search query or sorting options.'
-              : activeStatus !== 'all'
-              ? `${member.name} has no tasks marked as "${STATUS_CONFIG[activeStatus]?.label ?? activeStatus}".`
-              : `${member.name} has not been assigned any tasks yet.`}
-          </p>
-        </Card>
-      ) : viewMode === 'list' ? (
-        /* LIST VIEW */
-        <div className="flex flex-col gap-3">
-          {filteredTasks.map(task => {
-            const mStatus = getMemberStatus(task, memberId);
-            const overdue = isOverdue(task.due_date, mStatus);
-            const statusConfig = STATUS_CONFIG[mStatus] || STATUS_CONFIG.todo;
+          <Separator className="my-1 opacity-60" />
 
-            return (
-              <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
-                <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5`}>
-                  <CardContent className="p-5 flex flex-col gap-4">
-                    {/* Badges & Date Header */}
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <StatusBadge status={mStatus} />
-                        <PriorityBadge priority={task.priority} />
-                        {overdue && (
-                          <Badge variant="destructive" className="text-[10px] gap-1 font-semibold">
-                            <AlertTriangle className="size-2.5" /> Overdue
-                          </Badge>
-                        )}
-                      </div>
-                      <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                        <Calendar className="size-3.5" /> {formatDate(task.due_date)}
-                      </div>
-                    </div>
+          {/* Tasks Content List/Board */}
+          <div>
+            {filteredTasks.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl py-12 flex flex-col items-center justify-center text-center bg-muted/10">
+                <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📋</div>
+                <h3 className="font-semibold text-base mb-1">No tasks found</h3>
+                <p className="text-xs text-muted-foreground max-w-sm px-4">
+                  {searchQuery
+                    ? 'Try modifying your search query or sorting options.'
+                    : activeStatus !== 'all'
+                    ? `${member.name} has no tasks marked as "${STATUS_CONFIG[activeStatus]?.label ?? activeStatus}".`
+                    : `${member.name} has not been assigned any tasks yet.`}
+                </p>
+              </div>
+            ) : viewMode === 'list' ? (
+              /* LIST VIEW */
+              <div className="flex flex-col gap-3">
+                {filteredTasks.map(task => {
+                  const mStatus = getMemberStatus(task, memberId);
+                  const overdue = isOverdue(task.due_date, mStatus);
 
-                    {/* Task Title & Desc */}
-                    <div>
-                      <h3 className="font-bold text-base hover:text-indigo-600 transition-colors leading-snug">
-                        {task.title}
-                      </h3>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
-                          {task.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Meta Updates (Submissions, revisions, progress) */}
-                    {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback); })() && (
-                      <div className="border-t border-dashed pt-3 mt-1 flex flex-col gap-2.5">
-                        {/* Member Completion Note */}
-                        {getMemberAssignment(task, memberId)?.completion_note && (
-                          <div className="flex items-start gap-2.5 bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-blue-900">
-                            <Zap className="size-4 text-blue-500 shrink-0 mt-0.5" />
-                            <div>
-                              <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">Final Thoughts</div>
-                              <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{getMemberAssignment(task, memberId)?.completion_note}&rdquo;</p>
+                  return (
+                    <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
+                      <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5`}>
+                        <CardContent className="p-5 flex flex-col gap-4">
+                          {/* Badges & Date Header */}
+                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <StatusBadge status={mStatus} />
+                              <PriorityBadge priority={task.priority} />
+                              {overdue && (
+                                <Badge variant="destructive" className="text-[10px] gap-1 font-semibold">
+                                  <AlertTriangle className="size-2.5" /> Overdue
+                                </Badge>
+                              )}
+                            </div>
+                            <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
+                              <Calendar className="size-3.5" /> {formatDate(task.due_date)}
                             </div>
                           </div>
-                        )}
 
-                        {/* Work Submission */}
-                        {getMemberAssignment(task, memberId)?.submission_link && (
-                          <div className="flex items-center justify-between gap-3 bg-green-50/50 border border-green-100 rounded-lg p-3 text-green-900 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <Upload className="size-4 text-green-500 shrink-0" />
-                              <span className="text-xs font-semibold">Work has been submitted</span>
-                            </div>
-                            <a
-                              href={getMemberAssignment(task, memberId)?.submission_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 py-1.5 px-3 rounded-md transition-colors"
-                            >
-                              View Submission ↗
-                            </a>
+                          {/* Task Title & Desc */}
+                          <div>
+                            <h3 className="font-bold text-base hover:text-indigo-600 transition-colors leading-snug">
+                              {task.title}
+                            </h3>
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
+                                {task.description}
+                              </p>
+                            )}
                           </div>
-                        )}
 
-                        {/* Admin Revision Feedback */}
-                        {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
-                          <div className="flex items-start gap-2.5 bg-orange-50/50 border border-orange-100 rounded-lg p-3 text-orange-950">
-                            <RefreshCw className="size-4 text-orange-500 shrink-0 mt-0.5" />
-                            <div>
-                              <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">Revision Required</div>
-                              <p className="text-xs mt-0.5 leading-relaxed">{getMemberAssignment(task, memberId)?.feedback}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        /* KANBAN BOARD VIEW */
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start scrollbar-thin select-none">
-          {['todo', 'in_progress', 'submitted', 'revision', 'completed'].map(statusKey => {
-            const columnConfig = STATUS_CONFIG[statusKey];
-            const columnTasks = filteredTasks.filter(t => getMemberStatus(t, memberId) === statusKey);
-
-            return (
-              <div
-                key={statusKey}
-                className="flex-[0_0_290px] bg-muted/30 border border-border/80 rounded-xl p-3 flex flex-col max-h-[70vh] min-h-[350px] shadow-sm"
-              >
-                {/* Column Header */}
-                <div className="flex items-center justify-between border-b pb-2.5 mb-3 px-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm">{columnConfig.icon}</span>
-                    <span className="text-xs font-bold text-foreground">
-                      {columnConfig.label}
-                    </span>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] font-extrabold px-2 h-5">
-                    {columnTasks.length}
-                  </Badge>
-                </div>
-
-                {/* Column Cards Container */}
-                <div className="flex flex-col gap-2.5 overflow-y-auto flex-1 pr-1 scrollbar-thin">
-                  {columnTasks.length === 0 ? (
-                    <div className="text-center py-10 text-[11px] text-muted-foreground/60 border border-dashed rounded-lg bg-card/50">
-                      No tasks
-                    </div>
-                  ) : (
-                    columnTasks.map(task => {
-                      const overdue = isOverdue(task.due_date, task.status);
-
-                      return (
-                        <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
-                          <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5 relative`}>
-                            <CardContent className="p-3.5 flex flex-col gap-3">
-                              {/* Title */}
-                              <div className="text-xs font-bold text-foreground line-clamp-2 leading-relaxed">
-                                {task.title}
-                              </div>
-
-                              {/* Due Date */}
-                              <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                                <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date)}</span>
-                                {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
-                              </div>
-
-                              {/* Small Indicators for updates */}
-                              {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback || ma?.completion_note); })() && (
-                                <div className="flex gap-1.5 border-t border-dashed pt-2 mt-1">
-                                   {getMemberAssignment(task, memberId)?.completion_note && (
-                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title="Has completion note">
-                                       💭
-                                     </Badge>
-                                   )}
-                                   {getMemberAssignment(task, memberId)?.submission_link && (
-                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title="Has submission">
-                                       📤
-                                     </Badge>
-                                   )}
-                                   {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
-                                     <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title="Revision notes present">
-                                       🔄
-                                     </Badge>
-                                   )}
+                          {/* Meta Updates (Submissions, revisions, progress) */}
+                          {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback); })() && (
+                            <div className="border-t border-dashed pt-3 mt-1 flex flex-col gap-2.5">
+                              {/* Member Completion Note */}
+                              {getMemberAssignment(task, memberId)?.completion_note && (
+                                <div className="flex items-start gap-2.5 bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-blue-900">
+                                  <Zap className="size-4 text-blue-500 shrink-0 mt-0.5" />
+                                  <div>
+                                    <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">Final Thoughts</div>
+                                    <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{getMemberAssignment(task, memberId)?.completion_note}&rdquo;</p>
+                                  </div>
                                 </div>
                               )}
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      );
-                    })
-                  )}
-                </div>
+
+                              {/* Work Submission */}
+                              {getMemberAssignment(task, memberId)?.submission_link && (
+                                <div className="flex items-center justify-between gap-3 bg-green-50/50 border border-green-100 rounded-lg p-3 text-green-900 flex-wrap">
+                                  <div className="flex items-center gap-2">
+                                    <Upload className="size-4 text-green-500 shrink-0" />
+                                    <span className="text-xs font-semibold">Work has been submitted</span>
+                                  </div>
+                                  <a
+                                    href={getMemberAssignment(task, memberId)?.submission_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 py-1.5 px-3 rounded-md transition-colors"
+                                  >
+                                    View Submission ↗
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Admin Revision Feedback */}
+                              {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
+                                <div className="flex items-start gap-2.5 bg-orange-50/50 border border-orange-100 rounded-lg p-3 text-orange-950">
+                                  <RefreshCw className="size-4 text-orange-500 shrink-0 mt-0.5" />
+                                  <div>
+                                    <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">Revision Required</div>
+                                    <p className="text-xs mt-0.5 leading-relaxed">{getMemberAssignment(task, memberId)?.feedback}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      )}
+            ) : (
+              /* KANBAN BOARD VIEW */
+              <div className="flex gap-4 overflow-x-auto pb-4 items-start scrollbar-thin select-none">
+                {['todo', 'in_progress', 'submitted', 'revision', 'completed'].map(statusKey => {
+                  const columnConfig = STATUS_CONFIG[statusKey];
+                  const columnTasks = filteredTasks.filter(t => getMemberStatus(t, memberId) === statusKey);
+
+                  return (
+                    <div
+                      key={statusKey}
+                      className="flex-[0_0_290px] bg-muted/30 border border-border/80 rounded-xl p-3 flex flex-col max-h-[70vh] min-h-[350px] shadow-sm"
+                    >
+                      {/* Column Header */}
+                      <div className="flex items-center justify-between border-b pb-2.5 mb-3 px-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{columnConfig.icon}</span>
+                          <span className="text-xs font-bold text-foreground">
+                            {columnConfig.label}
+                          </span>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] font-extrabold px-2 h-5">
+                          {columnTasks.length}
+                        </Badge>
+                      </div>
+
+                      {/* Column Cards Container */}
+                      <div className="flex flex-col gap-2.5 overflow-y-auto flex-1 pr-1 scrollbar-thin">
+                        {columnTasks.length === 0 ? (
+                          <div className="text-center py-10 text-[11px] text-muted-foreground/60 border border-dashed rounded-lg bg-card/50">
+                            No tasks
+                          </div>
+                        ) : (
+                          columnTasks.map(task => {
+                            const overdue = isOverdue(task.due_date, task.status);
+
+                            return (
+                              <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
+                                <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5 relative`}>
+                                  <CardContent className="p-3.5 flex flex-col gap-3">
+                                    {/* Title */}
+                                    <div className="text-xs font-bold text-foreground line-clamp-2 leading-relaxed">
+                                      {task.title}
+                                    </div>
+
+                                    {/* Due Date */}
+                                    <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
+                                      <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date)}</span>
+                                      {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
+                                    </div>
+
+                                    {/* Small Indicators for updates */}
+                                    {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback || ma?.completion_note); })() && (
+                                      <div className="flex gap-1.5 border-t border-dashed pt-2 mt-1">
+                                         {getMemberAssignment(task, memberId)?.completion_note && (
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title="Has completion note">
+                                             💭
+                                           </Badge>
+                                         )}
+                                         {getMemberAssignment(task, memberId)?.submission_link && (
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title="Has submission">
+                                             📤
+                                           </Badge>
+                                         )}
+                                         {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title="Revision notes present">
+                                             🔄
+                                           </Badge>
+                                         )}
+                                      </div>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              </Link>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -526,17 +526,10 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
   transition: all var(--transition);
   position: relative;
   overflow: hidden;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--stat-accent, var(--color-primary));
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .stat-card:hover {
@@ -566,9 +559,9 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
 }
 
 .stat-label {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 /* =========================================

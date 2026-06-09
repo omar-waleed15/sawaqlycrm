@@ -252,15 +252,15 @@ export default function TasksPage() {
 
       {/* Schedule Modal */}
       <Dialog open={!!schedulingTask} onOpenChange={open => { if (!open) closeScheduleModal(); }}>
-        <DialogContent className="max-w-[460px] p-0 overflow-hidden">
+        <DialogContent className="max-w-[460px] p-6">
           {schedulingTask && (
             <>
-              <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-200 mb-1">Schedule Publication</p>
-                <DialogTitle className="text-lg font-bold text-white m-0">{schedulingTask.title}</DialogTitle>
-              </div>
+              <DialogHeader className="flex flex-col gap-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Schedule Publication</p>
+                <DialogTitle className="text-lg font-bold text-foreground m-0">{schedulingTask.title}</DialogTitle>
+              </DialogHeader>
 
-              <div className="px-6 py-5 flex flex-col gap-4">
+              <div className="flex flex-col gap-4 mt-4">
                 <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                   {schedulingTask.task_assignees && schedulingTask.task_assignees.length > 0 ? (
                     <span>👥 {schedulingTask.task_assignees.map(a => a.user?.name).filter(Boolean).join(', ')}</span>
@@ -304,7 +304,7 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              <DialogFooter className="px-6 py-4 border-t flex gap-2 justify-end">
+              <DialogFooter className="-mx-6 -mb-6 mt-6 px-6 py-4 border-t flex gap-2 justify-end">
                 {schedulingTask.publish_date && (
                   <Button variant="outline" onClick={handleClearSchedule} disabled={saving} className="text-rose-600 border-rose-200 hover:bg-rose-50">
                     <Trash2 className="size-3.5" /> Clear Date

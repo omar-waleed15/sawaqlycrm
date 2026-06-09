@@ -52,27 +52,6 @@ const PROJECT_STATUS_CONFIG: Record<string, { label: string; bg: string; color: 
   completed: { label: '✅ Completed',      bg: '#f5f3ff', color: '#6d28d9', accent: '#8b5cf6' },
 };
 
-type PipelineStage = Client['pipeline_stage'];
-
-const PIPELINE_STAGES: {
-  key: PipelineStage;
-  label: string;
-  emoji: string;
-  color: string;
-  bg: string;
-  border: string;
-}[] = [
-  { key: 'new_lead',         label: 'New Lead',          emoji: '🌱', color: '#475569', bg: '#f8fafc', border: '#cbd5e1' },
-  { key: 'contacted',        label: 'Contacted',         emoji: '📞', color: '#1d4ed8', bg: '#eff6ff', border: '#93c5fd' },
-  { key: 'meeting_scheduled',label: 'Meeting Scheduled', emoji: '📅', color: '#4f46e5', bg: '#eef2ff', border: '#a5b4fc' },
-  { key: 'meeting_done',     label: 'Meeting Done',      emoji: '🤝', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd' },
-  { key: 'won',              label: 'Won',               emoji: '🏆', color: '#15803d', bg: '#f0fdf4', border: '#86efac' },
-  { key: 'lost',             label: 'Lost',              emoji: '❌', color: '#be123c', bg: '#fff1f2', border: '#fda4af' },
-];
-
-function getPipelineStage(key: PipelineStage) {
-  return PIPELINE_STAGES.find(s => s.key === key) || PIPELINE_STAGES[0];
-}
 
 export default function FinanceDashboardPage() {
   const { user } = useAuth();
@@ -95,8 +74,7 @@ export default function FinanceDashboardPage() {
   const [installmentsEnabled, setInstallmentsEnabled] = useState(false);
   const [installmentRows, setInstallmentRows] = useState<{ amount: string; due_date: string; note: string; id?: string; paid?: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'pipeline' | 'contracts' | 'expenses'>('overview');
-  const [selectedPipelineStage, setSelectedPipelineStage] = useState<PipelineStage>('new_lead');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'contracts' | 'expenses'>('overview');
 
   // Analytics states
   const [analyticsData, setAnalyticsData] = useState<FinanceAnalyticsPayload | null>(null);
@@ -191,8 +169,6 @@ export default function FinanceDashboardPage() {
   const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
   
   // Search states
-  const [clientSearch, setClientSearch] = useState('');
-  const [pipelineSearch, setPipelineSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [contractSearch, setContractSearch] = useState('');
 
@@ -200,7 +176,6 @@ export default function FinanceDashboardPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   // Modal control states
-  const [clientModalOpen, setClientModalOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [contractModalOpen, setContractModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -208,30 +183,8 @@ export default function FinanceDashboardPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Selected entities for Edit mode
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-
-  // Client form states
-  const [clientForm, setClientForm] = useState({
-    name: '',
-    company: '',
-    email: '',
-    phone: '',
-    status: 'active' as Client['status'],
-    pipeline_stage: 'new_lead' as PipelineStage,
-  });
-
-  // Close Won Modal states
-  const [closeWonModalOpen, setCloseWonModalOpen] = useState(false);
-  const [closeWonClient, setCloseWonClient] = useState<Client | null>(null);
-  const [closeWonForm, setCloseWonForm] = useState({
-    name: '',
-    company: '',
-    email: '',
-    phone: '',
-    status: 'active' as Client['status'],
-  });
 
   // Project form states
   const [projectForm, setProjectForm] = useState({
@@ -331,26 +284,7 @@ export default function FinanceDashboardPage() {
 
   if (user?.role !== 'owner' && user?.role !== 'sales') return null;
 
-  // Form Reset functions
-  const resetClientForm = (client?: Client, defaultStage: PipelineStage = 'new_lead') => {
-    if (client) {
-      setClientForm({
-        name: client.name,
-        company: client.company || '',
-        email: client.email || '',
-        phone: client.phone || '',
-        status: client.status,
-        pipeline_stage: client.pipeline_stage || defaultStage,
-      });
-      setSelectedClient(client);
-      setModalMode('edit');
-    } else {
-      setClientForm({ name: '', company: '', email: '', phone: '', status: 'active', pipeline_stage: defaultStage });
-      setSelectedClient(null);
-      setModalMode('create');
-    }
-    setErrorMsg('');
-  };
+
 
   const resetProjectForm = (project?: Project) => {
     if (project) {
@@ -432,25 +366,7 @@ export default function FinanceDashboardPage() {
     setErrorMsg('');
   };
 
-  // CRUD Submissions
-  const handleClientSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientForm.name) { setErrorMsg('Client Name is required'); return; }
-    setSubmitting(true);
-    try {
-      if (modalMode === 'create') {
-        await clientsApi.create(clientForm);
-      } else if (selectedClient) {
-        await clientsApi.update(selectedClient.id, clientForm);
-      }
-      setClientModalOpen(false);
-      loadData(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Action failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -807,146 +723,7 @@ export default function FinanceDashboardPage() {
     }
   };
 
-  // Close Won Modal Handlers
-  const openCloseWonModal = (client: Client) => {
-    setCloseWonClient(client);
-    setCloseWonForm({
-      name: client.name,
-      company: client.company || '',
-      email: client.email || '',
-      phone: client.phone || '',
-      status: client.status || 'active',
-    });
-    setCloseWonModalOpen(true);
-    setErrorMsg('');
-  };
 
-  const handleCloseWonSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!closeWonForm.name) {
-      setErrorMsg('Client Name is required');
-      return;
-    }
-    if (!closeWonForm.company || !closeWonForm.email || !closeWonForm.phone) {
-      setErrorMsg('Company, Email, and Phone are required to close as Won');
-      return;
-    }
-    if (!closeWonClient) return;
-
-    setSubmitting(true);
-    try {
-      await clientsApi.update(closeWonClient.id, {
-        ...closeWonForm,
-        pipeline_stage: 'won',
-      });
-      setCloseWonModalOpen(false);
-      loadData(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Action failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Stage movement handlers
-  const ACTIVE_STAGES: PipelineStage[] = ['new_lead', 'contacted', 'meeting_scheduled', 'meeting_done'];
-
-  const handleMoveStage = async (client: Client, direction: 'forward' | 'backward') => {
-    const currentIndex = ACTIVE_STAGES.indexOf(client.pipeline_stage);
-    if (currentIndex === -1) {
-      if (client.pipeline_stage === 'lost') {
-        // Optimistic update
-        setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'new_lead' } : c));
-        try {
-          await clientsApi.update(client.id, { pipeline_stage: 'new_lead' });
-          loadData(true);
-        } catch (err) {
-          loadData(true);
-          alert('Failed to update stage');
-        }
-      } else if (client.pipeline_stage === 'won' && direction === 'backward') {
-        // Optimistic update
-        setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'meeting_done' } : c));
-        try {
-          await clientsApi.update(client.id, { pipeline_stage: 'meeting_done' });
-          loadData(true);
-        } catch (err) {
-          loadData(true);
-          alert('Failed to update stage');
-        }
-      }
-      return;
-    }
-
-    if (direction === 'backward' && currentIndex > 0) {
-      const newStage = ACTIVE_STAGES[currentIndex - 1];
-      // Optimistic update
-      setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: newStage } : c));
-      try {
-        await clientsApi.update(client.id, { pipeline_stage: newStage });
-        loadData(true);
-      } catch (err) {
-        loadData(true);
-        alert('Failed to update stage');
-      }
-    } else if (direction === 'forward') {
-      if (currentIndex === ACTIVE_STAGES.length - 1) {
-        openCloseWonModal(client);
-      } else {
-        const newStage = ACTIVE_STAGES[currentIndex + 1];
-        // Optimistic update
-        setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: newStage } : c));
-        try {
-          await clientsApi.update(client.id, { pipeline_stage: newStage });
-          loadData(true);
-        } catch (err) {
-          loadData(true);
-          alert('Failed to update stage');
-        }
-      }
-    }
-  };
-
-  const handleMarkAsLost = async (client: Client) => {
-    // Optimistic update
-    setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'lost' } : c));
-    try {
-      await clientsApi.update(client.id, { pipeline_stage: 'lost' });
-      loadData(true);
-    } catch (err) {
-      loadData(true);
-      alert('Failed to mark client as lost');
-    }
-  };
-
-  const handleReactivate = async (client: Client) => {
-    // Optimistic update
-    setClients(prev => prev.map(c => c.id === client.id ? { ...c, pipeline_stage: 'new_lead' } : c));
-    try {
-      await clientsApi.update(client.id, { pipeline_stage: 'new_lead' });
-      loadData(true);
-    } catch (err) {
-      loadData(true);
-      alert('Failed to reactivate lead');
-    }
-  };
-
-  // Filters logic
-  const filteredPipelineLeads = clients.filter(c =>
-    c.pipeline_stage === selectedPipelineStage && (
-      c.name.toLowerCase().includes(pipelineSearch.toLowerCase()) ||
-      (c.company && c.company.toLowerCase().includes(pipelineSearch.toLowerCase())) ||
-      (c.email && c.email.toLowerCase().includes(pipelineSearch.toLowerCase()))
-    )
-  );
-
-  const filteredWonClients = clients.filter(c =>
-    c.pipeline_stage === 'won' && (
-      c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-      (c.company && c.company.toLowerCase().includes(clientSearch.toLowerCase())) ||
-      (c.email && c.email.toLowerCase().includes(clientSearch.toLowerCase()))
-    )
-  );
 
   const filteredProjectsList = projects.filter(p =>
     p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
@@ -1066,35 +843,30 @@ export default function FinanceDashboardPage() {
         {/* 📊 KPI BLOCK */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
           <div className="stat-card" style={{ '--stat-accent': '#6366f1', '--stat-icon-bg': '#ede9fe' } as React.CSSProperties}>
-            <div className="stat-icon">🔄</div>
-            <div className="stat-value">{formatCurrency(analyticsData.kpis.mrr)}</div>
             <div className="stat-label">Monthly Recurring Rev (MRR)</div>
+            <div className="stat-value">{formatCurrency(analyticsData.kpis.mrr)}</div>
           </div>
           <div className="stat-card" style={{ '--stat-accent': '#10b981', '--stat-icon-bg': '#e6f4ea' } as React.CSSProperties}>
-            <div className="stat-icon">📈</div>
-            <div className="stat-value">{formatCurrency(ltmRevenue)}</div>
             <div className="stat-label">LTM Revenue (Collected)</div>
+            <div className="stat-value">{formatCurrency(ltmRevenue)}</div>
           </div>
           <div className="stat-card" style={{ '--stat-accent': '#ef4444', '--stat-icon-bg': '#fce8e6' } as React.CSSProperties}>
-            <div className="stat-icon">📉</div>
-            <div className="stat-value">{formatCurrency(ltmExpenses)}</div>
             <div className="stat-label">LTM Expenses (Filtered)</div>
+            <div className="stat-value">{formatCurrency(ltmExpenses)}</div>
           </div>
           <div className="stat-card" style={{
             '--stat-accent': ltmNetProfit >= 0 ? '#10b981' : '#ef4444',
             '--stat-icon-bg': ltmNetProfit >= 0 ? '#e6f4ea' : '#fce8e6'
           } as React.CSSProperties}>
-            <div className="stat-icon">{ltmNetProfit >= 0 ? '💰' : '💸'}</div>
-            <div className="stat-value" style={{ color: ltmNetProfit >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(ltmNetProfit)}</div>
             <div className="stat-label">LTM Net Profit (Filtered)</div>
+            <div className="stat-value" style={{ color: ltmNetProfit >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(ltmNetProfit)}</div>
           </div>
           <div className="stat-card" style={{
             '--stat-accent': ltmMargin >= 25 ? '#10b981' : ltmMargin >= 10 ? '#f59e0b' : '#ef4444',
             '--stat-icon-bg': ltmMargin >= 25 ? '#e6f4ea' : ltmMargin >= 10 ? '#fffbeb' : '#fce8e6'
           } as React.CSSProperties}>
-            <div className="stat-icon">📊</div>
-            <div className="stat-value">{ltmMargin.toFixed(1)}%</div>
             <div className="stat-label">LTM Profit Margin</div>
+            <div className="stat-value">{ltmMargin.toFixed(1)}%</div>
           </div>
         </div>
 
@@ -1605,9 +1377,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('clients')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">👥</div>
-            <div className="stat-value">{clients.filter(c => c.pipeline_stage === 'won').length}</div>
             <div className="stat-label">Active Clients</div>
+            <div className="stat-value">{clients.filter(c => c.pipeline_stage === 'won').length}</div>
           </div>
 
           {/* Card 2: Active Projects */}
@@ -1622,9 +1393,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('projects')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">🚀</div>
-            <div className="stat-value">{stats.activeProjects}</div>
             <div className="stat-label">Active Projects</div>
+            <div className="stat-value">{stats.activeProjects}</div>
           </div>
 
           {/* Card 3: Monthly Revenue */}
@@ -1639,9 +1409,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('revenue')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">💰</div>
-            <div className="stat-value">{formatCurrency(stats.monthlyRevenue)}</div>
             <div className="stat-label">Monthly Revenue (MRR)</div>
+            <div className="stat-value">{formatCurrency(stats.monthlyRevenue)}</div>
           </div>
 
           {/* Card 4: Upcoming Renewals */}
@@ -1656,9 +1425,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('renewals')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">📅</div>
-            <div className="stat-value">{stats.upcomingRenewalsCount}</div>
             <div className="stat-label">Renewals Due (30 Days)</div>
+            <div className="stat-value">{stats.upcomingRenewalsCount}</div>
           </div>
 
           {/* Card 5: Total Expenses */}
@@ -1673,9 +1441,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('expenses')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">💸</div>
-            <div className="stat-value">{formatCurrency(stats.totalExpensesThisMonth || 0)}</div>
             <div className="stat-label">Total Expenses This Month</div>
+            <div className="stat-value">{formatCurrency(stats.totalExpensesThisMonth || 0)}</div>
           </div>
 
           {/* Card 6: Net Profit */}
@@ -1690,11 +1457,10 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('netprofit')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-icon">{(stats.netProfitThisMonth || 0) >= 0 ? '📈' : '📉'}</div>
+            <div className="stat-label">Net Profit</div>
             <div className="stat-value" style={{ color: (stats.netProfitThisMonth || 0) >= 0 ? '#16a34a' : '#ef4444' }}>
               {formatCurrency(stats.netProfitThisMonth || 0)}
             </div>
-            <div className="stat-label">Net Profit</div>
           </div>
         </div>
       )}
@@ -1710,7 +1476,6 @@ export default function FinanceDashboardPage() {
         {[
           { id: 'overview', label: '📊 Dashboard Overview' },
           { id: 'analytics', label: '📊 Financial Analytics' },
-          { id: 'pipeline', label: '🎯 Sales Pipeline' },
           { id: 'contracts', label: '💼 Contracts & Subscriptions' },
           { id: 'expenses', label: '💸 Expenses & Salaries' },
         ].map(tab => (
@@ -1877,401 +1642,6 @@ export default function FinanceDashboardPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. PIPELINE TAB */}
-      {activeTab === 'pipeline' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* ── Top Action Bar ── */}
-          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', boxShadow: 'var(--shadow-sm)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}>🔍</span>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Search leads by name, company, email..."
-                value={pipelineSearch}
-                onChange={e => setPipelineSearch(e.target.value)}
-                style={{ paddingLeft: 38, marginBottom: 0 }}
-              />
-            </div>
-            <button className="btn btn-primary" onClick={() => { resetClientForm(undefined, 'new_lead'); setClientModalOpen(true); }}>
-              ＋ Add Lead
-            </button>
-          </div>
-
-          {/* Stage Filter Buttons Bar */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 10,
-            padding: '12px 16px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-sm)',
-          }}>
-            {PIPELINE_STAGES.map((stage) => {
-              const count = clients.filter(c => c.pipeline_stage === stage.key).length;
-              const isSelected = selectedPipelineStage === stage.key;
-              return (
-                <button
-                  key={stage.key}
-                  type="button"
-                  onClick={() => setSelectedPipelineStage(stage.key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 16px',
-                    borderRadius: '20px',
-                    background: isSelected ? stage.bg : 'var(--color-surface)',
-                    border: isSelected ? `2px solid ${stage.color}` : '2.5px solid var(--color-border)',
-                    color: isSelected ? stage.color : 'var(--color-text-secondary)',
-                    fontSize: '0.875rem',
-                    fontWeight: isSelected ? 700 : 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: isSelected ? `0 2px 10px ${stage.color}1c` : 'none',
-                    transform: isSelected ? 'scale(1.02)' : 'none',
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = stage.color;
-                      e.currentTarget.style.color = stage.color;
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = 'var(--color-border)';
-                      e.currentTarget.style.color = 'var(--color-text-secondary)';
-                    }
-                  }}
-                >
-                  <span>{stage.emoji}</span>
-                  <span style={{ whiteSpace: 'nowrap' }}>{stage.label}</span>
-                  <span style={{
-                    background: isSelected ? stage.color : 'var(--color-surface-2)',
-                    color: isSelected ? '#fff' : 'var(--color-text-secondary)',
-                    borderRadius: 12,
-                    padding: '2px 8px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    marginLeft: 4,
-                    transition: 'all 0.2s',
-                  }}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Responsive Grid of Cards */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: 20,
-            marginTop: 8,
-          }}>
-            {filteredPipelineLeads.map(c => {
-              const stage = getPipelineStage(c.pipeline_stage);
-              return (
-                <div
-                  key={c.id}
-                  className="lead-card"
-                  style={{
-                    opacity: c.pipeline_stage === 'lost' ? 0.8 : 1,
-                  }}
-                >
-                  {/* Avatar and Name/Company */}
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    {/* Gradient Avatar */}
-                    <div style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 'var(--radius-md)',
-                      background: `linear-gradient(135deg, ${stage.color}, ${stage.color}88)`,
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: '1rem',
-                      flexShrink: 0,
-                      boxShadow: `0 4px 10px ${stage.color}25`,
-                    }}>
-                      {c.name.charAt(0).toUpperCase()}
-                    </div>
-                    
-                    {/* Name and Tags */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontWeight: 800,
-                        fontSize: '0.9375rem',
-                        color: 'var(--color-text-primary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }} title={c.name}>
-                        {c.name}
-                      </div>
-                      {c.company && (
-                        <span style={{
-                          textTransform: 'uppercase',
-                          fontSize: '0.625rem',
-                          letterSpacing: '0.05em',
-                          fontWeight: 700,
-                          color: stage.color,
-                          background: `${stage.color}15`,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          display: 'inline-block',
-                          width: 'fit-content',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          maxWidth: '100%',
-                        }} title={c.company}>
-                          {c.company}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Contact details */}
-                  {(c.email || c.phone) && (
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 6,
-                      borderTop: '1px solid var(--color-border)',
-                      paddingTop: 12,
-                      marginTop: 4,
-                    }}>
-                      {c.email && (
-                        <a href={`mailto:${c.email}`} className="contact-chip" title={c.email} style={{
-                          maxWidth: '100%',
-                        }}>
-                          <span style={{ fontSize: '0.875rem' }}>✉</span>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {c.email}
-                          </span>
-                        </a>
-                      )}
-                      {c.phone && (
-                        <a href={`tel:${c.phone}`} className="contact-chip" title={c.phone}>
-                          <span style={{ fontSize: '0.875rem' }}>📞</span>
-                          <span>{c.phone}</span>
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 8 }}>
-                    {c.pipeline_stage === 'lost' ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          style={{
-                            flex: 1, fontSize: '0.6875rem', padding: '4px 8px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                            borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600
-                          }}
-                          onClick={() => handleReactivate(c)}
-                        >
-                          🔄 Reactivate
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ fontSize: '0.6875rem', padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          onClick={() => { resetClientForm(c, 'new_lead'); setClientModalOpen(true); }}
-                          title="Edit Lead"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          style={{ fontSize: '0.6875rem', padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          onClick={() => handleDeleteClient(c.id, c.name)}
-                          title="Delete Lead"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : c.pipeline_stage === 'won' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <span style={{
-                            flex: 1, fontSize: '0.6875rem', padding: '4px 8px',
-                            background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                            borderRadius: 'var(--radius-sm)', fontWeight: 700
-                          }}>
-                            🏆 Won / Closed
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '0.6875rem', padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            onClick={() => { resetClientForm(c, 'won'); setClientModalOpen(true); }}
-                            title="Edit Client"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-sm"
-                            style={{ fontSize: '0.6875rem', padding: '4px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            onClick={() => handleDeleteClient(c.id, c.name)}
-                            title="Delete Client"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveStage(c, 'backward')}
-                            style={{
-                              background: 'none', border: 'none', color: 'var(--color-primary)',
-                              cursor: 'pointer', fontSize: '0.75rem', padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 4,
-                              fontWeight: 600
-                            }}
-                            title="Move back to Meeting Done"
-                          >
-                            ◀ <span style={{ fontSize: '0.6875rem' }}>Move back to Meeting Done</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            type="button"
-                            className="btn"
-                            style={{
-                              flex: 2, fontSize: '0.6875rem', padding: '4px 8px',
-                              background: '#16a34a', color: '#fff', border: 'none',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                              borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600
-                            }}
-                            onClick={() => openCloseWonModal(c)}
-                          >
-                            🏆 Won
-                          </button>
-                          <button
-                            type="button"
-                            className="btn"
-                            style={{
-                              flex: 1, fontSize: '0.6875rem', padding: '4px 8px',
-                              background: 'transparent', color: '#dc2626', border: '1px solid #fca5a5',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600
-                            }}
-                            onClick={() => handleMarkAsLost(c)}
-                          >
-                            ✕ Lost
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            style={{
-                              fontSize: '0.6875rem', padding: '4px 6px',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}
-                            onClick={() => { resetClientForm(c, 'new_lead'); setClientModalOpen(true); }}
-                            title="Edit Lead"
-                          >
-                            ✏️
-                          </button>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
-                          <button
-                            type="button"
-                            disabled={c.pipeline_stage === 'new_lead'}
-                            onClick={() => handleMoveStage(c, 'backward')}
-                            style={{
-                              background: 'none', border: 'none', color: c.pipeline_stage === 'new_lead' ? 'var(--color-text-muted)' : 'var(--color-primary)',
-                              cursor: c.pipeline_stage === 'new_lead' ? 'not-allowed' : 'pointer', fontSize: '0.75rem', padding: '1px 6px', opacity: c.pipeline_stage === 'new_lead' ? 0.3 : 1
-                            }}
-                            title="Move stage back"
-                          >
-                            ◀
-                          </button>
-                          <span style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Move Stage</span>
-                          <button
-                            type="button"
-                            onClick={() => handleMoveStage(c, 'forward')}
-                            style={{
-                              background: 'none', border: 'none', color: 'var(--color-primary)',
-                              cursor: 'pointer', fontSize: '0.75rem', padding: '1px 6px'
-                            }}
-                            title={c.pipeline_stage === 'meeting_done' ? 'Close as Won' : 'Move stage forward'}
-                          >
-                            ▶
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Empty State */}
-            {filteredPipelineLeads.length === 0 && (
-              <div style={{
-                gridColumn: '1 / -1',
-                textAlign: 'center',
-                padding: '60px 20px',
-                background: 'var(--color-surface)',
-                border: '1.5px dashed var(--color-border)',
-                borderRadius: 'var(--radius-lg)',
-                color: 'var(--color-text-muted)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 12,
-              }}>
-                <div style={{ fontSize: '2.5rem' }}>
-                  {selectedPipelineStage === 'won' ? '🎉' : selectedPipelineStage === 'lost' ? '🗑️' : '✨'}
-                </div>
-                <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>
-                  {selectedPipelineStage === 'won'
-                    ? 'No Closed Won clients'
-                    : selectedPipelineStage === 'lost'
-                    ? 'No marked lost leads'
-                    : `No leads in ${getPipelineStage(selectedPipelineStage).label}`}
-                </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', maxWidth: 320 }}>
-                  {selectedPipelineStage === 'won'
-                    ? 'Successfully close opportunities in the pipeline to list them here!'
-                    : selectedPipelineStage === 'lost'
-                    ? 'Leads marked as lost will be archived here for reactivation.'
-                    : `Add a new lead or move one to this stage to get started.`}
-                </div>
-                {selectedPipelineStage !== 'won' && selectedPipelineStage !== 'lost' && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => { resetClientForm(undefined, selectedPipelineStage); setClientModalOpen(true); }}
-                    style={{ marginTop: 8 }}
-                  >
-                    ＋ Add Lead to {getPipelineStage(selectedPipelineStage).label}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -2827,124 +2197,7 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      {/* ── CLIENT MODAL ── */}
-      <Modal isOpen={clientModalOpen} onClose={() => setClientModalOpen(false)} title={modalMode === 'create' ? 'Add New Client' : 'Edit Client'}>
-        <form onSubmit={handleClientSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
-          
-          <div className="form-group">
-            <label className="form-label">Client Name *</label>
-            <input type="text" className="form-input" placeholder="e.g. John Smith" value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} required />
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Company Name</label>
-            <input type="text" className="form-input" placeholder="e.g. Acme Marketing Corp" value={clientForm.company} onChange={e => setClientForm({ ...clientForm, company: e.target.value })} />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input type="email" className="form-input" placeholder="e.g. client@acme.com" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Phone Number</label>
-              <input type="tel" className="form-input" placeholder="e.g. +1 555-0199" value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} />
-            </div>
-          </div>
-
-          {/* Pipeline Stage Selector */}
-          <div className="form-group">
-            <label className="form-label">Pipeline Stage *</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-              {PIPELINE_STAGES.map(stage => {
-                const isSelected = clientForm.pipeline_stage === stage.key;
-                return (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    onClick={() => setClientForm({ ...clientForm, pipeline_stage: stage.key })}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '7px 14px', borderRadius: 20, fontSize: '0.8125rem', fontWeight: 700,
-                      background: isSelected ? stage.color : stage.bg,
-                      color: isSelected ? '#fff' : stage.color,
-                      border: `2px solid ${isSelected ? stage.color : stage.border}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.18s',
-                      transform: isSelected ? 'scale(1.04)' : 'none',
-                      boxShadow: isSelected ? `0 2px 8px ${stage.color}40` : 'none',
-                    }}
-                  >
-                    {stage.emoji} {stage.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Account Status</label>
-            <select className="form-select" value={clientForm.status} onChange={e => setClientForm({ ...clientForm, status: e.target.value as any })}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setClientModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : modalMode === 'create' ? 'Create Client' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ── CLOSE WON MODAL ── */}
-      <Modal isOpen={closeWonModalOpen} onClose={() => setCloseWonModalOpen(false)} title="🏆 Close Client (Mark as Won)">
-        <form onSubmit={handleCloseWonSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-            Please complete the client details below to move them from the sales pipeline to the Clients list.
-          </p>
-          {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
-          
-          <div className="form-group">
-            <label className="form-label">Client Name *</label>
-            <input type="text" className="form-input" placeholder="e.g. John Smith" value={closeWonForm.name} onChange={e => setCloseWonForm({ ...closeWonForm, name: e.target.value })} required />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Company Name *</label>
-            <input type="text" className="form-input" placeholder="e.g. Acme Marketing Corp" value={closeWonForm.company} onChange={e => setCloseWonForm({ ...closeWonForm, company: e.target.value })} required />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Email Address *</label>
-              <input type="email" className="form-input" placeholder="e.g. client@acme.com" value={closeWonForm.email} onChange={e => setCloseWonForm({ ...closeWonForm, email: e.target.value })} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Phone Number *</label>
-              <input type="tel" className="form-input" placeholder="e.g. +1 555-0199" value={closeWonForm.phone} onChange={e => setCloseWonForm({ ...closeWonForm, phone: e.target.value })} required />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Account Status</label>
-            <select className="form-select" value={closeWonForm.status} onChange={e => setCloseWonForm({ ...closeWonForm, status: e.target.value as any })}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setCloseWonModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Promoting...' : '🏆 Promote to Client'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* ── PROJECT MODAL ── */}
       <Modal isOpen={projectModalOpen} onClose={() => setProjectModalOpen(false)} title={modalMode === 'create' ? 'Create Project' : 'Edit Project'}>

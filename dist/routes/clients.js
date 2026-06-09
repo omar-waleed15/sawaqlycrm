@@ -6,7 +6,7 @@ const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const router = (0, express_1.Router)();
 // GET /api/clients — List all clients
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (_req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (_req, res) => {
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('clients')
@@ -23,8 +23,8 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (_req, re
     }
 });
 // POST /api/clients — Create a new client
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
-    const { name, company, email, phone, status, pipeline_stage } = req.body;
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
     if (!name) {
         res.status(400).json({ error: 'Client name is required' });
         return;
@@ -39,6 +39,19 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, re
             phone: phone || null,
             status: status || 'active',
             pipeline_stage: pipeline_stage || 'new_lead',
+            start_date: start_date || null,
+            address: address || null,
+            content_plan_link: content_plan_link || null,
+            num_posts: num_posts ?? 0,
+            num_reels: num_reels ?? 0,
+            num_stories: num_stories ?? 0,
+            num_photos: num_photos ?? 0,
+            other_deliverables: other_deliverables || null,
+            done_posts: done_posts ?? 0,
+            done_reels: done_reels ?? 0,
+            done_stories: done_stories ?? 0,
+            done_photos: done_photos ?? 0,
+            done_other: done_other ?? false,
         })
             .select()
             .single();
@@ -53,9 +66,9 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, re
     }
 });
 // PUT /api/clients/:id — Update a client
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
     const { id } = req.params;
-    const { name, company, email, phone, status, pipeline_stage } = req.body;
+    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
     try {
         const updates = {};
         if (name !== undefined)
@@ -70,6 +83,32 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, 
             updates.status = status;
         if (pipeline_stage !== undefined)
             updates.pipeline_stage = pipeline_stage;
+        if (start_date !== undefined)
+            updates.start_date = start_date || null;
+        if (address !== undefined)
+            updates.address = address || null;
+        if (content_plan_link !== undefined)
+            updates.content_plan_link = content_plan_link || null;
+        if (num_posts !== undefined)
+            updates.num_posts = num_posts;
+        if (num_reels !== undefined)
+            updates.num_reels = num_reels;
+        if (num_stories !== undefined)
+            updates.num_stories = num_stories;
+        if (num_photos !== undefined)
+            updates.num_photos = num_photos;
+        if (other_deliverables !== undefined)
+            updates.other_deliverables = other_deliverables || null;
+        if (done_posts !== undefined)
+            updates.done_posts = done_posts;
+        if (done_reels !== undefined)
+            updates.done_reels = done_reels;
+        if (done_stories !== undefined)
+            updates.done_stories = done_stories;
+        if (done_photos !== undefined)
+            updates.done_photos = done_photos;
+        if (done_other !== undefined)
+            updates.done_other = done_other;
         const { data, error } = await supabase_1.supabaseAdmin
             .from('clients')
             .update(updates)
@@ -87,7 +126,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, 
     }
 });
 // DELETE /api/clients/:id — Delete a client
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
     const { id } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin

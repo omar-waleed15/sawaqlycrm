@@ -17,12 +17,17 @@ const contracts_1 = __importDefault(require("./routes/contracts"));
 const content_ideas_1 = __importDefault(require("./routes/content_ideas"));
 const expenses_1 = __importDefault(require("./routes/expenses"));
 const salaries_1 = __importDefault(require("./routes/salaries"));
+const finance_analytics_1 = __importDefault(require("./routes/finance_analytics"));
+const sales_1 = __importDefault(require("./routes/sales"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
 // Middleware
 app.use((0, cors_1.default)({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: (origin, callback) => {
+        // Allow any origin to support both localhost and vercel.app deployments
+        callback(null, true);
+    },
     credentials: true,
 }));
 app.use(express_1.default.json({ limit: '10mb' }));
@@ -43,6 +48,8 @@ app.use('/api/contracts', contracts_1.default);
 app.use('/api/ideas', content_ideas_1.default);
 app.use('/api/expenses', expenses_1.default);
 app.use('/api/salaries', salaries_1.default);
+app.use('/api/finance-analytics', finance_analytics_1.default);
+app.use('/api/sales', sales_1.default);
 // 404 handler
 app.use((_req, res) => {
     res.status(404).json({ error: 'Route not found' });
