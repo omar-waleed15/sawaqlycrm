@@ -55,7 +55,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             res.json({ tasks });
         }
         else {
-            // Member: only see tasks they're assigned to
+            // Member/Sales: see tasks they're assigned to OR tasks they created
             const { data: assignments, error: aErr } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
                 .select('task_id')
@@ -65,26 +65,28 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 return;
             }
             const taskIds = (assignments || []).map((a) => a.task_id);
-            if (taskIds.length === 0) {
-                res.json({ tasks: [] });
-                return;
-            }
             let query = supabase_1.supabaseAdmin
                 .from('tasks')
                 .select(TASK_SELECT)
-                .in('id', taskIds)
                 .order('created_at', { ascending: false });
             if (priority)
                 query = query.eq('priority', priority);
+            if (taskIds.length > 0) {
+                query = query.or(`creator_id.eq.${req.user.id},id.in.(${taskIds.join(',')})`);
+            }
+            else {
+                query = query.eq('creator_id', req.user.id);
+            }
             const { data, error } = await query;
             if (error) {
                 res.status(500).json({ error: error.message });
                 return;
             }
             let tasks = data || [];
-            // Filter by status (only the member's own assignment status)
+            // Filter by status (only the member's own assignment status OR if creator, checking if any assignee matches status)
             if (status) {
-                tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.user_id === req.user.id && a.status === status));
+                tasks = tasks.filter((t) => t.task_assignees?.some((a) => (a.user_id === req.user.id && a.status === status) ||
+                    (t.creator_id === req.user.id && a.status === status)));
             }
             res.json({ tasks });
         }
@@ -231,10 +233,11 @@ router.get('/:id', auth_1.authMiddleware, async (req, res) => {
             res.status(404).json({ error: 'Task not found' });
             return;
         }
-        // Members can only view tasks they're assigned to
+        // Non-admins can only view tasks they are assigned to OR tasks they created
         if (!isTaskAdmin(req.user.role)) {
             const isAssigned = data.task_assignees?.some((a) => a.user_id === req.user.id);
-            if (!isAssigned) {
+            const isCreator = data.creator_id === req.user.id;
+            if (!isAssigned && !isCreator) {
                 res.status(403).json({ error: 'Access denied' });
                 return;
             }
@@ -270,14 +273,16 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
         // Verify task exists
         const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
             .from('tasks')
-            .select('id')
+            .select('id, creator_id')
             .eq('id', id)
             .single();
         if (fetchError || !existing) {
             res.status(404).json({ error: 'Task not found' });
             return;
         }
-        if (admin) {
+        const isCreator = existing.creator_id === req.user.id;
+        const canManage = admin || isCreator;
+        if (canManage) {
             // Admin: update shared task fields
             const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id } = req.body;
             const updates = {};
@@ -384,8 +389,8 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
         res.status(500).json({ error: 'Failed to update task' });
     }
 });
-// POST /api/tasks/:id/assignees — Add an assignee to a task (admin/TL only)
-router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+// POST /api/tasks/:id/assignees — Add an assignee to a task (admin or creator)
+router.post('/:id/assignees', auth_1.authMiddleware, async (req, res) => {
     const { id } = req.params;
     const { user_id } = req.body;
     if (!user_id) {
@@ -393,6 +398,21 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
         return;
     }
     try {
+        const admin = isTaskAdmin(req.user.role);
+        const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
+            .from('tasks')
+            .select('creator_id')
+            .eq('id', id)
+            .single();
+        if (fetchError || !existing) {
+            res.status(404).json({ error: 'Task not found' });
+            return;
+        }
+        const isCreator = existing.creator_id === req.user.id;
+        if (!admin && !isCreator) {
+            res.status(403).json({ error: 'Access denied' });
+            return;
+        }
         const { error } = await supabase_1.supabaseAdmin
             .from('task_assignees')
             .insert({ task_id: id, user_id, status: 'todo' });
@@ -406,13 +426,13 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
             return;
         }
         // Re-fetch full task
-        const { data: fullTask, error: fetchError } = await supabase_1.supabaseAdmin
+        const { data: fullTask, error: fetchTaskError } = await supabase_1.supabaseAdmin
             .from('tasks')
             .select(TASK_SELECT)
             .eq('id', id)
             .single();
-        if (fetchError) {
-            res.status(500).json({ error: fetchError.message });
+        if (fetchTaskError) {
+            res.status(500).json({ error: fetchTaskError.message });
             return;
         }
         res.status(201).json({ task: fullTask });
@@ -421,10 +441,25 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
         res.status(500).json({ error: 'Failed to add assignee' });
     }
 });
-// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin/TL only)
-router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin or creator)
+router.delete('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => {
     const { id, userId } = req.params;
     try {
+        const admin = isTaskAdmin(req.user.role);
+        const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
+            .from('tasks')
+            .select('creator_id')
+            .eq('id', id)
+            .single();
+        if (fetchError || !existing) {
+            res.status(404).json({ error: 'Task not found' });
+            return;
+        }
+        const isCreator = existing.creator_id === req.user.id;
+        if (!admin && !isCreator) {
+            res.status(403).json({ error: 'Access denied' });
+            return;
+        }
         const { error } = await supabase_1.supabaseAdmin
             .from('task_assignees')
             .delete()
@@ -435,13 +470,13 @@ router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.owner
             return;
         }
         // Re-fetch full task
-        const { data: fullTask, error: fetchError } = await supabase_1.supabaseAdmin
+        const { data: fullTask, error: fetchTaskError } = await supabase_1.supabaseAdmin
             .from('tasks')
             .select(TASK_SELECT)
             .eq('id', id)
             .single();
-        if (fetchError) {
-            res.status(500).json({ error: fetchError.message });
+        if (fetchTaskError) {
+            res.status(500).json({ error: fetchTaskError.message });
             return;
         }
         res.json({ task: fullTask });
@@ -450,11 +485,26 @@ router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.owner
         res.status(500).json({ error: 'Failed to remove assignee' });
     }
 });
-// PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
-router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+// PUT /api/tasks/:id/assignees/:userId — Admin/Creator updates a specific assignee's data
+router.put('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => {
     const { id, userId } = req.params;
     const { status, feedback } = req.body;
     try {
+        const admin = isTaskAdmin(req.user.role);
+        const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
+            .from('tasks')
+            .select('creator_id')
+            .eq('id', id)
+            .single();
+        if (fetchError || !existing) {
+            res.status(404).json({ error: 'Task not found' });
+            return;
+        }
+        const isCreator = existing.creator_id === req.user.id;
+        if (!admin && !isCreator) {
+            res.status(403).json({ error: 'Access denied' });
+            return;
+        }
         const updates = {};
         if (status !== undefined)
             updates.status = status;
@@ -471,13 +521,13 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrT
             return;
         }
         // Re-fetch full task
-        const { data: fullTask, error: fetchError } = await supabase_1.supabaseAdmin
+        const { data: fullTask, error: fetchTaskError } = await supabase_1.supabaseAdmin
             .from('tasks')
             .select(TASK_SELECT)
             .eq('id', id)
             .single();
-        if (fetchError) {
-            res.status(500).json({ error: fetchError.message });
+        if (fetchTaskError) {
+            res.status(500).json({ error: fetchTaskError.message });
             return;
         }
         res.json({ task: fullTask });
@@ -486,10 +536,26 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrT
         res.status(500).json({ error: 'Failed to update assignee' });
     }
 });
-// DELETE /api/tasks/:id — Delete task (owner or team leader)
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+// DELETE /api/tasks/:id — Delete task (admin or creator)
+router.delete('/:id', auth_1.authMiddleware, async (req, res) => {
     const { id } = req.params;
+    const admin = isTaskAdmin(req.user.role);
     try {
+        // Check if task exists and get creator_id
+        const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
+            .from('tasks')
+            .select('creator_id')
+            .eq('id', id)
+            .single();
+        if (fetchError || !existing) {
+            res.status(404).json({ error: 'Task not found' });
+            return;
+        }
+        const isCreator = existing.creator_id === req.user.id;
+        if (!admin && !isCreator) {
+            res.status(403).json({ error: 'Access denied' });
+            return;
+        }
         const { error } = await supabase_1.supabaseAdmin
             .from('tasks')
             .delete()

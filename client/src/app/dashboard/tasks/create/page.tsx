@@ -46,7 +46,8 @@ export default function CreateTaskPage() {
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
+    const allowedRoles = ['owner', 'team_leader', 'sales', 'moderation', 'account_manager'];
+    if (user && !allowedRoles.includes(user.role)) {
       router.replace('/dashboard');
       return;
     }

@@ -28,7 +28,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard',          label: 'Dashboard',        icon: LayoutDashboard, allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
-  { href: '/dashboard/tasks',    label: 'All Tasks',        icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'member', 'moderation', 'account_manager'] },
+  { href: '/dashboard/tasks',    label: 'All Tasks',        icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
   { href: '/dashboard/team',     label: 'Team',             icon: Users,           allowedRoles: ['owner'] },
   { href: '/dashboard/finance',  label: 'Finance',          icon: Briefcase,       allowedRoles: ['owner'] },
   { href: '/dashboard/clients',  label: 'Clients',          icon: Users,           allowedRoles: ['owner', 'team_leader', 'account_manager'] },

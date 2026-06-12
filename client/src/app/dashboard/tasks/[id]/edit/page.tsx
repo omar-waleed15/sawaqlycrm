@@ -48,17 +48,23 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
-      router.replace('/dashboard');
-      return;
-    }
-
     Promise.all([
       tasksApi.get(id),
       usersApi.list(),
       projectsApi.list(),
     ]).then(([taskData, usersData, projectsData]) => {
       const t = taskData.task;
+
+      if (user) {
+        const isOwner = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(user.role);
+        const isCreator = t.creator_id === user.id;
+
+        if (!isOwner && !isCreator) {
+          router.replace('/dashboard/tasks');
+          return;
+        }
+      }
+
       setForm({
         title: t.title,
         description: t.description || '',

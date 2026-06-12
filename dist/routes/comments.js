@@ -8,17 +8,29 @@ const router = (0, express_1.Router)({ mergeParams: true });
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     const { taskId } = req.params;
     try {
-        // Verify member has access to this task
-        if (req.user.role !== 'owner' && req.user.role !== 'team_leader') {
-            const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
-                .from('task_assignees')
-                .select('id')
-                .eq('task_id', taskId)
-                .eq('user_id', req.user.id)
-                .maybeSingle();
-            if (assigneeError || !assignee) {
-                res.status(403).json({ error: 'Access denied. You are not assigned to this task.' });
-                return;
+        // Verify user has access to this task
+        const userRole = req.user.role;
+        const isTaskAdmin = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(userRole);
+        if (!isTaskAdmin) {
+            // Check if creator of the task
+            const { data: task, error: taskError } = await supabase_1.supabaseAdmin
+                .from('tasks')
+                .select('creator_id')
+                .eq('id', taskId)
+                .single();
+            const isCreator = !taskError && task && task.creator_id === req.user.id;
+            if (!isCreator) {
+                // Check if assigned to the task
+                const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
+                    .from('task_assignees')
+                    .select('id')
+                    .eq('task_id', taskId)
+                    .eq('user_id', req.user.id)
+                    .maybeSingle();
+                if (assigneeError || !assignee) {
+                    res.status(403).json({ error: 'Access denied. You do not have access to this task\'s comments.' });
+                    return;
+                }
             }
         }
         const { data, error } = await supabase_1.supabaseAdmin
@@ -45,17 +57,29 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
         return;
     }
     try {
-        // Verify member has access to this task
-        if (req.user.role !== 'owner' && req.user.role !== 'team_leader') {
-            const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
-                .from('task_assignees')
-                .select('id')
-                .eq('task_id', taskId)
-                .eq('user_id', req.user.id)
-                .maybeSingle();
-            if (assigneeError || !assignee) {
-                res.status(403).json({ error: 'Access denied. You are not assigned to this task.' });
-                return;
+        // Verify user has access to this task
+        const userRole = req.user.role;
+        const isTaskAdmin = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(userRole);
+        if (!isTaskAdmin) {
+            // Check if creator of the task
+            const { data: task, error: taskError } = await supabase_1.supabaseAdmin
+                .from('tasks')
+                .select('creator_id')
+                .eq('id', taskId)
+                .single();
+            const isCreator = !taskError && task && task.creator_id === req.user.id;
+            if (!isCreator) {
+                // Check if assigned to the task
+                const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
+                    .from('task_assignees')
+                    .select('id')
+                    .eq('task_id', taskId)
+                    .eq('user_id', req.user.id)
+                    .maybeSingle();
+                if (assigneeError || !assignee) {
+                    res.status(403).json({ error: 'Access denied. You do not have access to this task\'s comments.' });
+                    return;
+                }
             }
         }
         const { data, error } = await supabase_1.supabaseAdmin

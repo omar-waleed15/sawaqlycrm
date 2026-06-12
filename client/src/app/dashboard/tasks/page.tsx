@@ -40,6 +40,7 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+  const canCreate = user?.role && ['owner', 'team_leader', 'sales', 'moderation', 'account_manager'].includes(user.role);
 
   useEffect(() => {
     loadTasks();
@@ -126,7 +127,7 @@ export default function TasksPage() {
             {isOwner ? 'Manage and track all team tasks' : 'Tasks assigned to you'}
           </p>
         </div>
-        {isOwner && (
+        {canCreate && (
           <Link href="/dashboard/tasks/create">
             <Button>
               <Plus className="size-4" />
@@ -236,13 +237,13 @@ export default function TasksPage() {
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
               ? 'Try adjusting your filters to see more tasks.'
-              : isOwner
+              : canCreate
                 ? activeTab === 'scheduled'
                   ? 'No tasks yet. Create tasks and schedule publish dates to build your content plan.'
                   : 'Create your first task to get started.'
                 : 'No tasks assigned yet.'}
           </div>
-          {isOwner && !statusFilter && !priorityFilter && activeTab !== 'scheduled' && (
+          {canCreate && !statusFilter && !priorityFilter && activeTab !== 'scheduled' && (
             <Link href="/dashboard/tasks/create">
               <Button><Plus className="size-4" /> Create Task</Button>
             </Link>

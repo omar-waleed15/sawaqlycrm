@@ -83,6 +83,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [statusUpdating, setStatusUpdating] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+  const isCreator = task?.creator_id === user?.id;
 
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);
@@ -235,7 +236,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           <ArrowLeft className="size-4" /> Back
         </Button>
         <div className="flex-1" />
-        {isOwner && (
+        {(isOwner || isCreator) && (
           <>
             <Link href={`/dashboard/tasks/${id}/edit`}>
               <Button variant="outline" size="sm">
@@ -528,7 +529,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         )}
 
                         {/* Admin Action Buttons */}
-                        {isOwner && a.status === 'submitted' && (
+                        {(isOwner || isCreator) && a.status === 'submitted' && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
                             {!isWritingFeedback ? (
                               <>
