@@ -64,7 +64,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
       res.json({ tasks });
     } else {
-      // Member/Sales: see tasks they're assigned to OR tasks they created
+      // Member: only see tasks they're assigned to
       const { data: assignments, error: aErr } = await supabaseAdmin
         .from('task_assignees')
         .select('task_id')
@@ -73,19 +73,15 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
       if (aErr) { res.status(500).json({ error: aErr.message }); return; }
 
       const taskIds = (assignments || []).map((a: any) => a.task_id);
+      if (taskIds.length === 0) { res.json({ tasks: [] }); return; }
 
       let query = supabaseAdmin
         .from('tasks')
         .select(TASK_SELECT)
+        .in('id', taskIds)
         .order('created_at', { ascending: false });
 
       if (priority) query = query.eq('priority', priority as string);
-
-      if (taskIds.length > 0) {
-        query = query.or(`creator_id.eq.${req.user!.id},id.in.(${taskIds.join(',')})`);
-      } else {
-        query = query.eq('creator_id', req.user!.id);
-      }
 
       const { data, error } = await query;
 
@@ -93,13 +89,10 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
       let tasks = data || [];
 
-      // Filter by status (only the member's own assignment status OR if creator, checking if any assignee matches status)
+      // Filter by status (only the member's own assignment status)
       if (status) {
         tasks = tasks.filter((t: any) =>
-          t.task_assignees?.some((a: any) => 
-            (a.user_id === req.user!.id && a.status === status) ||
-            (t.creator_id === req.user!.id && a.status === status)
-          )
+          t.task_assignees?.some((a: any) => a.user_id === req.user!.id && a.status === status)
         );
       }
 
@@ -262,11 +255,10 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    // Non-admins can only view tasks they are assigned to OR tasks they created
+    // Members can only view tasks they're assigned to
     if (!isTaskAdmin(req.user!.role)) {
       const isAssigned = data.task_assignees?.some((a: any) => a.user_id === req.user!.id);
-      const isCreator = data.creator_id === req.user!.id;
-      if (!isAssigned && !isCreator) {
+      if (!isAssigned) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -307,7 +299,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
     // Verify task exists
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('tasks')
-      .select('id, creator_id')
+      .select('id')
       .eq('id', id)
       .single();
 
@@ -316,10 +308,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    const isCreator = existing.creator_id === req.user!.id;
-    const canManage = admin || isCreator;
-
-    if (canManage) {
+    if (admin) {
       // Admin: update shared task fields
       const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id } = req.body;
 
@@ -417,8 +406,8 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
   }
 });
 
-// POST /api/tasks/:id/assignees — Add an assignee to a task (admin or creator)
-router.post('/:id/assignees', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/tasks/:id/assignees — Add an assignee to a task (admin/TL only)
+router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { user_id } = req.body;
 
@@ -428,24 +417,6 @@ router.post('/:id/assignees', authMiddleware, async (req: AuthRequest, res: Resp
   }
 
   try {
-    const admin = isTaskAdmin(req.user!.role);
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('tasks')
-      .select('creator_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !existing) {
-      res.status(404).json({ error: 'Task not found' });
-      return;
-    }
-
-    const isCreator = existing.creator_id === req.user!.id;
-    if (!admin && !isCreator) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
     const { error } = await supabaseAdmin
       .from('task_assignees')
       .insert({ task_id: id, user_id, status: 'todo' });
@@ -460,13 +431,13 @@ router.post('/:id/assignees', authMiddleware, async (req: AuthRequest, res: Resp
     }
 
     // Re-fetch full task
-    const { data: fullTask, error: fetchTaskError } = await supabaseAdmin
+    const { data: fullTask, error: fetchError } = await supabaseAdmin
       .from('tasks')
       .select(TASK_SELECT)
       .eq('id', id)
       .single();
 
-    if (fetchTaskError) { res.status(500).json({ error: fetchTaskError.message }); return; }
+    if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
     res.status(201).json({ task: fullTask });
   } catch (err) {
@@ -474,29 +445,11 @@ router.post('/:id/assignees', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
-// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin or creator)
-router.delete('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin/TL only)
+router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
 
   try {
-    const admin = isTaskAdmin(req.user!.role);
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('tasks')
-      .select('creator_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !existing) {
-      res.status(404).json({ error: 'Task not found' });
-      return;
-    }
-
-    const isCreator = existing.creator_id === req.user!.id;
-    if (!admin && !isCreator) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
     const { error } = await supabaseAdmin
       .from('task_assignees')
       .delete()
@@ -506,13 +459,13 @@ router.delete('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest,
     if (error) { res.status(500).json({ error: error.message }); return; }
 
     // Re-fetch full task
-    const { data: fullTask, error: fetchTaskError } = await supabaseAdmin
+    const { data: fullTask, error: fetchError } = await supabaseAdmin
       .from('tasks')
       .select(TASK_SELECT)
       .eq('id', id)
       .single();
 
-    if (fetchTaskError) { res.status(500).json({ error: fetchTaskError.message }); return; }
+    if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
     res.json({ task: fullTask });
   } catch (err) {
@@ -520,30 +473,12 @@ router.delete('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest,
   }
 });
 
-// PUT /api/tasks/:id/assignees/:userId — Admin/Creator updates a specific assignee's data
-router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+// PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
+router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
   const { status, feedback } = req.body;
 
   try {
-    const admin = isTaskAdmin(req.user!.role);
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('tasks')
-      .select('creator_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !existing) {
-      res.status(404).json({ error: 'Task not found' });
-      return;
-    }
-
-    const isCreator = existing.creator_id === req.user!.id;
-    if (!admin && !isCreator) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
     const updates: Record<string, unknown> = {};
     if (status !== undefined) updates.status = status;
     if (feedback !== undefined) updates.feedback = feedback;
@@ -558,13 +493,13 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
     if (error) { res.status(500).json({ error: error.message }); return; }
 
     // Re-fetch full task
-    const { data: fullTask, error: fetchTaskError } = await supabaseAdmin
+    const { data: fullTask, error: fetchError } = await supabaseAdmin
       .from('tasks')
       .select(TASK_SELECT)
       .eq('id', id)
       .single();
 
-    if (fetchTaskError) { res.status(500).json({ error: fetchTaskError.message }); return; }
+    if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
     res.json({ task: fullTask });
   } catch (err) {
@@ -572,30 +507,11 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
   }
 });
 
-// DELETE /api/tasks/:id — Delete task (admin or creator)
-router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/tasks/:id — Delete task (owner or team leader)
+router.delete('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const admin = isTaskAdmin(req.user!.role);
 
   try {
-    // Check if task exists and get creator_id
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('tasks')
-      .select('creator_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !existing) {
-      res.status(404).json({ error: 'Task not found' });
-      return;
-    }
-
-    const isCreator = existing.creator_id === req.user!.id;
-    if (!admin && !isCreator) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
     const { error } = await supabaseAdmin
       .from('tasks')
       .delete()

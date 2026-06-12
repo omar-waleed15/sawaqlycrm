@@ -71,27 +71,19 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, upload.single('file')
   }
 });
 
-// DELETE /api/attachments/:id — Delete an attachment (admin or task creator)
-router.delete('/:attachmentId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/attachments/:id — Delete an attachment (owner only)
+router.delete('/:attachmentId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { attachmentId } = req.params;
 
   try {
     const { data: attachment, error: fetchError } = await supabaseAdmin
       .from('attachments')
-      .select('*, task:tasks(creator_id)')
+      .select('*')
       .eq('id', attachmentId)
       .single();
 
     if (fetchError || !attachment) {
       res.status(404).json({ error: 'Attachment not found' });
-      return;
-    }
-
-    const admin = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(req.user!.role);
-    const isCreator = attachment.task?.creator_id === req.user!.id;
-
-    if (!admin && !isCreator) {
-      res.status(403).json({ error: 'Access denied' });
       return;
     }
 
