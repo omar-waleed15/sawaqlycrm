@@ -107,7 +107,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     taskAssigneeIds: [] as string[],
   });
 
-  const [assigneePickerId, setAssigneePickerId] = useState('');
+
   const [members, setMembers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -159,15 +159,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       fetchTarget(salesRepId, targetMonth);
     }
   }, [salesRepId, targetMonth, fetchTarget]);
-
-  const addAssignee = () => {
-    if (!assigneePickerId) return;
-    setCloseWonForm(p => {
-      if (p.taskAssigneeIds.includes(assigneePickerId)) return p;
-      return { ...p, taskAssigneeIds: [...p.taskAssigneeIds, assigneePickerId] };
-    });
-    setAssigneePickerId('');
-  };
 
   const removeAssignee = (uid: string) => {
     setCloseWonForm(p => ({
@@ -1185,7 +1176,17 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                     )}
 
                     <div className="flex gap-2">
-                      <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                      <Select
+                        value=""
+                        onValueChange={val => {
+                          if (val) {
+                            setCloseWonForm(p => {
+                              if (p.taskAssigneeIds.includes(val)) return p;
+                              return { ...p, taskAssigneeIds: [...p.taskAssigneeIds, val] };
+                            });
+                          }
+                        }}
+                      >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="— Select a member to add —" />
                         </SelectTrigger>
@@ -1197,9 +1198,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
-                        <Plus className="size-4" /> Add
-                      </Button>
                     </div>
                   </div>
                 </div>

@@ -44,7 +44,6 @@ export default function CreateTaskPage() {
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [assigneePickerId, setAssigneePickerId] = useState('');
 
   useEffect(() => {
     if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
@@ -61,13 +60,6 @@ export default function CreateTaskPage() {
 
   const handleSelectChange = (name: string, value: string) => {
     setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const addAssignee = () => {
-    if (assigneePickerId && !assigneeIds.includes(assigneePickerId)) {
-      setAssigneeIds(prev => [...prev, assigneePickerId]);
-      setAssigneePickerId('');
-    }
   };
 
   const removeAssignee = (uid: string) => {
@@ -276,7 +268,14 @@ export default function CreateTaskPage() {
 
                 {/* Add assignee picker */}
                 <div className="flex gap-2">
-                  <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                  <Select
+                    value=""
+                    onValueChange={val => {
+                      if (val && !assigneeIds.includes(val)) {
+                        setAssigneeIds(prev => [...prev, val]);
+                      }
+                    }}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="— Select a member to add —" />
                     </SelectTrigger>
@@ -288,12 +287,9 @@ export default function CreateTaskPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
-                    <Plus className="size-4" /> Add
-                  </Button>
                 </div>
                 {assigneeIds.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1.5">No members assigned yet. Add at least one member.</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">No members assigned yet. Select a member to assign.</p>
                 )}
               </div>
 

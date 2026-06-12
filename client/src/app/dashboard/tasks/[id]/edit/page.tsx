@@ -46,7 +46,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [assigneePickerId, setAssigneePickerId] = useState('');
 
   useEffect(() => {
     if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
@@ -85,13 +84,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
   const handleSelectChange = (name: string, value: string) => {
     setForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const addAssignee = () => {
-    if (assigneePickerId && !assigneeIds.includes(assigneePickerId)) {
-      setAssigneeIds(prev => [...prev, assigneePickerId]);
-      setAssigneePickerId('');
-    }
   };
 
   const removeAssignee = (uid: string) => {
@@ -279,7 +271,14 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                 )}
 
                 <div className="flex gap-2">
-                  <Select value={assigneePickerId} onValueChange={val => setAssigneePickerId(val || '')}>
+                  <Select
+                    value=""
+                    onValueChange={val => {
+                      if (val && !assigneeIds.includes(val)) {
+                        setAssigneeIds(prev => [...prev, val]);
+                      }
+                    }}
+                  >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="— Select a member to add —" />
                     </SelectTrigger>
@@ -289,9 +288,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" onClick={addAssignee} disabled={!assigneePickerId}>
-                    <Plus className="size-4" /> Add
-                  </Button>
                 </div>
               </div>
 
