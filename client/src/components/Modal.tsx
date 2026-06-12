@@ -21,7 +21,7 @@ interface ModalProps {
 export default function Modal({ isOpen, onClose, title, children, footer, maxWidth = 520 }: ModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent style={{ maxWidth, display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} className="p-0 gap-0 overflow-hidden">
+      <DialogContent style={{ maxWidth: `min(${maxWidth}px, calc(100% - 2rem))`, display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} className="p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b shrink-0">
           <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
         </DialogHeader>

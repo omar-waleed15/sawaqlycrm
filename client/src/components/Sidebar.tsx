@@ -16,6 +16,7 @@ import {
   Calendar,
   Settings,
   LogOut,
+  X,
 } from 'lucide-react';
 
 interface NavItem {
@@ -36,7 +37,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/settings', label: 'Settings',         icon: Settings,        allowedRoles: ['owner', 'team_leader'] },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
@@ -49,9 +50,9 @@ export default function Sidebar() {
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   return (
-    <aside className="sidebar">
+    <aside className={cn('sidebar', isOpen && 'open')}>
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-border">
+      <div className="px-5 py-5 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="size-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-lg shrink-0">
             S
@@ -61,6 +62,17 @@ export default function Sidebar() {
             <div className="text-[11px] text-muted-foreground">Marketing Agency</div>
           </div>
         </div>
+        {onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden size-8 text-muted-foreground hover:text-foreground"
+            onClick={onClose}
+            title="Close Menu"
+          >
+            <X className="size-5" />
+          </Button>
+        )}
       </div>
 
       {/* Nav */}
@@ -76,6 +88,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                 isActive
@@ -108,7 +121,10 @@ export default function Sidebar() {
             variant="ghost"
             size="icon"
             className="size-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 shrink-0"
-            onClick={logout}
+            onClick={() => {
+              if (onClose) onClose();
+              logout();
+            }}
             title="Sign out"
           >
             <LogOut className="size-3.5" />
