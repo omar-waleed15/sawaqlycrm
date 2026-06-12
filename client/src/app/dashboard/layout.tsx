@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -47,8 +47,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <span className="text-sm font-bold text-foreground tracking-tight">Sawaqly CRM</span>
         </div>
-        <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-          {user?.name ? getInitials(user.name) : '?'}
+        <div className="flex items-center gap-2">
+          <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0" title={`${user?.name} (${user?.role})`}>
+            {user?.name ? getInitials(user.name) : '?'}
+          </div>
+          <button
+            onClick={logout}
+            className="p-2 -mr-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="size-5" />
+          </button>
         </div>
       </header>
 
