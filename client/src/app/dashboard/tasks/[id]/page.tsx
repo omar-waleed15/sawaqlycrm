@@ -73,6 +73,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [submittingLink, setSubmittingLink] = useState(false);
   const [completionNote, setCompletionNote] = useState('');
 
+  // Admin review state
+  const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
+  const [submittingReview, setSubmittingReview] = useState<Record<string, boolean>>({});
+  const [activeRevisionUserId, setActiveRevisionUserId] = useState<string | null>(null);
+
 
 
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -161,6 +166,38 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   };
 
 
+
+  // Admin: review actions
+  const handleApprove = async (userId: string) => {
+    setSubmittingReview(prev => ({ ...prev, [userId]: true }));
+    try {
+      const data = await tasksApi.updateAssignee(id, userId, { status: 'completed' });
+      setTask(data.task);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingReview(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const handleRequestRevision = async (userId: string) => {
+    const feedback = revisionFeedback[userId] || '';
+    if (!feedback.trim()) return;
+    setSubmittingReview(prev => ({ ...prev, [userId]: true }));
+    try {
+      const data = await tasksApi.updateAssignee(id, userId, {
+        status: 'revision',
+        feedback: feedback.trim(),
+      });
+      setTask(data.task);
+      setActiveRevisionUserId(null);
+      setRevisionFeedback(prev => ({ ...prev, [userId]: '' }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingReview(prev => ({ ...prev, [userId]: false }));
+    }
+  };
 
   // Admin: delete task
   const handleDelete = async () => {
@@ -415,7 +452,148 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             </>
           )}
 
+          {/* Submissions & Reviews Card (Shown for everyone if task has assignees) */}
+          {assignees.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">📥 Submissions &amp; Progress</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 divide-y divide-border">
+                  {assignees.map((a, index) => {
+                    const hasSubmitted = a.submission_link || a.completion_note;
+                    const isSubmitting = submittingReview[a.user_id];
+                    const isWritingFeedback = activeRevisionUserId === a.user_id;
 
+                    return (
+                      <div key={a.id} className={`flex flex-col gap-3 ${index > 0 ? 'pt-4' : ''}`}>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="size-8">
+                              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-bold">
+                                {a.user ? getInitials(a.user.name) : '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="text-sm font-bold">{a.user?.name}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase font-semibold">{a.user?.role}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={a.status} />
+                          </div>
+                        </div>
+
+                        {/* Submission details */}
+                        {hasSubmitted ? (
+                          <div className="bg-muted/50 rounded-lg p-3 border border-border flex flex-col gap-2.5 ml-10">
+                            {a.submission_link && (
+                              <div className="flex items-center gap-2 flex-wrap text-sm">
+                                <span className="text-muted-foreground font-semibold font-medium">Submission Link:</span>
+                                <a
+                                  href={a.submission_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-indigo-600 underline font-medium truncate max-w-[300px] hover:text-indigo-700"
+                                >
+                                  {a.submission_link} ↗
+                                </a>
+                              </div>
+                            )}
+                            {a.completion_note && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs font-semibold text-muted-foreground font-medium">Notes/Thoughts:</span>
+                                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{a.completion_note}</p>
+                              </div>
+                            )}
+                            
+                            {/* Feedback if exists */}
+                            {a.feedback && (
+                              <div className={`text-xs p-2.5 rounded border mt-1 ${
+                                a.status === 'completed' 
+                                  ? 'bg-green-50/50 border-green-100 text-green-800 dark:bg-green-950/20' 
+                                  : 'bg-orange-50/50 border-orange-100 text-orange-800 dark:bg-orange-950/20'
+                              }`}>
+                                <span className="font-bold block mb-0.5">
+                                  {a.status === 'completed' ? '✅ Approval Feedback:' : '🔄 Revision Feedback:'}
+                                </span>
+                                {a.feedback}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground italic ml-10">
+                            No submission yet. Status: <span className="font-semibold capitalize">{a.status.replace('_', ' ')}</span>
+                          </div>
+                        )}
+
+                        {/* Admin Action Buttons */}
+                        {isOwner && a.status === 'submitted' && (
+                          <div className="flex gap-2 justify-end ml-10 mt-1">
+                            {!isWritingFeedback ? (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                                  onClick={() => setActiveRevisionUserId(a.user_id)}
+                                  disabled={isSubmitting}
+                                >
+                                  <RotateCcw className="size-3.5" /> Request Revision
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold"
+                                  onClick={() => handleApprove(a.user_id)}
+                                  disabled={isSubmitting}
+                                >
+                                  {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />} Approve Work
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="flex flex-col gap-2 w-full mt-2">
+                                <Label htmlFor={`feedback-${a.user_id}`} className="text-xs font-bold text-orange-700">
+                                  Revision Instructions / Feedback
+                                </Label>
+                                <Textarea
+                                  id={`feedback-${a.user_id}`}
+                                  placeholder="Specify what needs to be changed..."
+                                  value={revisionFeedback[a.user_id] || ''}
+                                  onChange={e => setRevisionFeedback(prev => ({ ...prev, [a.user_id]: e.target.value }))}
+                                  rows={2}
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setActiveRevisionUserId(null);
+                                      setRevisionFeedback(prev => ({ ...prev, [a.user_id]: '' }));
+                                    }}
+                                    disabled={isSubmitting}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold"
+                                    onClick={() => handleRequestRevision(a.user_id)}
+                                    disabled={isSubmitting || !(revisionFeedback[a.user_id] || '').trim()}
+                                  >
+                                    {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : null} Submit Request
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* ============================================================ */}
           {/* SHARED CHAT */}
