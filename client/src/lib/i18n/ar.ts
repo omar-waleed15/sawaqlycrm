@@ -1,6 +1,6 @@
 export const ar: Record<string, string> = {
   // ── عام ──────────────────────────────────────────────────────────────
-  'common.appName': 'ساوقلي CRM',
+  'common.appName': 'سوقلي CRM',
   'common.marketingAgency': 'وكالة تسويق',
   'common.signOut': 'تسجيل الخروج',
   'common.cancel': 'إلغاء',
