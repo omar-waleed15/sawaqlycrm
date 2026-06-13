@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { salesApi, attachmentsApi, usersApi, projectsApi } from '@/lib/api';
-import { SalesDashboardData, Client, SalesCallLog, User, Project } from '@/types';
+import { salesApi, attachmentsApi, usersApi, projectsApi, tasksApi, contractsApi, clientsApi } from '@/lib/api';
+import { SalesDashboardData, Client, SalesCallLog, User, Project, Contract, Task } from '@/types';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,13 @@ import {
   ChevronUp,
   X,
   Trash2,
-  Target
+  Target,
+  Eye,
+  Rocket,
+  Building2,
+  Clock,
+  Mail,
+  ExternalLink
 } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
@@ -67,6 +73,29 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   const [loading, setLoading] = useState(true);
   const [expandedLeads, setExpandedLeads] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'leads' | 'closed'>('leads');
+
+  // Prospect detail modal state
+  const [detailDeal, setDetailDeal] = useState<Client | null>(null);
+  const [dealContracts, setDealContracts] = useState<Contract[]>([]);
+  const [dealProjects, setDealProjects] = useState<Project[]>([]);
+  const [loadingDealData, setLoadingDealData] = useState(false);
+
+  // Push task from won deal state
+  const [pushTaskDeal, setPushTaskDeal] = useState<Client | null>(null);
+  const [pushTaskForm, setPushTaskForm] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    due_date: '',
+    content_type: '',
+    content_description: '',
+    drive_link: '',
+    project_id: '',
+    assignee_ids: [] as string[],
+  });
+  const [pushingTask, setPushingTask] = useState(false);
+  const [pushTaskError, setPushTaskError] = useState('');
+  const [pushTaskSuccess, setPushTaskSuccess] = useState(false);
 
   // Modals state
   const [leadModalOpen, setLeadModalOpen] = useState(false);
@@ -195,6 +224,111 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       .then(res => setProjects(res.projects || []))
       .catch(err => console.error('Failed to load projects:', err));
   }, [fetchDashboard]);
+
+  // Open prospect detail modal and fetch associated contracts/projects
+  const openDealDetail = useCallback(async (deal: Client) => {
+    setDetailDeal(deal);
+    setLoadingDealData(true);
+    try {
+      const [contractsRes, projectsRes] = await Promise.all([
+        contractsApi.list().catch(() => ({ contracts: [] })),
+        projectsApi.list().catch(() => ({ projects: [] })),
+      ]);
+      setDealContracts((contractsRes.contracts || []).filter((c: Contract) => c.client_id === deal.id));
+      setDealProjects((projectsRes.projects || []).filter((p: Project) => p.client_id === deal.id));
+    } catch {
+      setDealContracts([]);
+      setDealProjects([]);
+    } finally {
+      setLoadingDealData(false);
+    }
+  }, []);
+
+  const closeDealDetail = () => {
+    setDetailDeal(null);
+    setDealContracts([]);
+    setDealProjects([]);
+  };
+
+  // Open Push Task modal from a won deal
+  const openPushTaskForDeal = (deal: Client) => {
+    closeDealDetail();
+    setPushTaskDeal(deal);
+    setPushTaskForm({
+      title: '',
+      description: '',
+      priority: 'medium',
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      content_type: '',
+      content_description: '',
+      drive_link: '',
+      project_id: dealProjects.length > 0 ? dealProjects[0].id : '',
+      assignee_ids: [],
+    });
+    setPushTaskError('');
+    setPushTaskSuccess(false);
+  };
+
+  const closePushTask = () => {
+    setPushTaskDeal(null);
+    setPushTaskError('');
+    setPushTaskSuccess(false);
+  };
+
+  const handlePushTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pushTaskDeal) return;
+    if (!pushTaskForm.title.trim()) { setPushTaskError('Task title is required'); return; }
+    if (pushTaskForm.assignee_ids.length === 0) { setPushTaskError('Please assign at least one member'); return; }
+    if (!pushTaskForm.due_date) { setPushTaskError('Please set a deadline'); return; }
+
+    setPushingTask(true);
+    setPushTaskError('');
+    try {
+      await tasksApi.create({
+        title: pushTaskForm.title,
+        description: pushTaskForm.description || undefined,
+        priority: pushTaskForm.priority as 'low' | 'medium' | 'high' | 'urgent',
+        due_date: pushTaskForm.due_date,
+        content_type: pushTaskForm.content_type || undefined,
+        content_description: pushTaskForm.content_description || undefined,
+        drive_link: pushTaskForm.drive_link || undefined,
+        project_id: (pushTaskForm.project_id && pushTaskForm.project_id !== 'none') ? pushTaskForm.project_id : undefined,
+        client_id: pushTaskDeal.id,
+        assignee_ids: pushTaskForm.assignee_ids,
+      });
+      setPushTaskSuccess(true);
+    } catch (err: any) {
+      setPushTaskError(err.message || 'Failed to create task');
+    } finally {
+      setPushingTask(false);
+    }
+  };
+
+  // Follow-up from deal detail
+  const openFollowUpFromDetail = (deal: Client) => {
+    closeDealDetail();
+    setSelectedLead(deal);
+    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '' });
+    setErrorMsg('');
+    setCallModalOpen(true);
+  };
+
+  const [deletingDeal, setDeletingDeal] = useState(false);
+
+  const handleDeleteDeal = async (dealId: string, dealName: string) => {
+    if (!confirm(`Are you sure you want to delete prospect "${dealName}"? This will delete all their call logs and associated projects/contracts.`)) return;
+    setDeletingDeal(true);
+    try {
+      await clientsApi.delete(dealId);
+      closeDealDetail();
+      fetchDashboard(true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete prospect');
+    } finally {
+      setDeletingDeal(false);
+    }
+  };
 
   const toggleLeadExpanded = (leadId: string) => {
     setExpandedLeads(prev =>
@@ -677,14 +811,18 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
             <div className="flex flex-col gap-3">
               {data.historicalDeals.map(lead => {
                 const stageCfg = PIPELINE_STAGE_CONFIG[lead.pipeline_stage] || PIPELINE_STAGE_CONFIG.won;
-                const repContracts = data.callLogs.filter(log => log.client_id === lead.id);
+                const leadCallLogs = data.callLogs.filter(log => log.client_id === lead.id);
 
                 return (
-                  <Card key={lead.id} className="overflow-hidden border border-border shadow-sm bg-card">
+                  <Card 
+                    key={lead.id} 
+                    className="overflow-hidden border border-border shadow-sm bg-card cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-200 group"
+                    onClick={() => openDealDetail(lead)}
+                  >
                     <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
+                      <div className="flex-1 overflow-hidden">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-sm text-foreground">{lead.name}</h3>
+                          <h3 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{lead.name}</h3>
                           {lead.company && (
                             <span className="text-[10px] font-bold text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
                               {lead.company}
@@ -702,13 +840,21 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           <span>
                             • Closed on {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
+                          {leadCallLogs.length > 0 && (
+                            <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                              <Clock className="size-3" /> {leadCallLogs.length} log{leadCallLogs.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
                       </div>
                       
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-2">
                         <Badge variant="secondary" className={`text-xs py-1 px-3 ${lead.pipeline_stage === 'won' ? 'bg-green-50 text-green-700 font-extrabold border-green-200' : 'bg-rose-50 text-rose-700 font-extrabold border-rose-200'}`}>
-                          {lead.pipeline_stage === 'won' ? 'Won' : 'Lost'}
+                          {lead.pipeline_stage === 'won' ? '✅ Won' : '❌ Lost'}
                         </Badge>
+                        <div className="size-8 rounded-lg bg-muted/60 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          <Eye className="size-4" />
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -1213,6 +1359,412 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
             </div>
           )}
         </form>
+      </Modal>
+
+      {/* ── Modal: Prospect Detail View ─────────────────────────────────────── */}
+      <Modal isOpen={!!detailDeal} onClose={closeDealDetail} title={`📋 ${detailDeal?.name || 'Prospect'} Details`} maxWidth={640}>
+        {detailDeal && (
+          <div className="flex flex-col gap-5">
+            {/* Status Header */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className={`text-xs py-1 px-3 font-bold uppercase ${
+                  (PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).bg
+                } ${
+                  (PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).color
+                }`}>
+                  {(PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).label}
+                </Badge>
+                {detailDeal.company && (
+                  <span className="text-xs font-bold text-muted-foreground bg-muted border px-2 py-0.5 rounded flex items-center gap-1">
+                    <Building2 className="size-3" /> {detailDeal.company}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                Added {new Date(detailDeal.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
+
+            {/* Contact Info Card */}
+            <div className="bg-muted/30 border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center gap-2.5 text-sm">
+                <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                  <Phone className="size-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Phone</div>
+                  <a href={`tel:${detailDeal.phone}`} className="text-xs font-semibold text-foreground hover:text-indigo-600 transition-colors">
+                    {detailDeal.phone || '—'}
+                  </a>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm">
+                <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                  <Mail className="size-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email</div>
+                  <span className="text-xs font-semibold text-foreground">{detailDeal.email || '—'}</span>
+                </div>
+              </div>
+              {detailDeal.meeting_date && (
+                <div className="flex items-center gap-2.5 text-sm sm:col-span-2">
+                  <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Calendar className="size-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meeting Date</div>
+                    <span className="text-xs font-semibold text-foreground">
+                      {new Date(detailDeal.meeting_date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Project & Contract Info (for won deals) */}
+            {detailDeal.pipeline_stage === 'won' && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <DollarSign className="size-3" /> Project & Contract
+                </h4>
+                {loadingDealData ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                    <Loader2 className="size-3.5 animate-spin" /> Loading project data…
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {dealProjects.length > 0 ? dealProjects.map(proj => (
+                      <div key={proj.id} className="bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-foreground">{proj.name}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            Status: <span className="font-semibold capitalize">{proj.status}</span>
+                            {proj.budget > 0 && <> • Budget: <span className="font-semibold">{formatCurrency(proj.budget)}</span></>}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] font-bold uppercase bg-white dark:bg-background">
+                          Project
+                        </Badge>
+                      </div>
+                    )) : (
+                      <p className="text-xs text-muted-foreground/60 italic py-1">No projects linked to this client.</p>
+                    )}
+
+                    {dealContracts.length > 0 ? dealContracts.map(contract => (
+                      <div key={contract.id} className="bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30 rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-foreground">{contract.name}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatCurrency(contract.amount)}
+                            {contract.is_recurring && <> • <span className="capitalize">{contract.billing_cycle}</span></>}
+                            {' '}• <span className="font-semibold capitalize">{contract.status}</span>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] font-bold uppercase bg-white dark:bg-background">
+                          Contract
+                        </Badge>
+                      </div>
+                    )) : (
+                      <p className="text-xs text-muted-foreground/60 italic py-1">No contracts linked to this client.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Call Logs Timeline */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Clock className="size-3" /> Call History & Notes
+              </h4>
+              {(() => {
+                const logs = data?.callLogs.filter(log => log.client_id === detailDeal.id) || [];
+                return logs.length > 0 ? (
+                  <div className="relative border-l-2 border-border/60 pl-4 ml-2 space-y-4 max-h-[220px] overflow-y-auto pr-1">
+                    {logs.map(log => {
+                      const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
+                      return (
+                        <div key={log.id} className="relative">
+                          <div className="absolute left-[-22px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-sm" />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
+                              <span className={`capitalize ${outcomeCfg.color}`}>{outcomeCfg.label}</span>
+                              <span>
+                                {new Date(log.call_date).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">
+                              {log.notes || <span className="italic text-muted-foreground/50">No notes logged.</span>}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground/50 italic py-2">
+                    No call history recorded for this prospect.
+                  </p>
+                );
+              })()}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 flex-wrap pt-3 border-t mt-1">
+              {detailDeal.pipeline_stage === 'won' && !salesRepId && (
+                <Button
+                  onClick={() => openPushTaskForDeal(detailDeal)}
+                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs"
+                  size="sm"
+                >
+                  <Rocket className="size-3.5" /> Push New Task
+                </Button>
+              )}
+              {!salesRepId && (
+                <>
+                  <Button
+                    onClick={() => openFollowUpFromDetail(detailDeal)}
+                    variant="outline"
+                    className="gap-1.5 text-xs font-semibold"
+                    size="sm"
+                  >
+                    <Phone className="size-3.5" /> Log Follow-up
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteDeal(detailDeal.id, detailDeal.name)}
+                    variant="destructive"
+                    className="gap-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white"
+                    size="sm"
+                    disabled={deletingDeal}
+                  >
+                    {deletingDeal ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    Delete Prospect
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={closeDealDetail}
+                variant="ghost"
+                className="ml-auto text-xs"
+                size="sm"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Modal: Push Task for Won Deal ───────────────────────────────────── */}
+      <Modal isOpen={!!pushTaskDeal} onClose={closePushTask} title={`🚀 Push Task: ${pushTaskDeal?.name || ''}`} maxWidth={580}>
+        {pushTaskDeal && (
+          <div>
+            {pushTaskSuccess ? (
+              <div className="text-center py-8 flex flex-col items-center justify-center">
+                <CheckCircle2 className="size-14 text-green-500 mb-3" />
+                <h3 className="font-bold text-base mb-1">Task Created!</h3>
+                <p className="text-xs text-muted-foreground max-w-xs mb-5">
+                  A new task has been pushed for <strong>&ldquo;{pushTaskDeal.company || pushTaskDeal.name}&rdquo;</strong> and assigned to the selected team members.
+                </p>
+                <div className="flex gap-3">
+                  <Button variant="outline" size="sm" onClick={closePushTask}>Close</Button>
+                  <Button size="sm" onClick={() => { closePushTask(); }} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+                    Done <CheckCircle2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handlePushTask} className="flex flex-col gap-4">
+                {pushTaskError && (
+                  <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
+                    {pushTaskError}
+                  </div>
+                )}
+
+                {/* Client context banner */}
+                <div className="bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 p-3 rounded-lg text-xs">
+                  <div className="font-bold text-foreground">{pushTaskDeal.company || pushTaskDeal.name}</div>
+                  <div className="text-muted-foreground mt-0.5">Creating a new task linked to this client&apos;s project.</div>
+                </div>
+
+                <div className="max-h-[50vh] overflow-y-auto pr-1 flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="push-task-title">Task Title *</Label>
+                    <Input
+                      id="push-task-title"
+                      placeholder="e.g. Design social media content batch #2"
+                      value={pushTaskForm.title}
+                      onChange={e => setPushTaskForm(p => ({ ...p, title: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="push-task-desc">Description</Label>
+                    <Textarea
+                      id="push-task-desc"
+                      placeholder="Task instructions, requirements, or context…"
+                      value={pushTaskForm.description}
+                      onChange={e => setPushTaskForm(p => ({ ...p, description: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="push-task-priority">Priority</Label>
+                      <Select value={pushTaskForm.priority} onValueChange={v => setPushTaskForm(p => ({ ...p, priority: v || 'medium' }))}>
+                        <SelectTrigger id="push-task-priority">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">🟢 Low</SelectItem>
+                          <SelectItem value="medium">🟡 Medium</SelectItem>
+                          <SelectItem value="high">🟠 High</SelectItem>
+                          <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="push-task-due">Deadline *</Label>
+                      <Input
+                        id="push-task-due"
+                        type="date"
+                        value={pushTaskForm.due_date}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={e => setPushTaskForm(p => ({ ...p, due_date: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Content Assets */}
+                  <div className="border-t border-border pt-4">
+                    <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">Content Assets</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="push-content-type">Content Type</Label>
+                        <Select value={pushTaskForm.content_type} onValueChange={v => setPushTaskForm(p => ({ ...p, content_type: v || '' }))}>
+                          <SelectTrigger id="push-content-type">
+                            <SelectValue placeholder="— Select —" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="post">Post</SelectItem>
+                            <SelectItem value="story">Story</SelectItem>
+                            <SelectItem value="reel">Reel</SelectItem>
+                            <SelectItem value="photos">Photos</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="push-drive-link">Drive Link</Label>
+                        <Input
+                          id="push-drive-link"
+                          type="url"
+                          placeholder="https://drive.google.com/…"
+                          value={pushTaskForm.drive_link}
+                          onChange={e => setPushTaskForm(p => ({ ...p, drive_link: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 mt-3">
+                      <Label htmlFor="push-content-desc">Content Details</Label>
+                      <Textarea
+                        id="push-content-desc"
+                        placeholder="Caption, hashtags, sizing, reference guidelines…"
+                        value={pushTaskForm.content_description}
+                        onChange={e => setPushTaskForm(p => ({ ...p, content_description: e.target.value }))}
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Project & Assignees */}
+                  <div className="border-t border-border pt-4 flex flex-col gap-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project & Assignees</h4>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="push-project-id">Link to Project</Label>
+                      <Select value={pushTaskForm.project_id || 'none'} onValueChange={v => setPushTaskForm(p => ({ ...p, project_id: v || '' }))}>
+                        <SelectTrigger id="push-project-id">
+                          <SelectValue placeholder="— Select Project —" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {projects.filter(p => p.client_id === pushTaskDeal.id).map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="mb-1 block">👥 Assign To *</Label>
+                      {pushTaskForm.assignee_ids.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {pushTaskForm.assignee_ids.map(uid => {
+                            const m = members.find(u => u.id === uid);
+                            if (!m) return null;
+                            return (
+                              <Badge key={uid} variant="secondary" className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold">
+                                <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                                  {getInitials(m.name)}
+                                </div>
+                                {m.name}
+                                <button
+                                  type="button"
+                                  onClick={() => setPushTaskForm(p => ({ ...p, assignee_ids: p.assignee_ids.filter(id => id !== uid) }))}
+                                  className="ml-1 hover:text-destructive transition-colors"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Select
+                          value=""
+                          onValueChange={val => {
+                            if (val && !pushTaskForm.assignee_ids.includes(val)) {
+                              setPushTaskForm(p => ({ ...p, assignee_ids: [...p.assignee_ids, val] }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="— Select a member to add —" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {members.filter(m => !pushTaskForm.assignee_ids.includes(m.id)).map(m => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.name} ({m.role})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-3 border-t mt-2">
+                  <Button type="button" variant="outline" onClick={closePushTask} disabled={pushingTask}>Cancel</Button>
+                  <Button type="submit" disabled={pushingTask} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold gap-1.5">
+                    {pushingTask ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                    Create Task
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );
