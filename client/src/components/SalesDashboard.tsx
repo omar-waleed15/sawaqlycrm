@@ -697,12 +697,15 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                 const stageCfg = PIPELINE_STAGE_CONFIG[lead.pipeline_stage] || PIPELINE_STAGE_CONFIG.new_lead;
 
                 return (
-                  <Card key={lead.id} className="overflow-hidden border border-border shadow-sm">
-                    <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <Card key={lead.id} className="overflow-hidden border border-border shadow-sm bg-card">
+                    <div 
+                      className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:bg-muted/10 transition-all duration-200 group"
+                      onClick={() => openDealDetail(lead)}
+                    >
                       {/* Left: contact detail */}
                       <div className="flex-1 overflow-hidden">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-sm text-foreground truncate max-w-[200px]">{lead.name}</h3>
+                          <h3 className="font-bold text-sm text-foreground truncate max-w-[200px] group-hover:text-primary transition-colors">{lead.name}</h3>
                           {lead.company && (
                             <span className="text-[10px] font-bold text-muted-foreground bg-muted border px-1.5 py-0.5 rounded">
                               {lead.company}
@@ -728,7 +731,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                       {/* Right: Actions */}
                       <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
                         <Button 
-                          onClick={() => toggleLeadExpanded(lead.id)} 
+                          onClick={(e) => { e.stopPropagation(); toggleLeadExpanded(lead.id); }} 
                           variant="ghost" 
                           size="sm"
                           className="h-8 text-xs font-semibold gap-1"
@@ -738,7 +741,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                         </Button>
                         {!salesRepId && (
                            <Button 
-                             onClick={() => handleOpenLogCall(lead)}
+                             onClick={(e) => { e.stopPropagation(); handleOpenLogCall(lead); }}
                              className="h-8 text-xs font-bold gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3"
                              size="sm"
                            >
