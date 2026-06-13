@@ -7,18 +7,17 @@ import { useAuth } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 interface TaskCardProps {
   task: Task;
   onScheduleClick?: (task: Task) => void;
 }
 
-
-
-function formatDate(dateStr?: string): string {
+function formatDate(dateStr?: string, locale: string = 'en'): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isOverdue(dateStr?: string, assignees?: TaskAssignee[]): boolean {
@@ -35,6 +34,7 @@ function getInitials(name: string): string {
 export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const assignees = task.task_assignees || [];
   const overdue = isOverdue(task.due_date, assignees);
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
@@ -75,7 +75,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
             <div className="flex items-center gap-1.5">
               {task.content_type && (
                 <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
-                  📦 {task.content_type}
+                  📦 {t(`contentType.${task.content_type}`)}
                 </Badge>
               )}
               <PriorityBadge priority={task.priority} />
@@ -83,7 +83,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
             {task.due_date && (
               <div className={cn('flex items-center gap-1 text-[11px] select-none shrink-0', overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground')}>
                 <span>📅</span>
-                <span>{overdue ? 'Overdue · ' : ''}{formatDate(task.due_date)}</span>
+                <span>{overdue ? `${t('common.overdue')} · ` : ''}{formatDate(task.due_date, locale)}</span>
               </div>
             )}
           </div>
@@ -94,8 +94,8 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
           <div className="flex flex-col gap-2 empty:hidden">
             {/* Submission progress for admin */}
             {isOwner && submittedCount > 0 && (
-              <div className="bg-violet-50 dark:bg-violet-950/20 border-l-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 dark:text-violet-300 font-semibold">
-                📤 {submittedCount} submission{submittedCount !== 1 ? 's' : ''} pending review
+              <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 dark:text-violet-300 font-semibold">
+                📤 {t('tasks.submissionsPending', { count: submittedCount })}
               </div>
             )}
 
@@ -103,10 +103,10 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
             {task.publish_date && (
               <div className="flex flex-col gap-1 border-t border-dashed border-border pt-2">
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded px-2 py-0.5 w-fit">
-                  📢 Publish: {formatDate(task.publish_date)}
+                  📢 {t('tasks.publish')} {formatDate(task.publish_date, locale)}
                 </span>
                 {task.publish_notes && (
-                  <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed mt-0.5 pl-1">
+                  <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed mt-0.5 ps-1">
                     📝 {task.publish_notes}
                   </p>
                 )}
@@ -119,7 +119,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
         <div className="flex items-center justify-between pt-3 border-t border-border mt-1">
           {/* Creator Profile */}
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">From:</span>
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">{t('tasks.from')}</span>
             <span className="text-xs text-muted-foreground font-medium truncate" title={task.creator?.name || 'Unknown'}>
               {task.creator?.name || 'Unknown'}
             </span>
@@ -158,7 +158,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
                 )}
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground select-none">Unassigned</span>
+              <span className="text-xs text-muted-foreground select-none">{t('common.unassigned')}</span>
             )}
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
         {onScheduleClick && !task.publish_date && (
           <div className="mt-3 pt-3 border-t border-dashed border-border">
             <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-md py-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors">
-              🗓️ Click to schedule
+              🗓️ {t('tasks.clickToSchedule')}
             </span>
           </div>
         )}
@@ -175,3 +175,4 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
     </Card>
   );
 }
+

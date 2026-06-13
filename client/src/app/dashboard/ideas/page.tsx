@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { useLanguage } from '@/lib/i18n';
 import {
   Select,
   SelectContent,
@@ -24,21 +25,19 @@ import {
   Loader2,
   Trash2,
   Edit,
-  ExternalLink,
-  CheckCircle2,
   FileText,
   AlertTriangle,
-  Lightbulb,
+  CheckCircle2,
+  Calendar,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 
 const CONTENT_TYPES = ['post', 'story', 'reel', 'photos', 'video', 'carousel', 'other'];
 
-const RATING_CONFIG: Record<ContentRating, { label: string; emoji: string; badgeVariant: 'default' | 'secondary' | 'destructive'; colorClass: string; bgClass: string; borderClass: string }> = {
-  good:   { label: 'Good',   emoji: '🟢', badgeVariant: 'default',     colorClass: 'text-green-600 dark:text-green-400',   bgClass: 'bg-green-50 dark:bg-green-950/20', borderClass: 'border-green-200 dark:border-green-900/50' },
-  medium: { label: 'Medium', emoji: '🟡', badgeVariant: 'secondary',   colorClass: 'text-yellow-600 dark:text-yellow-400', bgClass: 'bg-yellow-50 dark:bg-yellow-950/20', borderClass: 'border-yellow-200 dark:border-yellow-900/50' },
-  bad:    { label: 'Bad',    emoji: '🔴', badgeVariant: 'destructive', colorClass: 'text-red-600 dark:text-red-400',     bgClass: 'bg-red-50 dark:bg-red-950/20', borderClass: 'border-red-200 dark:border-red-900/50' },
+const RATING_CONFIG: Record<ContentRating, { labelKey: string; emoji: string; badgeVariant: 'default' | 'secondary' | 'destructive'; colorClass: string; bgClass: string; borderClass: string }> = {
+  good:   { labelKey: 'ideas.good',   emoji: '🟢', badgeVariant: 'default',     colorClass: 'text-green-600 dark:text-green-400',   bgClass: 'bg-green-50 dark:bg-green-950/20', borderClass: 'border-green-200 dark:border-green-900/50' },
+  medium: { labelKey: 'ideas.medium', emoji: '🟡', badgeVariant: 'secondary',   colorClass: 'text-yellow-600 dark:text-yellow-400', bgClass: 'bg-yellow-50 dark:bg-yellow-950/20', borderClass: 'border-yellow-200 dark:border-yellow-900/50' },
+  bad:    { labelKey: 'ideas.bad',    emoji: '🔴', badgeVariant: 'destructive', colorClass: 'text-red-600 dark:text-red-400',     bgClass: 'bg-red-50 dark:bg-red-950/20', borderClass: 'border-red-200 dark:border-red-900/50' },
 };
 
 const CONTENT_TYPE_ICONS: Record<string, string> = {
@@ -46,10 +45,10 @@ const CONTENT_TYPE_ICONS: Record<string, string> = {
 };
 
 const PRIORITY_OPTIONS = [
-  { value: 'low',    label: '🟢 Low'    },
-  { value: 'medium', label: '🟡 Medium' },
-  { value: 'high',   label: '🟠 High'   },
-  { value: 'urgent', label: '🔴 Urgent' },
+  { value: 'low',    labelKey: 'priority.low',    emoji: '🟢' },
+  { value: 'medium', labelKey: 'priority.medium', emoji: '🟡' },
+  { value: 'high',   labelKey: 'priority.high',   emoji: '🟠' },
+  { value: 'urgent', labelKey: 'priority.urgent', emoji: '🔴' },
 ];
 
 const emptyForm = {
@@ -71,6 +70,7 @@ const emptyPushForm = {
 export default function IdeasPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
 
   // Redirect unauthorized users
   useEffect(() => {
@@ -280,11 +280,11 @@ export default function IdeasPage() {
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">💡 Content Ideas</h1>
-          <p className="page-header-subtitle">Capture, rate, and push creative ideas directly to your team as tasks</p>
+          <h1 className="page-header-title">{t('ideas.title')}</h1>
+          <p className="page-header-subtitle">{t('ideas.subtitle')}</p>
         </div>
         <Button onClick={openCreate} className="gap-1.5">
-          <Plus className="size-4" /> New Idea
+          <Plus className="size-4" /> {t('ideas.newIdea')}
         </Button>
       </div>
 
@@ -298,7 +298,7 @@ export default function IdeasPage() {
             <button
               key={r}
               onClick={() => setFilterRating(active ? 'all' : r)}
-              className={`flex flex-col p-4 rounded-xl border text-left transition-all ${
+              className={`flex flex-col p-4 rounded-xl border text-start transition-all ${
                 active
                   ? 'bg-primary/5 border-primary ring-1 ring-primary/20'
                   : 'bg-card border-border hover:bg-muted/10'
@@ -306,7 +306,7 @@ export default function IdeasPage() {
             >
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1">
                 <span className={`size-2 rounded-full ${dotColor}`} />
-                {cfg.label} Ideas
+                {t(cfg.labelKey)} {t('ideas.title')}
               </div>
               <div className="text-2xl font-bold text-foreground">{countByRating(r)}</div>
             </button>
@@ -314,7 +314,7 @@ export default function IdeasPage() {
         })}
         <button
           onClick={() => setFilterRating('all')}
-          className={`flex flex-col p-4 rounded-xl border text-left transition-all ${
+          className={`flex flex-col p-4 rounded-xl border text-start transition-all ${
             filterRating === 'all'
               ? 'bg-primary/5 border-primary ring-1 ring-primary/20'
               : 'bg-card border-border hover:bg-muted/10'
@@ -322,15 +322,15 @@ export default function IdeasPage() {
         >
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-1">
             <span className="size-2 rounded-full bg-indigo-500" />
-            All Concepts
+            {t('ideas.allConcepts')}
           </div>
           <div className="text-2xl font-bold text-foreground">{ideas.length}</div>
         </button>
       </div>
 
       {/* Content-type pill filters */}
-      <div className="flex gap-2 flex-wrap mb-6 items-center">
-        <span className="text-xs text-muted-foreground font-medium mr-1">Types:</span>
+      <div className="flex gap-2 flex-wrap mb-6 items-center text-start">
+        <span className="text-xs text-muted-foreground font-medium mr-1 rtl:ml-1 rtl:mr-0">{t('ideas.types')}</span>
         {['all', ...CONTENT_TYPES].map(type => {
           const active = filterType === type;
           return (
@@ -342,8 +342,8 @@ export default function IdeasPage() {
               className="h-8 text-xs font-medium rounded-full"
             >
               {type === 'all'
-                ? '🌐 All Types'
-                : `${CONTENT_TYPE_ICONS[type] || '✨'} ${type.charAt(0).toUpperCase() + type.slice(1)}`}
+                ? t('ideas.allTypes')
+                : `${CONTENT_TYPE_ICONS[type] || '✨'} ${t('contentType.' + type)}`}
             </Button>
           );
         })}
@@ -353,18 +353,16 @@ export default function IdeasPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[250px] gap-3">
           <Loader2 className="size-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading content ideas…</p>
+          <p className="text-sm text-muted-foreground">{t('ideas.loadingIdeas')}</p>
         </div>
       ) : filtered.length === 0 ? (
         <Card className="border-dashed py-16 text-center max-w-lg mx-auto mt-4">
           <CardContent className="flex flex-col items-center">
             <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-4">💡</div>
-            <h3 className="font-semibold text-base mb-1">No ideas found</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Click <strong>New Idea</strong> to capture your first creative brainstorming concept.
-            </p>
+            <h3 className="font-semibold text-base mb-1">{t('ideas.noIdeas')}</h3>
+            <p className="text-xs text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('ideas.noIdeasHint') }} />
             <Button onClick={openCreate} size="sm" className="gap-1">
-              <Plus className="size-4" /> Create Idea
+              <Plus className="size-4" /> {t('ideas.createIdea')}
             </Button>
           </CardContent>
         </Card>
@@ -381,7 +379,7 @@ export default function IdeasPage() {
                   {/* Top row: Title on left, Rating on right */}
                   <div className="flex items-start justify-between gap-4">
                     <h3
-                      className="font-bold text-base hover:text-primary transition-colors cursor-pointer leading-snug line-clamp-2 flex-1"
+                      className="font-bold text-base hover:text-primary transition-colors cursor-pointer leading-snug line-clamp-2 flex-1 text-start"
                       onClick={() => setViewIdea(idea)}
                     >
                       {idea.title}
@@ -391,7 +389,7 @@ export default function IdeasPage() {
                       className={`text-[10px] font-bold py-0.5 px-2 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1 shrink-0 ${cfg.bgClass} ${cfg.colorClass} ${cfg.borderClass}`}
                       title="Click to cycle rating"
                     >
-                      {cfg.emoji} {cfg.label}
+                      {cfg.emoji} {t(cfg.labelKey)}
                     </button>
                   </div>
 
@@ -399,14 +397,14 @@ export default function IdeasPage() {
                   {idea.content_type && (
                     <div className="flex items-center">
                       <Badge variant="outline" className="text-[10px] py-0.5 px-2 font-semibold">
-                        {CONTENT_TYPE_ICONS[idea.content_type] || '✨'} {idea.content_type}
+                        {CONTENT_TYPE_ICONS[idea.content_type] || '✨'} {t('contentType.' + idea.content_type)}
                       </Badge>
                     </div>
                   )}
 
                   {/* Description */}
                   {idea.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed mt-0.5">
+                    <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed mt-0.5 text-start">
                       {idea.description}
                     </p>
                   )}
@@ -417,9 +415,9 @@ export default function IdeasPage() {
                       href={idea.drive_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-auto"
+                      className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-semibold mt-auto text-start"
                     >
-                      📁 Google Drive Asset ↗
+                      📁 {t('ideas.driveAsset')} ↗
                     </a>
                   )}
 
@@ -431,13 +429,13 @@ export default function IdeasPage() {
                     className="w-full text-xs font-semibold gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
                     size="sm"
                   >
-                    🚀 Push to Task
+                    🚀 {t('ideas.pushToTask')}
                   </Button>
 
                   {/* Footer: date + action buttons */}
                   <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">
                     <span>
-                      {new Date(idea.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(idea.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -445,7 +443,7 @@ export default function IdeasPage() {
                         size="icon"
                         onClick={() => setViewIdea(idea)}
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        title="View details"
+                        title={t('ideas.viewDetails')}
                       >
                         <FileText className="size-3.5" />
                       </Button>
@@ -454,7 +452,7 @@ export default function IdeasPage() {
                         size="icon"
                         onClick={() => openEdit(idea)}
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        title="Edit idea"
+                        title={t('ideas.editIdeaBtn')}
                       >
                         <Edit className="size-3.5" />
                       </Button>
@@ -463,7 +461,7 @@ export default function IdeasPage() {
                         size="icon"
                         onClick={() => setDeleteTarget(idea)}
                         className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        title="Delete idea"
+                        title={t('ideas.deleteIdea')}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -480,9 +478,9 @@ export default function IdeasPage() {
       <Modal
         isOpen={showModal}
         onClose={closeModal}
-        title={editingIdea ? '✏️ Edit Idea' : '💡 New Content Idea'}
+        title={editingIdea ? t('ideas.editIdea') : t('ideas.newContentIdea')}
       >
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
+        <form onSubmit={handleSave} className="flex flex-col gap-4 text-start">
           {error && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
               {error}
@@ -490,7 +488,7 @@ export default function IdeasPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="idea-title">Title *</Label>
+            <Label htmlFor="idea-title">{t('ideas.ideaTitle')} *</Label>
             <Input
               id="idea-title"
               type="text"
@@ -502,7 +500,7 @@ export default function IdeasPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="idea-description">Description</Label>
+            <Label htmlFor="idea-description">{t('ideas.ideaDescription')}</Label>
             <Textarea
               id="idea-description"
               placeholder="Brief overview of the idea…"
@@ -514,18 +512,18 @@ export default function IdeasPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="idea-content-type">Content Type</Label>
+              <Label htmlFor="idea-content-type">{t('ideas.ideaContentType')}</Label>
               <Select
                 value={form.content_type}
                 onValueChange={v => setForm(p => ({ ...p, content_type: v || '' }))}
               >
                 <SelectTrigger id="idea-content-type">
-                  <SelectValue placeholder="Select type…" />
+                  <SelectValue placeholder={t('ideas.selectType')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {CONTENT_TYPES.map(t => (
-                    <SelectItem key={t} value={t}>
-                      {CONTENT_TYPE_ICONS[t]} {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {CONTENT_TYPES.map(tTask => (
+                    <SelectItem key={tTask} value={tTask}>
+                      {CONTENT_TYPE_ICONS[tTask]} {t('contentType.' + tTask)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -533,7 +531,7 @@ export default function IdeasPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Rating</Label>
+              <Label>{t('ideas.rating')}</Label>
               <div className="flex gap-2">
                 {(['good', 'medium', 'bad'] as ContentRating[]).map(r => {
                   const cfg = RATING_CONFIG[r];
@@ -552,7 +550,7 @@ export default function IdeasPage() {
                       }`}
                     >
                       <span>{cfg.emoji}</span>
-                      <span>{cfg.label}</span>
+                      <span>{t(cfg.labelKey)}</span>
                     </Button>
                   );
                 })}
@@ -561,7 +559,7 @@ export default function IdeasPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="idea-drive-link">📁 Google Drive Link</Label>
+            <Label htmlFor="idea-drive-link">📁 {t('ideas.driveLink')}</Label>
             <Input
               id="idea-drive-link"
               type="url"
@@ -572,7 +570,7 @@ export default function IdeasPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="idea-content-description">Content Description / Execution Details</Label>
+            <Label htmlFor="idea-content-description">{t('ideas.contentDescription')}</Label>
             <Textarea
               id="idea-content-description"
               placeholder="Detailed notes on caption, visual style, sizing, hashtags, reference guidelines…"
@@ -583,10 +581,10 @@ export default function IdeasPage() {
           </div>
 
           <div className="flex gap-3 justify-end pt-2 border-t mt-2">
-            <Button type="button" variant="outline" onClick={closeModal}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={closeModal}>{t('common.cancel')}</Button>
             <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              {editingIdea ? 'Save Changes' : 'Create Idea'}
+              {saving ? <Loader2 className="mr-2 size-4 animate-spin rtl:ml-2 rtl:mr-0" /> : null}
+              {editingIdea ? t('common.saveChanges') : t('ideas.createIdea')}
             </Button>
           </div>
         </form>
@@ -596,55 +594,55 @@ export default function IdeasPage() {
       <Modal
         isOpen={!!viewIdea}
         onClose={() => setViewIdea(null)}
-        title="Content Idea Details"
+        title={t('ideas.ideaDetails')}
       >
         {viewIdea && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 text-start">
             <div className="flex items-center gap-3 flex-wrap">
               {viewIdea.content_type && (
                 <Badge variant="outline" className="text-xs py-0.5 px-2 font-semibold">
-                  {CONTENT_TYPE_ICONS[viewIdea.content_type] || '✨'} {viewIdea.content_type}
+                  {CONTENT_TYPE_ICONS[viewIdea.content_type] || '✨'} {t('contentType.' + viewIdea.content_type)}
                 </Badge>
               )}
               <Badge
                 variant={RATING_CONFIG[viewIdea.rating].badgeVariant}
                 className="text-xs py-0.5 px-2"
               >
-                {RATING_CONFIG[viewIdea.rating].emoji} {RATING_CONFIG[viewIdea.rating].label} Rating
+                {RATING_CONFIG[viewIdea.rating].emoji} {t(RATING_CONFIG[viewIdea.rating].labelKey)}
               </Badge>
             </div>
 
             <div>
               <h2 className="text-lg font-bold text-foreground leading-snug">{viewIdea.title}</h2>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Created on {new Date(viewIdea.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {t('ideas.createdOn')} {new Date(viewIdea.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
 
             {viewIdea.description && (
               <div className="bg-muted/40 p-3 rounded-lg border">
-                <div className="text-xs font-semibold text-muted-foreground mb-1">📋 Overview</div>
+                <div className="text-xs font-semibold text-muted-foreground mb-1">📋 {t('ideas.overview')}</div>
                 <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{viewIdea.description}</p>
               </div>
             )}
 
             {viewIdea.content_description && (
               <div className="bg-muted/40 p-3 rounded-lg border">
-                <div className="text-xs font-semibold text-muted-foreground mb-1">📝 Execution Details</div>
+                <div className="text-xs font-semibold text-muted-foreground mb-1">📝 {t('ideas.executionDetails')}</div>
                 <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{viewIdea.content_description}</p>
               </div>
             )}
 
             {viewIdea.drive_link && (
               <div className="bg-muted/40 p-3 rounded-lg border">
-                <div className="text-xs font-semibold text-muted-foreground mb-1">📁 Drive Asset</div>
+                <div className="text-xs font-semibold text-muted-foreground mb-1">📁 {t('ideas.driveAssetLabel')}</div>
                 <a
                   href={viewIdea.drive_link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-bold"
                 >
-                  Open in Google Drive ↗
+                  {t('ideas.openDrive')} ↗
                 </a>
               </div>
             )}
@@ -656,7 +654,7 @@ export default function IdeasPage() {
                 onClick={() => { setViewIdea(null); openPush(viewIdea); }}
                 className="text-xs font-semibold gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
               >
-                🚀 Push to Task
+                🚀 {t('ideas.pushToTask')}
               </Button>
               <Button
                 variant="secondary"
@@ -664,7 +662,7 @@ export default function IdeasPage() {
                 onClick={() => { setViewIdea(null); openEdit(viewIdea); }}
                 className="text-xs font-semibold"
               >
-                Edit
+                {t('common.edit')}
               </Button>
               <Button
                 variant="ghost"
@@ -683,21 +681,21 @@ export default function IdeasPage() {
       <Modal
         isOpen={!!pushTarget}
         onClose={closePush}
-        title="🚀 Push Idea to Task"
+        title={`🚀 ${t('ideas.pushIdeaToTask')}`}
       >
         {pushTarget && (
-          <div>
+          <div className="text-start">
             {pushSuccess ? (
               <div className="text-center py-6 flex flex-col items-center justify-center">
                 <CheckCircle2 className="size-12 text-green-500 mb-3" />
-                <h3 className="font-bold text-base mb-1">Task Created!</h3>
+                <h3 className="font-bold text-base mb-1">{t('ideas.taskCreated')}</h3>
                 <p className="text-xs text-muted-foreground max-w-xs mb-5">
-                  <strong>&ldquo;{pushTarget.title}&rdquo;</strong> has been successfully pushed as a new task and assigned.
+                  <strong>&ldquo;{pushTarget.title}&rdquo;</strong> {t('ideas.taskCreatedDesc').replace('{title}', '')}
                 </p>
                 <div className="flex gap-3 justify-center">
-                  <Button variant="outline" size="sm" onClick={closePush}>Close</Button>
+                  <Button variant="outline" size="sm" onClick={closePush}>{t('common.close')}</Button>
                   <Button size="sm" onClick={() => { closePush(); router.push('/dashboard/tasks'); }} className="gap-1">
-                    Go to Board <ArrowRight className="size-3.5" />
+                    {t('ideas.goToBoard')} <ArrowRight className="size-3.5 rtl:rotate-180" />
                   </Button>
                 </div>
               </div>
@@ -707,11 +705,11 @@ export default function IdeasPage() {
                   <div className="flex gap-1.5 flex-wrap mb-1.5">
                     {pushTarget.content_type && (
                       <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-semibold bg-white">
-                        {CONTENT_TYPE_ICONS[pushTarget.content_type] || '✨'} {pushTarget.content_type}
+                        {CONTENT_TYPE_ICONS[pushTarget.content_type] || '✨'} {t('contentType.' + pushTarget.content_type)}
                       </Badge>
                     )}
                     <Badge variant="secondary" className="text-[9px] py-0 px-1.5 bg-white">
-                      Rating: {RATING_CONFIG[pushTarget.rating].label}
+                      {t('ideas.rating')}: {t(RATING_CONFIG[pushTarget.rating].labelKey)}
                     </Badge>
                   </div>
                   <div className="font-bold">&ldquo;{pushTarget.title}&rdquo;</div>
@@ -719,27 +717,27 @@ export default function IdeasPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="push-assignee">👥 Assign To *</Label>
+                  <Label htmlFor="push-assignee">👥 {t('ideas.assignTo')} *</Label>
                   <div className="flex gap-2">
                     <Select
                       value={pushForm.assignee_picker_id}
                       onValueChange={v => setPushForm(p => ({ ...p, assignee_picker_id: v || '' }))}
                     >
                       <SelectTrigger id="push-assignee" className="flex-1">
-                        <SelectValue placeholder="Select team member…" />
+                        <SelectValue placeholder={t('ideas.selectTeamMember')} />
                       </SelectTrigger>
                       <SelectContent>
                         {users
                           .filter(u => !pushForm.assignee_ids.includes(u.id))
                           .map(u => (
                             <SelectItem key={u.id} value={u.id}>
-                              {u.name} — {u.role === 'owner' ? 'Admin' : u.role === 'team_leader' ? 'Leader' : u.role === 'sales' ? 'Sales' : 'Member'}
+                              {u.name} — {u.role === 'owner' ? t('role.owner') : u.role === 'team_leader' ? t('role.team_leader') : u.role === 'sales' ? t('role.sales') : t('role.member')}
                             </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
                     <Button type="button" onClick={addPushAssignee} variant="outline" className="shrink-0">
-                      Add
+                      {t('common.add')}
                     </Button>
                   </div>
                   
@@ -754,7 +752,7 @@ export default function IdeasPage() {
                             <button
                               type="button"
                               onClick={() => removePushAssignee(uid)}
-                              className="text-indigo-400 hover:text-indigo-600 transition-colors text-[10px] ml-0.5"
+                              className="text-indigo-400 hover:text-indigo-600 transition-colors text-[10px] ml-0.5 rtl:mr-0.5 rtl:ml-0"
                             >
                               ✕
                             </button>
@@ -766,7 +764,7 @@ export default function IdeasPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="push-due-date">📅 Deadline *</Label>
+                  <Label htmlFor="push-due-date">📅 {t('ideas.deadline')} *</Label>
                   <Input
                     id="push-due-date"
                     type="date"
@@ -778,7 +776,7 @@ export default function IdeasPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label>⚡ Priority</Label>
+                  <Label>⚡ {t('ideas.priorityLabel')}</Label>
                   <div className="grid grid-cols-4 gap-2">
                     {PRIORITY_OPTIONS.map(opt => {
                       const isSelected = pushForm.priority === opt.value;
@@ -791,7 +789,7 @@ export default function IdeasPage() {
                           onClick={() => setPushForm(p => ({ ...p, priority: opt.value }))}
                           className="text-xs"
                         >
-                          {opt.label.split(' ')[1]}
+                          {t(opt.labelKey)}
                         </Button>
                       );
                     })}
@@ -805,10 +803,10 @@ export default function IdeasPage() {
                 )}
 
                 <div className="flex gap-3 justify-end pt-2 border-t mt-2">
-                  <Button type="button" variant="outline" onClick={closePush}>Cancel</Button>
+                  <Button type="button" variant="outline" onClick={closePush}>{t('common.cancel')}</Button>
                   <Button type="submit" disabled={pushing} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {pushing ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                    🚀 Create Task
+                    {pushing ? <Loader2 className="mr-2 size-4 animate-spin rtl:ml-2 rtl:mr-0" /> : null}
+                    🚀 {t('ideas.pushTask')}
                   </Button>
                 </div>
               </form>
@@ -821,7 +819,7 @@ export default function IdeasPage() {
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Delete Content Idea"
+        title={t('ideas.deleteIdea')}
       >
         {deleteTarget && (
           <div className="flex flex-col gap-4 text-center py-2">
@@ -829,16 +827,16 @@ export default function IdeasPage() {
               <AlertTriangle className="size-6" />
             </div>
             <div>
-              <h3 className="font-bold text-base mb-1 text-foreground">Are you sure?</h3>
+              <h3 className="font-bold text-base mb-1 text-foreground">{t('common.yes')}</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                You are about to delete the content idea <strong>&ldquo;{deleteTarget.title}&rdquo;</strong>. This action is permanent and cannot be undone.
+                {t('ideas.deleteConfirm')}
               </p>
             </div>
             <div className="flex gap-3 justify-center mt-3 pt-2 border-t">
-              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
               <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
                 {deleting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                Delete Idea
+                {t('ideas.deleteIdea')}
               </Button>
             </div>
           </div>

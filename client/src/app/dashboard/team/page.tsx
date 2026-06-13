@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { usersApi } from '@/lib/api';
 import { User, UserRole } from '@/types';
 import Modal from '@/components/Modal';
@@ -35,6 +36,7 @@ import {
 
 export default function TeamPage() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const router = useRouter();
 
   const [users, setUsers] = useState<User[]>([]);
@@ -79,7 +81,7 @@ export default function TeamPage() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
-      setFormError('All fields are required');
+      setFormError(t('team.fieldsRequired'));
       return;
     }
 
@@ -92,7 +94,7 @@ export default function TeamPage() {
       resetForm();
       loadUsers();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to create team member');
+      setFormError(err.message || t('team.failedCreate'));
     } finally {
       setSubmitting(false);
     }
@@ -102,7 +104,7 @@ export default function TeamPage() {
     e.preventDefault();
     if (!selectedUser) return;
     if (!name) {
-      setFormError('Name is required');
+      setFormError(t('team.nameRequired'));
       return;
     }
 
@@ -115,7 +117,7 @@ export default function TeamPage() {
       resetForm();
       loadUsers();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to update team member');
+      setFormError(err.message || t('team.failedUpdate'));
     } finally {
       setSubmitting(false);
     }
@@ -123,11 +125,11 @@ export default function TeamPage() {
 
   const handleDeleteUser = async (id: string, userName: string) => {
     if (id === user?.id) {
-      alert('You cannot delete your own account.');
+      alert(t('team.cannotDeleteSelf'));
       return;
     }
 
-    if (!confirm(`Are you sure you want to remove ${userName}? This will delete all of their profile information and accounts.`)) {
+    if (!confirm(t('team.deleteConfirm', { name: userName }))) {
       return;
     }
 
@@ -135,7 +137,7 @@ export default function TeamPage() {
       await usersApi.delete(id);
       loadUsers();
     } catch (err: any) {
-      alert(err.message || 'Failed to delete team member');
+      alert(err.message || t('team.failedDelete'));
     }
   };
 
@@ -177,11 +179,11 @@ export default function TeamPage() {
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">Team Management</h1>
-          <p className="page-header-subtitle">Manage and assign roles to your marketing team</p>
+          <h1 className="page-header-title">{t('team.title')}</h1>
+          <p className="page-header-subtitle">{t('team.subtitle')}</p>
         </div>
         <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="gap-1.5">
-          <Plus className="size-4" /> Add Member
+          <Plus className="size-4" /> {t('team.addMember')}
         </Button>
       </div>
 
@@ -189,56 +191,56 @@ export default function TeamPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Total Team</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('team.totalTeam')}</span>
             <Users className="size-4 text-indigo-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{users.length}</div>
-            <p className="text-[11px] text-muted-foreground mt-1">Registered accounts</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('team.registeredAccounts')}</p>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Admins</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('team.admins')}</span>
             <Shield className="size-4 text-rose-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{ownerCount}</div>
-            <p className="text-[11px] text-muted-foreground mt-1">Full control access</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('team.fullControl')}</p>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Team Leaders</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('team.teamLeaders')}</span>
             <Target className="size-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{teamLeaderCount}</div>
-            <p className="text-[11px] text-muted-foreground mt-1">Lead & assign tasks</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('team.leadAssignTasks')}</p>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Sales</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('team.salesLabel')}</span>
             <BadgeDollarSign className="size-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{salesCount}</div>
-            <p className="text-[11px] text-muted-foreground mt-1">Client relations</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('team.clientRelations')}</p>
           </CardContent>
         </Card>
 
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <span className="text-sm font-medium text-muted-foreground">Members</span>
+            <span className="text-sm font-medium text-muted-foreground">{t('team.membersLabel')}</span>
             <UserSquare2 className="size-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{memberCount}</div>
-            <p className="text-[11px] text-muted-foreground mt-1">Task execution team</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{t('team.taskExecution')}</p>
           </CardContent>
         </Card>
       </div>
@@ -249,14 +251,14 @@ export default function TeamPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search members by name or email..."
+            placeholder={t('team.searchPlaceholder')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-9 w-full max-w-md"
           />
         </div>
         <div className="text-xs text-muted-foreground self-center">
-          Showing {filteredUsers.length} of {users.length} members
+          {t('team.showingOf', { shown: filteredUsers.length, total: users.length })}
         </div>
       </div>
 
@@ -307,12 +309,12 @@ export default function TeamPage() {
                         }
                         className="text-[10px] py-0.5 px-1.5"
                       >
-                        {member.role === 'owner' ? 'Admin' :
-                         member.role === 'team_leader' ? 'Leader' :
-                         member.role === 'sales' ? 'Sales' :
-                         member.role === 'moderation' ? 'Moderator' :
-                         member.role === 'account_manager' ? 'Account Manager' :
-                         'Member'}
+                        {member.role === 'owner' ? t('role.owner') :
+                         member.role === 'team_leader' ? t('role.team_leader') :
+                         member.role === 'sales' ? t('role.sales') :
+                         member.role === 'moderation' ? t('role.moderation') :
+                         member.role === 'account_manager' ? t('role.account_manager') :
+                         t('role.member')}
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{member.email}</p>
@@ -323,7 +325,7 @@ export default function TeamPage() {
 
                 <div className="flex justify-between items-center mt-auto">
                   <span className="text-[11px] text-muted-foreground">
-                    Joined: {member.created_at ? new Date(member.created_at).toLocaleDateString() : 'N/A'}
+                    {t('team.joined')} {member.created_at ? new Date(member.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US') : t('common.noData')}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button
@@ -332,7 +334,7 @@ export default function TeamPage() {
                       onClick={() => router.push(`/dashboard/team/${member.id}`)}
                       className="h-8 text-xs gap-1"
                     >
-                      <ExternalLink className="size-3" /> Tasks
+                      <ExternalLink className="size-3" /> {t('team.tasks')}
                     </Button>
                     <Button
                       variant="secondary"
@@ -340,7 +342,7 @@ export default function TeamPage() {
                       onClick={() => openEditModal(member)}
                       className="h-8 text-xs"
                     >
-                      Edit
+                      {t('common.edit')}
                     </Button>
                     {member.id !== user?.id && (
                       <Button
@@ -361,8 +363,8 @@ export default function TeamPage() {
       ) : (
         <div className="empty-state">
           <div className="empty-state-icon">👥</div>
-          <div className="empty-state-title">No team members found</div>
-          <div className="empty-state-desc">No members matched your search criteria. Try a different query.</div>
+          <div className="empty-state-title">{t('team.noMembers')}</div>
+          <div className="empty-state-desc">{t('team.noMembersDesc')}</div>
         </div>
       )}
 
@@ -370,7 +372,7 @@ export default function TeamPage() {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Add Team Member"
+        title={t('team.addTeamMember')}
       >
         <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
           {formError && (
@@ -380,11 +382,11 @@ export default function TeamPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-name">Full Name</Label>
+            <Label htmlFor="new-name">{t('team.fullName')}</Label>
             <Input
               id="new-name"
               type="text"
-              placeholder="e.g. John Doe"
+              placeholder={t('team.fullNamePlaceholder')}
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -392,11 +394,11 @@ export default function TeamPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-email">Email Address</Label>
+            <Label htmlFor="new-email">{t('team.emailAddress')}</Label>
             <Input
               id="new-email"
               type="email"
-              placeholder="e.g. john@sawaqly.com"
+              placeholder={t('team.emailPlaceholder')}
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -404,7 +406,7 @@ export default function TeamPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-password">Password</Label>
+            <Label htmlFor="new-password">{t('team.passwordLabel')}</Label>
             <Input
               id="new-password"
               type="password"
@@ -416,30 +418,30 @@ export default function TeamPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="new-role">Role</Label>
+            <Label htmlFor="new-role">{t('team.roleLabel')}</Label>
             <Select value={role} onValueChange={v => setRole(v as UserRole || 'member')}>
               <SelectTrigger id="new-role">
-                <SelectValue placeholder="Select a role" />
+                <SelectValue placeholder={t('team.selectRole')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="member">Team Member</SelectItem>
-                <SelectItem value="team_leader">Team Leader</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
-                <SelectItem value="moderation">Moderator</SelectItem>
-                <SelectItem value="account_manager">Account Manager</SelectItem>
-                <SelectItem value="owner">Admin</SelectItem>
+                <SelectItem value="member">{t('role.teamMember')}</SelectItem>
+                <SelectItem value="team_leader">{t('role.team_leader')}</SelectItem>
+                <SelectItem value="sales">{t('role.sales')}</SelectItem>
+                <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
+                <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
+                <SelectItem value="owner">{t('role.owner')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex gap-3 justify-end pt-2 border-t mt-2">
-            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>{t('common.cancel')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? (
                 <>
-                  <Loader2 className="mr-2 size-4 animate-spin" /> Creating...
+                  <Loader2 className="mr-2 size-4 animate-spin" /> {t('team.creating')}
                 </>
-              ) : 'Create Account'}
+              ) : t('team.createAccount')}
             </Button>
           </div>
         </form>
@@ -449,7 +451,7 @@ export default function TeamPage() {
       <Modal
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
-        title="Edit Team Member"
+        title={t('team.editTeamMember')}
       >
         <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
           {formError && (
@@ -459,7 +461,7 @@ export default function TeamPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-email">Email (Cannot be changed)</Label>
+            <Label htmlFor="edit-email">{t('team.emailCannotChange')}</Label>
             <Input
               id="edit-email"
               type="email"
@@ -470,7 +472,7 @@ export default function TeamPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-name">Full Name</Label>
+            <Label htmlFor="edit-name">{t('team.fullName')}</Label>
             <Input
               id="edit-name"
               type="text"
@@ -481,7 +483,7 @@ export default function TeamPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-role">Role</Label>
+            <Label htmlFor="edit-role">{t('team.roleLabel')}</Label>
             <Select
               value={role}
               onValueChange={v => setRole(v as UserRole || 'member')}
@@ -491,27 +493,27 @@ export default function TeamPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="member">Team Member</SelectItem>
-                <SelectItem value="team_leader">Team Leader</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
-                <SelectItem value="moderation">Moderator</SelectItem>
-                <SelectItem value="account_manager">Account Manager</SelectItem>
-                <SelectItem value="owner">Admin</SelectItem>
+                <SelectItem value="member">{t('role.teamMember')}</SelectItem>
+                <SelectItem value="team_leader">{t('role.team_leader')}</SelectItem>
+                <SelectItem value="sales">{t('role.sales')}</SelectItem>
+                <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
+                <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
+                <SelectItem value="owner">{t('role.owner')}</SelectItem>
               </SelectContent>
             </Select>
             {selectedUser?.id === user?.id && (
-              <span className="text-xs text-muted-foreground mt-0.5">You cannot demote yourself.</span>
+              <span className="text-xs text-muted-foreground mt-0.5">{t('team.cannotDemote')}</span>
             )}
           </div>
 
           <div className="flex gap-3 justify-end pt-2 border-t mt-2">
-            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>{t('common.cancel')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting ? (
                 <>
-                  <Loader2 className="mr-2 size-4 animate-spin" /> Saving...
+                  <Loader2 className="mr-2 size-4 animate-spin" /> {t('team.saving')}
                 </>
-              ) : 'Save Changes'}
+              ) : t('common.saveChanges')}
             </Button>
           </div>
         </form>

@@ -3297,3 +3297,109 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
     @apply font-sans;
   }
 }
+
+/* =========================================
+   RTL OVERRIDES
+   ========================================= */
+html[dir="rtl"] body {
+  font-family: var(--font-arabic, 'Noto Sans Arabic'), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html[dir="rtl"] .sidebar {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--color-border);
+}
+
+html[dir="rtl"] .main-content {
+  margin-left: 0;
+  margin-right: var(--sidebar-width);
+}
+
+html[dir="rtl"] .topbar {
+  left: 0;
+  right: var(--sidebar-width);
+}
+
+html[dir="rtl"] .sidebar-badge {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+html[dir="rtl"] .task-card::before {
+  left: auto;
+  right: 0;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+html[dir="rtl"] .form-select {
+  background-position: left 12px center;
+  padding-right: 14px;
+  padding-left: 36px;
+}
+
+html[dir="rtl"] .filter-select {
+  background-position: left 10px center;
+  padding-right: 12px;
+  padding-left: 32px;
+}
+
+html[dir="rtl"] .search-input-wrap .search-icon {
+  left: auto;
+  right: 14px;
+}
+
+html[dir="rtl"] .search-input-wrap input {
+  padding-left: 14px;
+  padding-right: 40px;
+}
+
+/* Language toggle */
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.lang-toggle:hover {
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+
+.lang-toggle .lang-icon {
+  font-size: 16px;
+}
+
+/* RTL mobile overrides */
+@media (max-width: 768px) {
+  html[dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
+
+  html[dir="rtl"] .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  html[dir="rtl"] .main-content {
+    margin-right: 0;
+  }
+
+  html[dir="rtl"] .topbar {
+    right: 0;
+  }
+
+  html[dir="rtl"] .mobile-menu-btn {
+    order: 2;
+  }
+}

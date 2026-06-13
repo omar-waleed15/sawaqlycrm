@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, projectsApi } from '@/lib/api';
 import { User, Project } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ function getInitials(name: string): string {
 
 export default function CreateTaskPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [members, setMembers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -97,12 +99,12 @@ export default function CreateTaskPage() {
     <div className="page-container fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">Create Task</h1>
-          <p className="page-header-subtitle">Add a new task and assign it to team members</p>
+          <h1 className="page-header-title">{t('createTask.title')}</h1>
+          <p className="page-header-subtitle">{t('createTask.subtitle')}</p>
         </div>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="size-4" />
-          Back
+          {t('common.back')}
         </Button>
       </div>
 
@@ -117,11 +119,11 @@ export default function CreateTaskPage() {
               )}
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="title">Task Title *</Label>
+                <Label htmlFor="title">{t('createTask.taskTitle')} *</Label>
                 <Input
                   id="title"
                   name="title"
-                  placeholder="e.g., Design social media graphics for Q3 campaign"
+                  placeholder={t('createTask.taskTitlePlaceholder')}
                   value={form.title}
                   onChange={handleChange}
                   required
@@ -130,11 +132,11 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('createTask.description')}</Label>
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="Provide detailed task instructions, requirements, and any relevant context..."
+                  placeholder={t('createTask.descriptionPlaceholder')}
                   value={form.description}
                   onChange={handleChange}
                   rows={5}
@@ -143,26 +145,26 @@ export default function CreateTaskPage() {
 
               {/* Content Assets */}
               <div className="border-t border-border pt-4">
-                <h4 className="text-sm font-bold mb-3">🎥 Content Assets &amp; Details</h4>
+                <h4 className="text-sm font-bold mb-3">🎥 {t('createTask.contentAssets')}</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="content_type">Content Type</Label>
+                    <Label htmlFor="content_type">{t('createTask.contentType')}</Label>
                     <Select value={form.content_type} onValueChange={v => handleSelectChange('content_type', v || '')}>
                       <SelectTrigger id="content_type">
-                        <SelectValue placeholder="— Select Content Type —" />
+                        <SelectValue placeholder={t('createTask.selectContentType')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="post">Post</SelectItem>
-                        <SelectItem value="story">Story</SelectItem>
-                        <SelectItem value="reel">Reel</SelectItem>
-                        <SelectItem value="photos">Photos</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="post">{t('contentType.post')}</SelectItem>
+                        <SelectItem value="story">{t('contentType.story')}</SelectItem>
+                        <SelectItem value="reel">{t('contentType.reel')}</SelectItem>
+                        <SelectItem value="photos">{t('contentType.photos')}</SelectItem>
+                        <SelectItem value="other">{t('contentType.other')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="drive_link">Google Drive Link</Label>
+                    <Label htmlFor="drive_link">{t('createTask.driveLink')}</Label>
                     <Input
                       id="drive_link"
                       name="drive_link"
@@ -175,11 +177,11 @@ export default function CreateTaskPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5 mt-3">
-                  <Label htmlFor="content_description">Content Details</Label>
+                  <Label htmlFor="content_description">{t('createTask.contentDetails')}</Label>
                   <Textarea
                     id="content_description"
                     name="content_description"
-                    placeholder="Specify caption, hashtags, sizing, or reference guidelines..."
+                    placeholder={t('createTask.contentDetailsPlaceholder')}
                     value={form.content_description}
                     onChange={handleChange}
                     rows={3}
@@ -189,22 +191,22 @@ export default function CreateTaskPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="priority">Priority</Label>
+                  <Label htmlFor="priority">{t('createTask.priority')}</Label>
                   <Select value={form.priority} onValueChange={v => handleSelectChange('priority', v || '')}>
                     <SelectTrigger id="priority">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">🟢 Low</SelectItem>
-                      <SelectItem value="medium">🟡 Medium</SelectItem>
-                      <SelectItem value="high">🟠 High</SelectItem>
-                      <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                      <SelectItem value="low">🟢 {t('priority.low')}</SelectItem>
+                      <SelectItem value="medium">🟡 {t('priority.medium')}</SelectItem>
+                      <SelectItem value="high">🟠 {t('priority.high')}</SelectItem>
+                      <SelectItem value="urgent">🔴 {t('priority.urgent')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="due_date">Due Date</Label>
+                  <Label htmlFor="due_date">{t('createTask.dueDate')}</Label>
                   <Input
                     id="due_date"
                     name="due_date"
@@ -217,13 +219,13 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="project_id">Link to Project</Label>
+                <Label htmlFor="project_id">{t('createTask.linkToProject')}</Label>
                 <Select value={form.project_id} onValueChange={v => handleSelectChange('project_id', v || '')}>
                   <SelectTrigger id="project_id">
-                    <SelectValue placeholder="— Select Project (Optional) —" />
+                    <SelectValue placeholder={t('createTask.selectProject')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None (Internal / No Project)</SelectItem>
+                    <SelectItem value="none">{t('createTask.noneProject')}</SelectItem>
                     {projects.map(p => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name} {p.client ? `— ${p.client.name}` : ''}
@@ -235,7 +237,7 @@ export default function CreateTaskPage() {
 
               {/* Multi-Assignee Picker */}
               <div className="border-t border-border pt-4">
-                <Label className="mb-2 block">👥 Assign To</Label>
+                <Label className="mb-2 block">👥 {t('createTask.assignTo')}</Label>
 
                 {/* Selected assignees as chips */}
                 {assigneeIds.length > 0 && (
@@ -277,36 +279,36 @@ export default function CreateTaskPage() {
                     }}
                   >
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="— Select a member to add —" />
+                      <SelectValue placeholder={t('createTask.selectMember')} />
                     </SelectTrigger>
                     <SelectContent>
                       {unassignedMembers.map(m => (
                         <SelectItem key={m.id} value={m.id}>
-                          {m.name} ({m.role})
+                          {m.name} ({t('role.' + m.role) || m.role})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 {assigneeIds.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1.5">No members assigned yet. Select a member to assign.</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">{t('createTask.noAssignees')}</p>
                 )}
               </div>
 
               <div className="flex gap-3 justify-end pt-1 border-t border-border">
                 <Button type="button" variant="outline" onClick={() => router.back()}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      Creating...
+                      {t('createTask.creating')}
                     </>
                   ) : (
                     <>
                       <Plus className="size-4" />
-                      Create Task
+                      {t('createTask.createTask')}
                     </>
                   )}
                 </Button>

@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { useLanguage } from '@/lib/i18n';
 import {
   Select,
   SelectContent,
@@ -40,28 +41,28 @@ import {
   Check,
 } from 'lucide-react';
 
-function formatDate(dateStr?: string): string {
+function formatDate(dateStr?: string, locale?: string): string {
   if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
 }
 
-function getTaskOverallStatus(task: Task): { label: string; className: string; icon: typeof CheckCircle2 } {
+function getTaskOverallStatus(task: Task, t: any): { label: string; className: string; icon: typeof CheckCircle2 } {
   if (!task.task_assignees || task.task_assignees.length === 0) {
-    return { label: 'To Do', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
+    return { label: t('status.todo'), className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
   }
   const allCompleted = task.task_assignees.every(a => a.status === 'completed');
   if (allCompleted) {
-    return { label: 'Completed', className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', icon: CheckCircle2 };
+    return { label: t('status.completed'), className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', icon: CheckCircle2 };
   }
   const anyInProgress = task.task_assignees.some(a => a.status === 'in_progress' || a.status === 'submitted');
   if (anyInProgress) {
-    return { label: 'In Progress', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: Clock };
+    return { label: t('status.in_progress'), className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: Clock };
   }
-  return { label: 'To Do', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
+  return { label: t('status.todo'), className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
 }
 
 function getCompletionRate(projectTasks: Task[]): number {
@@ -73,11 +74,11 @@ function getCompletionRate(projectTasks: Task[]): number {
   return Math.round((completed / projectTasks.length) * 100);
 }
 
-const PROJECT_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  planning: { label: 'Planning', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
-  active: { label: 'Active', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  on_hold: { label: 'On Hold', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  completed: { label: 'Completed', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
+const PROJECT_STATUS_CONFIG: Record<string, { labelKey: string; className: string }> = {
+  planning: { labelKey: 'clients.planning', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+  active: { labelKey: 'clients.active', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
+  on_hold: { labelKey: 'clients.onHold', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  completed: { labelKey: 'status.completed', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
 };
 
 function getInitials(name: string): string {
@@ -86,10 +87,12 @@ function getInitials(name: string): string {
 
 /* ─── Inline Task Table Component ─── */
 function ProjectTasksTable({ projectTasks }: { projectTasks: Task[] }) {
+  const { t, locale } = useLanguage();
+
   if (projectTasks.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground italic py-3 pl-2">
-        No tasks linked to this project yet.
+      <p className="text-xs text-muted-foreground italic py-3 ps-2">
+        {t('clients.noTasksLinked')}
       </p>
     );
   }
@@ -100,30 +103,30 @@ function ProjectTasksTable({ projectTasks }: { projectTasks: Task[] }) {
         <table className="table" style={{ margin: 0 }}>
           <thead>
             <tr className="text-xs text-muted-foreground bg-muted/20">
-              <th className="py-2.5 px-4 font-bold">Task Title</th>
-              <th className="py-2.5 px-4 font-bold">Assignees</th>
-              <th className="py-2.5 px-4 font-bold">Due Date</th>
-              <th className="py-2.5 px-4 font-bold">Status</th>
+              <th className="py-2.5 px-4 font-bold text-start">{t('clients.taskTitle')}</th>
+              <th className="py-2.5 px-4 font-bold text-start">{t('clients.assignees')}</th>
+              <th className="py-2.5 px-4 font-bold text-start">{t('tasks.dueDate')}</th>
+              <th className="py-2.5 px-4 font-bold text-start">{t('clients.status')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {projectTasks.map(t => {
-              const overall = getTaskOverallStatus(t);
+            {projectTasks.map(tTask => {
+              const overall = getTaskOverallStatus(tTask, t);
               const StatusIcon = overall.icon;
               return (
-                <tr key={t.id} className="text-xs hover:bg-muted/5 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-foreground">
+                <tr key={tTask.id} className="text-xs hover:bg-muted/5 transition-colors">
+                  <td className="py-3 px-4 font-semibold text-foreground text-start">
                     <a
-                      href={`/dashboard/tasks/${t.id}`}
+                      href={`/dashboard/tasks/${tTask.id}`}
                       className="hover:underline hover:text-indigo-600 dark:hover:text-indigo-400"
                     >
-                      {t.title}
+                      {tTask.title}
                     </a>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 text-start">
                     <div className="flex -space-x-1.5 overflow-hidden">
-                      {t.task_assignees && t.task_assignees.length > 0 ? (
-                        t.task_assignees.map(a => {
+                      {tTask.task_assignees && tTask.task_assignees.length > 0 ? (
+                        tTask.task_assignees.map(a => {
                           if (!a.user) return null;
                           return (
                             <div
@@ -136,14 +139,14 @@ function ProjectTasksTable({ projectTasks }: { projectTasks: Task[] }) {
                           );
                         })
                       ) : (
-                        <span className="text-muted-foreground italic text-[10px]">Unassigned</span>
+                        <span className="text-muted-foreground italic text-[10px]">{t('common.unassigned')}</span>
                       )}
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-muted-foreground">
-                    {t.due_date ? formatDate(t.due_date) : 'No due date'}
+                  <td className="py-3 px-4 text-muted-foreground text-start">
+                    {tTask.due_date ? formatDate(tTask.due_date, locale) : t('taskDetail.noDueDate')}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 text-start">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${overall.className}`}>
                       <StatusIcon className="size-3" />
                       {overall.label}
@@ -161,6 +164,7 @@ function ProjectTasksTable({ projectTasks }: { projectTasks: Task[] }) {
 
 /* ─── Completion Badge Component ─── */
 function CompletionBadge({ rate, total }: { rate: number; total: number }) {
+  const { t } = useLanguage();
   const color =
     rate >= 100 ? 'text-emerald-600 dark:text-emerald-400' :
     rate >= 50 ? 'text-blue-600 dark:text-blue-400' :
@@ -180,7 +184,7 @@ function CompletionBadge({ rate, total }: { rate: number; total: number }) {
         />
       </div>
       <span className={`text-xs font-bold tabular-nums ${color}`}>{rate}%</span>
-      <span className="text-[10px] text-muted-foreground">({total} tasks)</span>
+      <span className="text-[10px] text-muted-foreground">({total} {t('common.tasks')})</span>
     </div>
   );
 }
@@ -189,6 +193,7 @@ function CompletionBadge({ rate, total }: { rate: number; total: number }) {
 export default function ClientsDashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
 
   // Navigation Guard: only owner (admin), team_leader, or account_manager
   useEffect(() => {
@@ -222,9 +227,6 @@ export default function ClientsDashboardPage() {
   // Selected for Edit
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  // When creating a project from a client's expanded view
-  const [preselectedClientId, setPreselectedClientId] = useState('');
 
   // Progress tracking modal
   const [progressModalOpen, setProgressModalOpen] = useState(false);
@@ -373,7 +375,7 @@ export default function ClientsDashboardPage() {
   const handleClientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientForm.name) {
-      setErrorMsg('Client Name is required');
+      setErrorMsg(t('team.nameRequired'));
       return;
     }
     setSubmitting(true);
@@ -421,7 +423,7 @@ export default function ClientsDashboardPage() {
 
   // Delete Handlers
   const handleDeleteClient = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete client "${name}"? This will delete all their associated projects.`)) return;
+    if (!confirm(t('clients.deleteClientConfirm').replace('{name}', name))) return;
     try {
       await clientsApi.delete(id);
       loadData(true);
@@ -431,7 +433,7 @@ export default function ClientsDashboardPage() {
   };
 
   const handleDeleteProject = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete project "${name}"?`)) return;
+    if (!confirm(t('clients.deleteProjectConfirm').replace('{name}', name))) return;
     try {
       await projectsApi.delete(id);
       loadData(true);
@@ -442,7 +444,7 @@ export default function ClientsDashboardPage() {
 
   // Helpers: get tasks for a specific project
   const getProjectTasks = (projectId: string): Task[] => {
-    return tasks.filter(t => t.project_id === projectId);
+    return tasks.filter(tTask => tTask.project_id === projectId);
   };
 
   // Open progress modal for a client
@@ -513,19 +515,19 @@ export default function ClientsDashboardPage() {
     <div className="page-container fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">Clients &amp; Projects Manager</h1>
+          <h1 className="page-header-title">{t('clients.title')}</h1>
           <p className="page-header-subtitle">
-            Manage client profiles, create projects, and track task completion rates.
+            {t('clients.subtitle')}
           </p>
         </div>
         <div className="flex gap-2">
           {activeTab === 'clients' ? (
             <Button onClick={() => { resetClientForm(); setClientModalOpen(true); }}>
-              <Plus className="size-4 mr-2" /> Add Client
+              <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.addClient')}
             </Button>
           ) : (
             <Button onClick={() => { resetProjectForm(); setProjectModalOpen(true); }} disabled={clients.length === 0}>
-              <Plus className="size-4 mr-2" /> Create Project
+              <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.createProject')}
             </Button>
           )}
         </div>
@@ -541,7 +543,7 @@ export default function ClientsDashboardPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          👥 Clients list
+          👥 {t('clients.clientsList')}
         </button>
         <button
           onClick={() => setActiveTab('projects')}
@@ -551,7 +553,7 @@ export default function ClientsDashboardPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          🚀 Projects list
+          🚀 {t('clients.projectsList')}
         </button>
       </div>
 
@@ -566,13 +568,13 @@ export default function ClientsDashboardPage() {
             <div className="flex flex-col gap-4">
               {/* Search Bar */}
               <div className="relative w-full max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 rtl:left-auto rtl:right-3" />
                 <Input
                   type="text"
-                  placeholder="Search clients by name, company, email..."
+                  placeholder={t('clients.searchClients')}
                   value={clientSearch}
                   onChange={e => setClientSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 rtl:pl-3 rtl:pr-9"
                 />
               </div>
 
@@ -599,9 +601,9 @@ export default function ClientsDashboardPage() {
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-2 flex-1">
                             <div>
                               <h3 className="text-sm font-bold text-foreground leading-tight">{c.name}</h3>
-                              <p className="text-xs text-muted-foreground truncate">{c.company || 'Private Client'}</p>
+                              <p className="text-xs text-muted-foreground truncate">{c.company || t('clients.privateClient')}</p>
                             </div>
-                            <div className="text-xs text-muted-foreground self-center">
+                            <div className="text-xs text-muted-foreground self-center text-start">
                               {c.email && <div>📧 {c.email}</div>}
                               {c.phone && <div>📞 {c.phone}</div>}
                             </div>
@@ -612,15 +614,15 @@ export default function ClientsDashboardPage() {
                             </div>
                             <div className="flex gap-2 items-center md:justify-end">
                               <Badge variant={c.status === 'active' ? 'default' : 'secondary'}>
-                                {c.status}
+                                {c.status === 'active' ? t('clients.active') : t('clients.inactive')}
                               </Badge>
                               <Badge variant="outline">
-                                {clientProjects.length} Projects
+                                {clientProjects.length} {t('clients.projects')}
                               </Badge>
                             </div>
                           </div>
                         </div>
-                        <div className="pl-4">
+                        <div className="pl-4 rtl:pl-0 rtl:pr-4">
                           {isExpanded ? (
                             <ChevronUp className="size-5 text-muted-foreground" />
                           ) : (
@@ -635,9 +637,9 @@ export default function ClientsDashboardPage() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
                               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                👥 Contact details
+                                👥 {t('clients.contactDetails')}
                               </h4>
-                              <div className="text-sm space-y-1">
+                              <div className="text-sm space-y-1 text-start">
                                 <div className="font-semibold">{c.name}</div>
                                 {c.company && <div className="text-muted-foreground">{c.company}</div>}
                                 {c.email && <div className="text-muted-foreground truncate">{c.email}</div>}
@@ -645,27 +647,27 @@ export default function ClientsDashboardPage() {
                               </div>
                               <div className="flex gap-2 justify-end mt-2 pt-2 border-t">
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); resetClientForm(c); setClientModalOpen(true); }}>
-                                  <Edit className="size-3 mr-1" /> Edit
+                                  <Edit className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('common.edit')}
                                 </Button>
                                 <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClient(c.id, c.name); }}>
-                                  <Trash2 className="size-3 mr-1" /> Delete
+                                  <Trash2 className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('common.delete')}
                                 </Button>
                               </div>
                             </div>
 
                             <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
                               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                <MapPin className="size-3.5" /> Address &amp; Timeline
+                                <MapPin className="size-3.5" /> {t('clients.addressTimeline')}
                               </h4>
-                              <div className="text-sm space-y-2">
+                              <div className="text-sm space-y-2 text-start">
                                 <div className="flex gap-1.5 items-start">
-                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">Start Date:</span>
-                                  <span>{c.start_date ? formatDate(c.start_date) : 'Not specified'}</span>
+                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">{t('clients.startDate')}</span>
+                                  <span>{c.start_date ? formatDate(c.start_date, locale) : t('clients.notSpecified')}</span>
                                 </div>
                                 <div className="flex gap-1.5 items-start">
-                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">Address:</span>
+                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">{t('clients.address')}</span>
                                   <span className="text-muted-foreground whitespace-pre-line leading-snug">
-                                    {c.address || 'No address specified'}
+                                    {c.address || t('clients.noAddress')}
                                   </span>
                                 </div>
                               </div>
@@ -674,7 +676,7 @@ export default function ClientsDashboardPage() {
                             <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
                               <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                  📁 Deliverables &amp; Content Plan
+                                  📁 {t('clients.deliverables')}
                                 </h4>
                                 <Button
                                   size="sm"
@@ -682,17 +684,17 @@ export default function ClientsDashboardPage() {
                                   className="h-7 text-xs"
                                   onClick={(e) => { e.stopPropagation(); openProgressModal(c); }}
                                 >
-                                  <BarChart3 className="size-3 mr-1" /> Update Progress
+                                  <BarChart3 className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('clients.updateProgress')}
                                 </Button>
                               </div>
-                              <div className="text-sm space-y-2.5 flex-1">
+                              <div className="text-sm space-y-2.5 flex-1 flex flex-col justify-between">
                                 {/* Content deliverable progress */}
                                 <div className="grid grid-cols-4 gap-2">
                                   {[
-                                    { label: 'Posts', done: c.done_posts ?? 0, total: c.num_posts ?? 0 },
-                                    { label: 'Reels', done: c.done_reels ?? 0, total: c.num_reels ?? 0 },
-                                    { label: 'Stories', done: c.done_stories ?? 0, total: c.num_stories ?? 0 },
-                                    { label: 'Photos', done: c.done_photos ?? 0, total: c.num_photos ?? 0 },
+                                    { label: t('clients.posts'), done: c.done_posts ?? 0, total: c.num_posts ?? 0 },
+                                    { label: t('clients.reels'), done: c.done_reels ?? 0, total: c.num_reels ?? 0 },
+                                    { label: t('clients.stories'), done: c.done_stories ?? 0, total: c.num_stories ?? 0 },
+                                    { label: t('clients.photos'), done: c.done_photos ?? 0, total: c.num_photos ?? 0 },
                                   ].map(item => {
                                     const pct = item.total > 0 ? Math.round((item.done / item.total) * 100) : 0;
                                     const isComplete = item.total > 0 && item.done >= item.total;
@@ -719,8 +721,8 @@ export default function ClientsDashboardPage() {
                                 {/* Others row */}
                                 {c.other_deliverables && (
                                   <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2">
-                                    <span className="text-xs text-muted-foreground">
-                                      <span className="font-semibold">Others:</span> {c.other_deliverables}
+                                    <span className="text-xs text-muted-foreground text-start">
+                                      <span className="font-semibold">{t('clients.others')}</span> {c.other_deliverables}
                                     </span>
                                     <span className={`text-xs font-bold ${
                                       c.done_other ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
@@ -738,11 +740,11 @@ export default function ClientsDashboardPage() {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-xs transition-colors border border-indigo-200 dark:border-indigo-800/40 w-fit"
                                   >
-                                    Open Content Plan <ExternalLink className="size-3" />
+                                    {t('clients.openContentPlan')} <ExternalLink className="size-3" />
                                   </a>
                                 ) : (
-                                  <div className="text-muted-foreground italic text-xs">
-                                    No Content Plan link registered.
+                                  <div className="text-muted-foreground italic text-xs text-start">
+                                    {t('clients.noContentPlan')}
                                   </div>
                                 )}
                               </div>
@@ -753,7 +755,7 @@ export default function ClientsDashboardPage() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                <Briefcase className="size-3.5" /> Projects ({clientProjects.length})
+                                <Briefcase className="size-3.5" /> {t('clients.projects')} ({clientProjects.length})
                               </h4>
                               <Button
                                 size="sm"
@@ -765,7 +767,7 @@ export default function ClientsDashboardPage() {
                                   setProjectModalOpen(true);
                                 }}
                               >
-                                <Plus className="size-3 mr-1" /> New Project
+                                <Plus className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('clients.newProject')}
                               </Button>
                             </div>
                             {clientProjects.length > 0 ? (
@@ -789,10 +791,10 @@ export default function ClientsDashboardPage() {
                                             p.status === 'completed' ? 'bg-emerald-500' :
                                             p.status === 'on_hold' ? 'bg-amber-500' : 'bg-slate-400'
                                           }`} />
-                                          <div className="flex-1 min-w-0">
+                                          <div className="flex-1 min-w-0 text-start">
                                             <div className="flex items-center gap-2 flex-wrap">
                                               <span className="font-semibold text-sm text-foreground">{p.name}</span>
-                                              <Badge className={`${cfg.className} text-[10px] px-2 py-0`}>{cfg.label}</Badge>
+                                              <Badge className={`${cfg.className} text-[10px] px-2 py-0`}>{t(cfg.labelKey)}</Badge>
                                             </div>
                                             {p.description && (
                                               <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{p.description}</p>
@@ -820,7 +822,7 @@ export default function ClientsDashboardPage() {
                                             </div>
                                           </div>
                                         </div>
-                                        <div className="pl-3">
+                                        <div className="pl-3 rtl:pl-0 rtl:pr-3">
                                           {isProjExpanded ? (
                                             <ChevronUp className="size-4 text-muted-foreground" />
                                           ) : (
@@ -834,16 +836,16 @@ export default function ClientsDashboardPage() {
                                         <div className="border-t border-border bg-muted/5 p-4">
                                           <div className="flex items-center justify-between mb-3">
                                             <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                              <ListTodo className="size-3.5" /> Tasks ({pTasks.length})
+                                              <ListTodo className="size-3.5" /> {t('common.tasks')} ({pTasks.length})
                                             </h5>
                                             {pTasks.length > 0 && (
                                               <div className="flex items-center gap-2 text-xs">
                                                 <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                                  {pTasks.filter(t => t.task_assignees?.every(a => a.status === 'completed')).length} completed
+                                                  {pTasks.filter(tTask => tTask.task_assignees?.every(a => a.status === 'completed')).length} {t('status.completed')}
                                                 </span>
                                                 <span className="text-muted-foreground">·</span>
                                                 <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                                                  {pTasks.filter(t => !t.task_assignees?.every(a => a.status === 'completed')).length} remaining
+                                                  {pTasks.filter(tTask => !tTask.task_assignees?.every(a => a.status === 'completed')).length} {t('status.in_progress')}
                                                 </span>
                                               </div>
                                             )}
@@ -856,7 +858,7 @@ export default function ClientsDashboardPage() {
                                 })}
                               </div>
                             ) : (
-                              <p className="text-xs text-muted-foreground italic pl-1">No projects created under this client.</p>
+                              <p className="text-xs text-muted-foreground italic pl-1 text-start">{t('clients.noProjects')}</p>
                             )}
                           </div>
                         </CardContent>
@@ -866,7 +868,7 @@ export default function ClientsDashboardPage() {
                 })}
                 {filteredClients.length === 0 && (
                   <div className="text-center py-10 border rounded-lg border-dashed text-muted-foreground text-sm">
-                    No clients found matching query.
+                    {t('clients.noClientsFound')}
                   </div>
                 )}
               </div>
@@ -878,13 +880,13 @@ export default function ClientsDashboardPage() {
             <div className="flex flex-col gap-4">
               {/* Search Bar */}
               <div className="relative w-full max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 rtl:left-auto rtl:right-3" />
                 <Input
                   type="text"
-                  placeholder="Search projects by name or client..."
+                  placeholder={t('clients.searchProjects')}
                   value={projectSearch}
                   onChange={e => setProjectSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 rtl:pl-3 rtl:pr-9"
                 />
               </div>
 
@@ -893,7 +895,7 @@ export default function ClientsDashboardPage() {
                 {projectsByClient.map(({ client, projects: clientProjs }) => (
                   <div key={client.id} className="space-y-3">
                     {/* Client group header */}
-                    <div className="flex items-center gap-3 px-1">
+                    <div className="flex items-center gap-3 px-1 text-start">
                       <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
                         {client.name.charAt(0).toUpperCase()}
                       </div>
@@ -901,13 +903,13 @@ export default function ClientsDashboardPage() {
                         <h3 className="text-sm font-bold text-foreground">{client.name}</h3>
                         {client.company && <p className="text-xs text-muted-foreground">{client.company}</p>}
                       </div>
-                      <Badge variant="outline" className="ml-auto text-xs">
-                        {clientProjs.length} project{clientProjs.length !== 1 ? 's' : ''}
+                      <Badge variant="outline" className="ml-auto rtl:ml-0 rtl:mr-auto text-xs">
+                        {clientProjs.length} {t('clients.projects')}
                       </Badge>
                     </div>
 
                     {/* Project cards under this client */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11 rtl:pl-0 rtl:pr-11">
                       {clientProjs.map(p => {
                         const cfg = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
                         const pTasks = getProjectTasks(p.id);
@@ -926,17 +928,17 @@ export default function ClientsDashboardPage() {
                             <CardContent className="p-5 flex flex-col gap-3 flex-1">
                               {/* Header */}
                               <div className="flex justify-between items-start gap-3">
-                                <h3 className="font-bold text-sm text-foreground leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                <h3 className="font-bold text-sm text-foreground leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-start">
                                   {p.name}
                                 </h3>
-                                <Badge className={`${cfg.className} shrink-0 text-[10px] px-2 py-0`}>{cfg.label}</Badge>
+                                <Badge className={`${cfg.className} shrink-0 text-[10px] px-2 py-0`}>{t(cfg.labelKey)}</Badge>
                               </div>
 
                               {/* Description */}
                               {p.description ? (
-                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{p.description}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed text-start">{p.description}</p>
                               ) : (
-                                <p className="text-xs text-muted-foreground/40 italic">No description.</p>
+                                <p className="text-xs text-muted-foreground/40 italic text-start">{t('taskDetail.noDescription')}</p>
                               )}
 
                               {/* Completion Rate */}
@@ -946,9 +948,9 @@ export default function ClientsDashboardPage() {
 
                               {/* Timeline */}
                               <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                                <span className="flex items-center gap-1"><Calendar className="size-3 text-indigo-500" /> {p.start_date ? formatDate(p.start_date) : 'N/A'}</span>
+                                <span className="flex items-center gap-1"><Calendar className="size-3 text-indigo-500" /> {p.start_date ? formatDate(p.start_date, locale) : t('common.noData')}</span>
                                 <span>—</span>
-                                <span className="flex items-center gap-1 font-semibold text-foreground"><Calendar className="size-3 text-rose-500" /> {p.end_date ? formatDate(p.end_date) : 'N/A'}</span>
+                                <span className="flex items-center gap-1 font-semibold text-foreground"><Calendar className="size-3 text-rose-500" /> {p.end_date ? formatDate(p.end_date, locale) : t('common.noData')}</span>
                               </div>
 
                               {/* Expand tasks button */}
@@ -957,16 +959,16 @@ export default function ClientsDashboardPage() {
                                 className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors pt-1"
                               >
                                 {isProjExpanded ? <ChevronUp className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                                {isProjExpanded ? 'Hide Tasks' : `View Tasks (${pTasks.length})`}
+                                {isProjExpanded ? t('common.close') : `${t('common.view')} (${pTasks.length})`}
                               </button>
 
                               {/* Actions */}
                               <div className="flex gap-2 justify-end pt-2 border-t border-border/60">
                                 <Button size="sm" variant="outline" onClick={() => { resetProjectForm(p); setProjectModalOpen(true); }} className="h-8 text-xs">
-                                  <Edit className="size-3 mr-1.5" /> Edit
+                                  <Edit className="size-3 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('common.edit')}
                                 </Button>
                                 <Button size="sm" variant="destructive" onClick={() => handleDeleteProject(p.id, p.name)} className="h-8 text-xs">
-                                  <Trash2 className="size-3 mr-1.5" /> Delete
+                                  <Trash2 className="size-3 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('common.delete')}
                                 </Button>
                               </div>
                             </CardContent>
@@ -987,7 +989,7 @@ export default function ClientsDashboardPage() {
 
               {filteredProjects.length === 0 && (
                 <div className="text-center py-10 border border-dashed rounded-lg text-muted-foreground text-sm">
-                  No projects matching query.
+                  {t('clients.noClientsFound')}
                 </div>
               )}
             </div>
@@ -999,9 +1001,9 @@ export default function ClientsDashboardPage() {
       <Modal
         isOpen={clientModalOpen}
         onClose={() => setClientModalOpen(false)}
-        title={modalMode === 'create' ? 'Add New Client' : 'Edit Client Profile'}
+        title={modalMode === 'create' ? t('clients.addClient') : t('clients.editClient')}
       >
-        <form onSubmit={handleClientSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleClientSubmit} className="flex flex-col gap-4 text-start">
           {errorMsg && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md">
               {errorMsg}
@@ -1009,7 +1011,7 @@ export default function ClientsDashboardPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_name">Client Name *</Label>
+            <Label htmlFor="c_name">{t('clients.clientName')} *</Label>
             <Input
               id="c_name"
               placeholder="e.g. Khalifa Al-Kubaisi"
@@ -1020,7 +1022,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_company">Company Name</Label>
+            <Label htmlFor="c_company">{t('clients.company')}</Label>
             <Input
               id="c_company"
               placeholder="e.g. Sawaqly Marketing"
@@ -1031,7 +1033,7 @@ export default function ClientsDashboardPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c_email">Email Address</Label>
+              <Label htmlFor="c_email">{t('team.emailAddress')}</Label>
               <Input
                 id="c_email"
                 type="email"
@@ -1041,7 +1043,7 @@ export default function ClientsDashboardPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c_phone">Phone Number</Label>
+              <Label htmlFor="c_phone">{t('clients.phone')}</Label>
               <Input
                 id="c_phone"
                 placeholder="+974 5555-1234"
@@ -1053,7 +1055,7 @@ export default function ClientsDashboardPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c_status">Account Status</Label>
+              <Label htmlFor="c_status">{t('clients.statusLabel')}</Label>
               <Select
                 value={clientForm.status}
                 onValueChange={v => setClientForm({ ...clientForm, status: (v || 'active') as Client['status'] })}
@@ -1062,13 +1064,13 @@ export default function ClientsDashboardPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">🟢 Active</SelectItem>
-                  <SelectItem value="inactive">🔴 Inactive</SelectItem>
+                  <SelectItem value="active">🟢 {t('clients.active')}</SelectItem>
+                  <SelectItem value="inactive">🔴 {t('clients.inactive')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="c_start_date">Start Date</Label>
+              <Label htmlFor="c_start_date">{t('finance.startDate')}</Label>
               <Input
                 id="c_start_date"
                 type="date"
@@ -1079,7 +1081,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_address">Physical Address</Label>
+            <Label htmlFor="c_address">{t('clients.addressTimeline')}</Label>
             <Textarea
               id="c_address"
               placeholder="Building, street name, city, country..."
@@ -1090,7 +1092,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_content_plan">Content Plan Link (Google Sheets / Drive)</Label>
+            <Label htmlFor="c_content_plan">{t('clients.contentPlanLink')}</Label>
             <Input
               id="c_content_plan"
               type="url"
@@ -1101,11 +1103,11 @@ export default function ClientsDashboardPage() {
           </div>
 
           {/* Content Deliverables */}
-          <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-bold mb-3">🎬 Content Deliverables</h4>
+          <div className="border-t border-border pt-4 text-start">
+            <h4 className="text-sm font-bold mb-3">🎬 {t('clients.deliverables')}</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_posts">Posts</Label>
+                <Label htmlFor="c_posts">{t('clients.numPosts')}</Label>
                 <Input
                   id="c_posts"
                   type="number"
@@ -1116,7 +1118,7 @@ export default function ClientsDashboardPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_reels">Reels</Label>
+                <Label htmlFor="c_reels">{t('clients.numReels')}</Label>
                 <Input
                   id="c_reels"
                   type="number"
@@ -1127,7 +1129,7 @@ export default function ClientsDashboardPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_stories">Stories</Label>
+                <Label htmlFor="c_stories">{t('clients.numStories')}</Label>
                 <Input
                   id="c_stories"
                   type="number"
@@ -1138,7 +1140,7 @@ export default function ClientsDashboardPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_photos">Photos</Label>
+                <Label htmlFor="c_photos">{t('clients.numPhotos')}</Label>
                 <Input
                   id="c_photos"
                   type="number"
@@ -1150,7 +1152,7 @@ export default function ClientsDashboardPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1.5 mt-3">
-              <Label htmlFor="c_other_deliverables">Others</Label>
+              <Label htmlFor="c_other_deliverables">{t('clients.otherDeliverables')}</Label>
               <Input
                 id="c_other_deliverables"
                 placeholder="e.g. Brochures, Flyers, Brand Guidelines..."
@@ -1162,10 +1164,10 @@ export default function ClientsDashboardPage() {
 
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button type="button" variant="outline" onClick={() => setClientModalOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Save Profile'}
+              {submitting ? t('clients.savingProgress') : t('common.save')}
             </Button>
           </div>
         </form>
@@ -1175,9 +1177,9 @@ export default function ClientsDashboardPage() {
       <Modal
         isOpen={projectModalOpen}
         onClose={() => setProjectModalOpen(false)}
-        title={modalMode === 'create' ? 'Add New Project' : 'Edit Project Details'}
+        title={modalMode === 'create' ? t('clients.newProject') : t('clients.editProject')}
       >
-        <form onSubmit={handleProjectSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleProjectSubmit} className="flex flex-col gap-4 text-start">
           {errorMsg && (
             <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md">
               {errorMsg}
@@ -1185,13 +1187,13 @@ export default function ClientsDashboardPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_client">Link to Client *</Label>
+            <Label htmlFor="p_client">{t('clients.selectClient')} *</Label>
             <Select
               value={projectForm.client_id}
               onValueChange={v => setProjectForm({ ...projectForm, client_id: v || '' })}
             >
               <SelectTrigger id="p_client">
-                <SelectValue placeholder="— Select Client —" />
+                <SelectValue placeholder={t('clients.selectClient')} />
               </SelectTrigger>
               <SelectContent>
                 {clients.map(c => (
@@ -1204,7 +1206,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_name">Project Name *</Label>
+            <Label htmlFor="p_name">{t('clients.projectName')} *</Label>
             <Input
               id="p_name"
               placeholder="e.g. Q3 SEO Optimization"
@@ -1215,7 +1217,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_desc">Project Description</Label>
+            <Label htmlFor="p_desc">{t('clients.projectDescription')}</Label>
             <Textarea
               id="p_desc"
               placeholder="Describe targets, deliverables, details..."
@@ -1226,7 +1228,7 @@ export default function ClientsDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_status">Status</Label>
+            <Label htmlFor="p_status">{t('clients.statusLabel')}</Label>
             <Select
               value={projectForm.status}
               onValueChange={v => setProjectForm({ ...projectForm, status: v as Project['status'] })}
@@ -1235,17 +1237,17 @@ export default function ClientsDashboardPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="planning">📝 Planning</SelectItem>
-                <SelectItem value="active">⚡ Active</SelectItem>
-                <SelectItem value="on_hold">🔄 On Hold</SelectItem>
-                <SelectItem value="completed">✅ Completed</SelectItem>
+                <SelectItem value="planning">📝 {t('clients.planning')}</SelectItem>
+                <SelectItem value="active">⚡ {t('clients.active')}</SelectItem>
+                <SelectItem value="on_hold">🔄 {t('clients.onHold')}</SelectItem>
+                <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_start">Start Date</Label>
+              <Label htmlFor="p_start">{t('clients.startDate')}</Label>
               <Input
                 id="p_start"
                 type="date"
@@ -1254,7 +1256,7 @@ export default function ClientsDashboardPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_end">End Date / Deadline</Label>
+              <Label htmlFor="p_end">{t('clients.endDate')}</Label>
               <Input
                 id="p_end"
                 type="date"
@@ -1266,10 +1268,10 @@ export default function ClientsDashboardPage() {
 
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button type="button" variant="outline" onClick={() => setProjectModalOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Save Project'}
+              {submitting ? t('clients.savingProgress') : (modalMode === 'create' ? t('clients.createProjectBtn') : t('common.saveChanges'))}
             </Button>
           </div>
         </form>
@@ -1279,19 +1281,19 @@ export default function ClientsDashboardPage() {
       <Modal
         isOpen={progressModalOpen}
         onClose={() => setProgressModalOpen(false)}
-        title={`Update Progress — ${progressClient?.name || ''}`}
+        title={`${t('clients.progressTitle')} — ${progressClient?.name || ''}`}
       >
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 text-start">
           <p className="text-xs text-muted-foreground">
-            Enter how many deliverables have been completed for this client.
+            {t('clients.progressTitle')}
           </p>
 
           <div className="grid grid-cols-2 gap-4">
             {[
-              { key: 'done_posts', label: 'Posts Done', total: progressClient?.num_posts ?? 0 },
-              { key: 'done_reels', label: 'Reels Done', total: progressClient?.num_reels ?? 0 },
-              { key: 'done_stories', label: 'Stories Done', total: progressClient?.num_stories ?? 0 },
-              { key: 'done_photos', label: 'Photos Done', total: progressClient?.num_photos ?? 0 },
+              { key: 'done_posts', label: t('clients.donePosts'), total: progressClient?.num_posts ?? 0 },
+              { key: 'done_reels', label: t('clients.doneReels'), total: progressClient?.num_reels ?? 0 },
+              { key: 'done_stories', label: t('clients.doneStories'), total: progressClient?.num_stories ?? 0 },
+              { key: 'done_photos', label: t('clients.donePhotos'), total: progressClient?.num_photos ?? 0 },
             ].map(item => (
               <div key={item.key} className="flex flex-col gap-1.5">
                 <Label htmlFor={`prog_${item.key}`}>
@@ -1316,7 +1318,7 @@ export default function ClientsDashboardPage() {
           {progressClient?.other_deliverables && (
             <div className="flex items-center justify-between bg-muted/30 rounded-lg px-4 py-3">
               <div>
-                <div className="text-sm font-semibold">Others</div>
+                <div className="text-sm font-semibold">{t('clients.others')}</div>
                 <div className="text-xs text-muted-foreground">{progressClient.other_deliverables}</div>
               </div>
               <button
@@ -1335,13 +1337,13 @@ export default function ClientsDashboardPage() {
 
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button variant="outline" onClick={() => setProgressModalOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleProgressSave} disabled={savingProgress}>
               {savingProgress ? (
-                <><Loader2 className="size-4 animate-spin" /> Saving...</>
+                <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('clients.savingProgress')}</>
               ) : (
-                <><Check className="size-4" /> Save Progress</>
+                <><Check className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('clients.saveProgress')}</>
               )}
             </Button>
           </div>

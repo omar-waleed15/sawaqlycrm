@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { tasksApi, commentsApi } from '@/lib/api';
 import { Task, TaskAssignee, Comment, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
@@ -25,41 +26,34 @@ import {
 } from '@/components/ui/dialog';
 import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock } from 'lucide-react';
 
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return 'No due date';
-  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+function formatDate(dateStr?: string, t?: any, locale?: string): string {
+  if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
+  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+function formatDateTime(dateStr: string, locale: string): string {
+  return new Date(dateStr).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function timeUntilExpiry(createdAt: string): string {
+function timeUntilExpiry(createdAt: string, t: any): string {
   const expiresAt = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000;
   const now = Date.now();
   const diff = expiresAt - now;
-  if (diff <= 0) return 'expiring...';
+  if (diff <= 0) return t('taskDetail.expiring');
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) return `${hours}h ${mins}m left`;
-  return `${mins}m left`;
+  if (hours > 0) return t('taskDetail.timeLeft', { hours, mins });
+  return t('taskDetail.minsLeft', { mins });
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  todo: '📝 To Do',
-  in_progress: '⚡ In Progress',
-  submitted: '📤 Submitted',
-  revision: '🔄 Needs Revision',
-  completed: '✅ Completed',
-};
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const router = useRouter();
 
   const [task, setTask] = useState<Task | null>(null);
@@ -77,8 +71,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
   const [submittingReview, setSubmittingReview] = useState<Record<string, boolean>>({});
   const [activeRevisionUserId, setActiveRevisionUserId] = useState<string | null>(null);
-
-
 
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -103,7 +95,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         setCompletionNote(myA.completion_note || '');
       }
 
-
     } catch {
       router.replace('/dashboard/tasks');
     } finally {
@@ -113,7 +104,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     loadTask();
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -165,8 +155,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     finally { setStatusUpdating(false); }
   };
 
-
-
   // Admin: review actions
   const handleApprove = async (userId: string) => {
     setSubmittingReview(prev => ({ ...prev, [userId]: true }));
@@ -201,7 +189,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   // Admin: delete task
   const handleDelete = async () => {
-    if (!confirm('Delete this task? This cannot be undone.')) return;
+    if (!confirm(t('taskDetail.deleteConfirm'))) return;
     try {
       await tasksApi.delete(id);
       router.push('/dashboard/tasks');
@@ -221,7 +209,6 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const assignees = task.task_assignees || [];
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && assignees.some(a => a.status !== 'completed');
 
-
   // Compute summary
   const totalAssignees = assignees.length;
   const completedCount = assignees.filter(a => a.status === 'completed').length;
@@ -232,18 +219,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="size-4" /> {t('common.back')}
         </Button>
         <div className="flex-1" />
         {isOwner && (
           <>
             <Link href={`/dashboard/tasks/${id}/edit`}>
               <Button variant="outline" size="sm">
-                <Pencil className="size-4" /> Edit
+                <Pencil className="size-4" /> {t('common.edit')}
               </Button>
             </Link>
             <Button variant="destructive" size="sm" onClick={handleDelete}>
-              <Trash2 className="size-4" /> Delete
+              <Trash2 className="size-4" /> {t('common.delete')}
             </Button>
           </>
         )}
@@ -259,16 +246,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 <PriorityBadge priority={task.priority} />
 
                 {isOverdue && (
-                  <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">⚠ Overdue</Badge>
+                  <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">⚠ {t('common.overdue')}</Badge>
                 )}
                 {totalAssignees > 0 && (
                   <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
-                    👥 {completedCount}/{totalAssignees} completed
+                    👥 {t('taskDetail.completedCount', { completedCount, totalAssignees })}
                   </Badge>
                 )}
                 {submittedCount > 0 && (
                   <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
-                    📤 {submittedCount} submitted
+                    📤 {t('taskDetail.submittedCount', { submittedCount })}
                   </Badge>
                 )}
               </div>
@@ -277,33 +264,33 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   <DialogTrigger
                     render={
                       <Button variant="outline" size="sm" className="shrink-0 gap-1.5 font-medium text-xs">
-                        🎥 Content Details
+                        🎥 {t('taskDetail.contentDetails')}
                       </Button>
                     }
                   />
                   <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-indigo-700 font-bold text-lg">
-                        🎥 Content Details &amp; Assets
+                        🎥 {t('taskDetail.contentDetailsAssets')}
                       </DialogTitle>
                       <DialogDescription>
-                        Guidelines and files attached to this task.
+                        {t('taskDetail.guidelinesAttached')}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4 py-2">
                       {task.drive_link && (
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-sm font-semibold text-muted-foreground font-medium">Google Drive Attachments:</span>
+                          <span className="text-sm font-semibold text-muted-foreground font-medium">{t('taskDetail.googleDriveAttachments')}</span>
                           <a href={task.drive_link} target="_blank" rel="noopener noreferrer">
                             <Button className="w-full justify-center gap-1.5">
-                              📁 Open Google Drive ↗
+                              📁 {t('taskDetail.openDrive')} ↗
                             </Button>
                           </a>
                         </div>
                       )}
                       {task.content_description && (
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-sm font-semibold text-muted-foreground font-medium">Content Guidelines:</span>
+                          <span className="text-sm font-semibold text-muted-foreground font-medium">{t('taskDetail.contentGuidelines')}</span>
                           <p className="text-sm text-foreground whitespace-pre-wrap bg-muted px-3 py-2.5 rounded-md border border-border leading-relaxed">
                             {task.content_description}
                           </p>
@@ -319,7 +306,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               {task.description ? (
                 <p className="text-muted-foreground leading-relaxed text-sm whitespace-pre-wrap">{task.description}</p>
               ) : (
-                <p className="text-muted-foreground italic text-sm">No description provided.</p>
+                <p className="text-muted-foreground italic text-sm">{t('taskDetail.noDescription')}</p>
               )}
             </CardContent>
           </Card>
@@ -333,7 +320,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               {myAssignment.feedback && myAssignment.status === 'revision' && (
                 <Card className="border-l-4 border-l-orange-500 bg-orange-50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-orange-700">🔄 Revision Feedback from Admin</CardTitle>
+                    <CardTitle className="text-sm text-orange-700">🔄 {t('taskDetail.revisionFeedbackAdmin')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-orange-900 whitespace-pre-wrap">{myAssignment.feedback}</p>
@@ -343,13 +330,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {myAssignment.status === 'todo' && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">⚡ Start Working</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">⚡ {t('taskDetail.resumeWorking')}</CardTitle></CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                      This task is in your <strong>To Do</strong> list. Click below to start working.
+                      {t('taskDetail.todoStartDesc')}
                     </p>
                     <Button onClick={handleStartTask} disabled={statusUpdating}>
-                      {statusUpdating ? <Loader2 className="size-4 animate-spin" /> : '⚡'} Start Task
+                      {statusUpdating ? <Loader2 className="size-4 animate-spin" /> : '⚡'} {t('taskDetail.startWorking')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -357,13 +344,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {myAssignment.status === 'revision' && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">⚡ Resume Working</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">⚡ {t('taskDetail.resumeWorking')}</CardTitle></CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground mb-4">
-                      This task requires revision. Click below to set status back to <strong>In Progress</strong>.
+                      {t('taskDetail.revisionResumeDesc')}
                     </p>
                     <Button onClick={handleResumeWork} disabled={statusUpdating}>
-                      <RotateCcw className="size-4" /> Resume Work
+                      <RotateCcw className="size-4" /> {t('taskDetail.resumeWorking')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -371,17 +358,17 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {myAssignment.status === 'in_progress' && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">📤 Submit Your Work</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">📤 {t('taskDetail.submitWork')}</CardTitle></CardHeader>
                   <CardContent>
                     {myAssignment.submission_link && (
                       <div className="flex items-center gap-2 mb-3">
                         <CheckCircle2 className="size-4 text-green-600" />
-                        <span className="text-sm font-semibold text-green-700">Previously submitted</span>
-                        <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">View link ↗</a>
+                        <span className="text-sm font-semibold text-green-700">{t('taskDetail.previouslySubmitted')}</span>
+                        <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">{t('taskDetail.viewLink')} ↗</a>
                       </div>
                     )}
                     <div className="flex flex-col gap-1.5">
-                      <Label>{myAssignment.submission_link ? 'Update submission link' : 'Paste your submission link'}</Label>
+                      <Label>{myAssignment.submission_link ? t('taskDetail.updateSubmissionLink') : t('taskDetail.pasteSubmissionLink')}</Label>
                       <Input
                         type="url"
                         placeholder="https://drive.google.com/... or https://notion.so/..."
@@ -390,10 +377,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       />
                     </div>
                     <div className="flex flex-col gap-1.5 mt-3">
-                      <Label htmlFor="completion_note">💭 Final Thoughts (optional)</Label>
+                      <Label htmlFor="completion_note">💭 {t('taskDetail.finalThoughtsOptional')}</Label>
                       <Textarea
                         id="completion_note"
-                        placeholder="Share your final thoughts, notes, or anything the admin should know..."
+                        placeholder={t('taskDetail.completionNotePlaceholder')}
                         value={completionNote}
                         onChange={e => setCompletionNote(e.target.value)}
                         rows={3}
@@ -401,7 +388,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     </div>
                     <div className="flex justify-end mt-3">
                       <Button onClick={handleSubmitWork} disabled={submittingLink || !submissionLink.trim()}>
-                        {submittingLink ? <Loader2 className="size-4 animate-spin" /> : myAssignment.submission_link ? 'Update & Resubmit' : 'Submit Work'}
+                        {submittingLink ? <Loader2 className="size-4 animate-spin" /> : myAssignment.submission_link ? t('taskDetail.updateResubmit') : t('taskDetail.submitWork')}
                       </Button>
                     </div>
                   </CardContent>
@@ -411,21 +398,21 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               {myAssignment.status === 'submitted' && (
                 <Card className="border-l-4 border-l-violet-500 bg-violet-50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-violet-700">📤 Submitted &amp; Pending Review</CardTitle>
+                    <CardTitle className="text-sm text-violet-700">📤 {t('taskDetail.submittedPending')}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-violet-800 mb-2">
-                      You have submitted your work. The admin will review it.
+                      {t('taskDetail.submittedPendingDesc')}
                     </p>
                     {myAssignment.submission_link && (
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground font-medium">Your submission:</span>
+                        <span className="text-muted-foreground font-medium">{t('taskDetail.yourSubmission')}</span>
                         <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">{myAssignment.submission_link} ↗</a>
                       </div>
                     )}
                     {myAssignment.completion_note && (
                       <div className="mt-3 border-t border-violet-200 pt-3">
-                        <span className="text-sm font-semibold text-violet-700 block mb-1">💭 Your Final Thoughts:</span>
+                        <span className="text-sm font-semibold text-violet-700 block mb-1">💭 {t('taskDetail.yourFinalThoughts')}</span>
                         <p className="text-sm text-violet-900 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{myAssignment.completion_note}</p>
                       </div>
                     )}
@@ -436,14 +423,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               {myAssignment.status === 'completed' && (
                 <Card className="border-l-4 border-l-green-500 bg-green-50">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-green-700">✅ Completed &amp; Approved</CardTitle>
+                    <CardTitle className="text-sm text-green-700">✅ {t('taskDetail.completedApproved')}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-green-800">Your submission has been approved.</p>
+                    <p className="text-sm text-green-800">{t('taskDetail.approvedDesc')}</p>
                     {myAssignment.completion_note && (
                       <div className="mt-3 border-t border-green-200 pt-3">
-                        <span className="text-sm font-semibold text-green-700 block mb-1">💭 Final Thoughts:</span>
-                        <p className="text-sm text-green-900 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{myAssignment.completion_note}</p>
+                        <span className="text-sm font-semibold text-green-700 block mb-1">💭 {t('taskDetail.finalThoughts')}</span>
+                        <p className="text-sm text-green-950 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{myAssignment.completion_note}</p>
                       </div>
                     )}
                   </CardContent>
@@ -456,7 +443,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           {assignees.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">📥 Submissions &amp; Progress</CardTitle>
+                <CardTitle className="text-sm">📥 {t('taskDetail.submissionsProgress')}</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <div className="flex flex-col gap-4 divide-y divide-border">
@@ -489,7 +476,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                           <div className="bg-muted/50 rounded-lg p-3 border border-border flex flex-col gap-2.5 ml-10">
                             {a.submission_link && (
                               <div className="flex items-center gap-2 flex-wrap text-sm">
-                                <span className="text-muted-foreground font-semibold font-medium">Submission Link:</span>
+                                <span className="text-muted-foreground font-semibold font-medium">{t('taskDetail.submissionLinkLabel')}</span>
                                 <a
                                   href={a.submission_link}
                                   target="_blank"
@@ -502,7 +489,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             )}
                             {a.completion_note && (
                               <div className="flex flex-col gap-1">
-                                <span className="text-xs font-semibold text-muted-foreground font-medium">Notes/Thoughts:</span>
+                                <span className="text-xs font-semibold text-muted-foreground font-medium">{t('taskDetail.notesThoughts')}</span>
                                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{a.completion_note}</p>
                               </div>
                             )}
@@ -515,7 +502,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   : 'bg-orange-50/50 border-orange-100 text-orange-800 dark:bg-orange-950/20'
                               }`}>
                                 <span className="font-bold block mb-0.5">
-                                  {a.status === 'completed' ? '✅ Approval Feedback:' : '🔄 Revision Feedback:'}
+                                  {a.status === 'completed' ? t('taskDetail.approvalFeedback') : t('taskDetail.revisionFeedbackLabel')}
                                 </span>
                                 {a.feedback}
                               </div>
@@ -523,7 +510,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                           </div>
                         ) : (
                           <div className="text-xs text-muted-foreground italic ml-10">
-                            No submission yet. Status: <span className="font-semibold capitalize">{a.status.replace('_', ' ')}</span>
+                            {t('taskDetail.noSubmissionYet')} <span className="font-semibold capitalize">{t('status.' + a.status)}</span>
                           </div>
                         )}
 
@@ -539,7 +526,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   onClick={() => setActiveRevisionUserId(a.user_id)}
                                   disabled={isSubmitting}
                                 >
-                                  <RotateCcw className="size-3.5" /> Request Revision
+                                  <RotateCcw className="size-3.5" /> {t('taskDetail.requestRevision')}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -547,17 +534,17 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   onClick={() => handleApprove(a.user_id)}
                                   disabled={isSubmitting}
                                 >
-                                  {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />} Approve Work
+                                  {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />} {t('taskDetail.approveWork')}
                                 </Button>
                               </>
                             ) : (
                               <div className="flex flex-col gap-2 w-full mt-2">
                                 <Label htmlFor={`feedback-${a.user_id}`} className="text-xs font-bold text-orange-700">
-                                  Revision Instructions / Feedback
+                                  {t('taskDetail.revisionInstructions')}
                                 </Label>
                                 <Textarea
                                   id={`feedback-${a.user_id}`}
-                                  placeholder="Specify what needs to be changed..."
+                                  placeholder={t('taskDetail.specifyRevision')}
                                   value={revisionFeedback[a.user_id] || ''}
                                   onChange={e => setRevisionFeedback(prev => ({ ...prev, [a.user_id]: e.target.value }))}
                                   rows={2}
@@ -572,7 +559,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                     }}
                                     disabled={isSubmitting}
                                   >
-                                    Cancel
+                                    {t('common.cancel')}
                                   </Button>
                                   <Button
                                     size="sm"
@@ -580,7 +567,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                     onClick={() => handleRequestRevision(a.user_id)}
                                     disabled={isSubmitting || !(revisionFeedback[a.user_id] || '').trim()}
                                   >
-                                    {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : null} Submit Request
+                                    {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : null} {t('taskDetail.submitRequest')}
                                   </Button>
                                 </div>
                               </div>
@@ -601,17 +588,17 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">💬 Chat &amp; Discussion ({comments.length})</CardTitle>
+                <CardTitle className="text-sm">{t('taskDetail.chatDiscussion', { count: comments.length })}</CardTitle>
                 <div className="flex items-center gap-1.5 text-[10px] text-amber-600 font-semibold bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
                   <Clock className="size-3" />
-                  Messages expire in 24h
+                  {t('taskDetail.messagesExpire')}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
                 {comments.length === 0 && (
-                  <p className="text-muted-foreground text-sm">No messages yet. Start the conversation!</p>
+                  <p className="text-muted-foreground text-sm">{t('taskDetail.noMessages')}</p>
                 )}
                 {comments.map((comment: Comment) => (
                   <div key={comment.id} className="flex gap-3">
@@ -622,9 +609,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     </Avatar>
                     <div className="flex-1">
                       <div className="flex items-baseline gap-2 mb-1">
-                        <span className="text-xs font-semibold">{comment.user?.name || 'Unknown'}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatDateTime(comment.created_at)}</span>
-                        <span className="text-[9px] text-amber-500 font-medium ml-auto">{timeUntilExpiry(comment.created_at)}</span>
+                        <span className="text-xs font-semibold">{comment.user?.name || t('common.unknown')}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDateTime(comment.created_at, locale)}</span>
+                        <span className="text-[9px] text-amber-500 font-medium ml-auto">{timeUntilExpiry(comment.created_at, t)}</span>
                       </div>
                       <div className="text-sm bg-muted rounded-lg px-3 py-2 leading-relaxed">{comment.content}</div>
                     </div>
@@ -642,7 +629,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 </Avatar>
                 <div className="flex-1 flex flex-col gap-2">
                   <Textarea
-                    placeholder="Write a message..."
+                    placeholder={t('taskDetail.addComment')}
                     value={commentText}
                     onChange={e => setCommentText(e.target.value)}
                     rows={3}
@@ -650,7 +637,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   <div className="flex justify-end">
                     <Button type="submit" size="sm" disabled={submittingComment || !commentText.trim()}>
                       {submittingComment ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                      Send Message
+                      {t('taskDetail.sendMessage')}
                     </Button>
                   </div>
                 </div>
@@ -662,23 +649,23 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         {/* Sidebar */}
         <div className="task-detail-sidebar">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">Task Details</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">{t('taskDetail.taskDetails')}</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.priority')}</span>
                 <PriorityBadge priority={task.priority} />
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.dueDate')}</span>
                 <span className={`text-sm font-medium ${isOverdue ? 'text-rose-600' : 'text-foreground'}`}>
-                  {formatDate(task.due_date)}
+                  {formatDate(task.due_date, t, locale)}
                 </span>
               </div>
               {task.content_type && (
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Format</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.contentType')}</span>
                   <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 uppercase text-[10px] tracking-wide font-medium w-fit">
-                    📦 {task.content_type}
+                    📦 {t('contentType.' + task.content_type.toLowerCase()) || task.content_type}
                   </Badge>
                 </div>
               )}
@@ -688,7 +675,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               {/* Assignees list */}
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Assigned To ({totalAssignees})
+                  {t('taskDetail.assignedToCount', { count: totalAssignees })}
                 </span>
                 {assignees.length > 0 ? (
                   <div className="flex flex-col gap-2">
@@ -707,14 +694,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     ))}
                   </div>
                 ) : (
-                  <span className="text-sm text-muted-foreground">Unassigned</span>
+                  <span className="text-sm text-muted-foreground">{t('common.unassigned')}</span>
                 )}
               </div>
 
               <Separator />
 
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Created By</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.createdBy')}</span>
                 {task.creator && (
                   <div className="flex items-center gap-2">
                     <Avatar className="size-7">
@@ -730,8 +717,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <Separator />
 
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Created</span>
-                <span className="text-sm text-muted-foreground">{formatDate(task.created_at)}</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.created')}</span>
+                <span className="text-sm text-muted-foreground">{formatDate(task.created_at, t, locale)}</span>
               </div>
             </CardContent>
           </Card>

@@ -11,10 +11,12 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Loader2, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (user && user.role !== 'owner' && user.role !== 'team_leader') {
@@ -62,32 +64,32 @@ export default function SettingsPage() {
   if (user?.role !== 'owner' && user?.role !== 'team_leader') return null;
 
   return (
-    <div className="page-container fade-in">
+    <div className="page-container fade-in text-start">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">Settings</h1>
-          <p className="page-header-subtitle">Manage system preferences and agency configurations</p>
+          <h1 className="page-header-title">{t('settings.title')}</h1>
+          <p className="page-header-subtitle">{t('settings.subtitle')}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-[2fr_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
         {/* Main Settings Panel */}
         <div className="flex flex-col gap-6">
           <Card>
             <CardHeader className="border-b">
-              <CardTitle className="text-base">Agency Profile</CardTitle>
+              <CardTitle className="text-base text-start">{t('settings.agencyProfile')}</CardTitle>
             </CardHeader>
             <CardContent className="pt-5">
               <form onSubmit={handleSaveSettings} className="flex flex-col gap-5">
                 {saveSuccess && (
                   <div className="flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium">
                     <CheckCircle2 className="size-4" />
-                    Settings saved successfully!
+                    {t('settings.saved')}
                   </div>
                 )}
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="agency-name">Agency Name</Label>
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="agency-name">{t('settings.agencyName')}</Label>
                   <Input
                     id="agency-name"
                     type="text"
@@ -97,8 +99,8 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="support-email">Support / Contact Email</Label>
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="support-email">{t('settings.supportEmail')}</Label>
                   <Input
                     id="support-email"
                     type="email"
@@ -108,8 +110,8 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="deadline-days">Default Task Deadline (Days from creation)</Label>
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="deadline-days">{t('settings.defaultDeadline')}</Label>
                   <Input
                     id="deadline-days"
                     type="number"
@@ -124,8 +126,8 @@ export default function SettingsPage() {
                 <div className="flex justify-end mt-1">
                   <Button type="submit" disabled={saving}>
                     {saving ? (
-                      <><Loader2 className="size-4 animate-spin" /> Saving...</>
-                    ) : 'Save Settings'}
+                      <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('settings.saving')}</>
+                    ) : t('settings.saveSettings')}
                   </Button>
                 </div>
               </form>
@@ -134,11 +136,11 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader className="border-b">
-              <CardTitle className="text-base">Task Workflow Config</CardTitle>
+              <CardTitle className="text-base text-start">{t('settings.workflowConfig')}</CardTitle>
             </CardHeader>
-            <CardContent className="pt-5 flex flex-col gap-5">
+            <CardContent className="pt-5 flex flex-col gap-5 text-start">
               <div>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Task Priorities</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">{t('settings.priorities')}</h4>
                 <div className="flex flex-wrap gap-2">
                   <PriorityBadge priority="urgent" />
                   <PriorityBadge priority="high" />
@@ -146,14 +148,14 @@ export default function SettingsPage() {
                   <PriorityBadge priority="low" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Priorities determine due-date urgency styling and list sort weights.
+                  {t('settings.prioritiesDesc')}
                 </p>
               </div>
 
               <Separator />
 
               <div>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Task Statuses</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">{t('settings.statuses')}</h4>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status="todo" />
                   <StatusBadge status="in_progress" />
@@ -162,7 +164,7 @@ export default function SettingsPage() {
                   <StatusBadge status="completed" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Workflow: To Do → In Progress → Submitted (by Member) → Revision / Completed (by Admin).
+                  {t('settings.statusesDesc')}
                 </p>
               </div>
             </CardContent>
@@ -170,32 +172,32 @@ export default function SettingsPage() {
         </div>
 
         {/* System Health Sidebar */}
-        <div>
+        <div className="text-start">
           <Card>
             <CardHeader className="border-b">
-              <CardTitle className="text-base">System Health</CardTitle>
+              <CardTitle className="text-base">{t('settings.systemHealth')}</CardTitle>
             </CardHeader>
             <CardContent className="pt-5 flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Express Server</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('settings.expressServer')}</span>
                 {backendHealth === 'loading' && (
-                  <Badge variant="outline" className="text-muted-foreground">Checking...</Badge>
+                  <Badge variant="outline" className="text-muted-foreground">{t('settings.checking')}</Badge>
                 )}
                 {backendHealth === 'online' && (
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    <span className="size-1.5 rounded-full bg-green-500 mr-1" /> Online
+                    <span className="size-1.5 rounded-full bg-green-500 mr-1 rtl:ml-1 rtl:mr-0" /> {t('settings.online')}
                   </Badge>
                 )}
                 {backendHealth === 'offline' && (
                   <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">
-                    <span className="size-1.5 rounded-full bg-rose-500 mr-1" /> Offline
+                    <span className="size-1.5 rounded-full bg-rose-500 mr-1 rtl:ml-1 rtl:mr-0" /> {t('settings.offline')}
                   </Badge>
                 )}
               </div>
 
               {latency !== null && backendHealth === 'online' && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Response Latency</span>
+                  <span className="text-sm font-medium text-muted-foreground">{t('settings.latency')}</span>
                   <span className="text-sm font-semibold">{latency}ms</span>
                 </div>
               )}
@@ -203,23 +205,23 @@ export default function SettingsPage() {
               <Separator />
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Supabase Database</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('settings.supabaseDb')}</span>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  <span className="size-1.5 rounded-full bg-green-500 mr-1" /> Connected
+                  <span className="size-1.5 rounded-full bg-green-500 mr-1 rtl:ml-1 rtl:mr-0" /> {t('settings.connected')}
                 </Badge>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Supabase Storage</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('settings.supabaseStorage')}</span>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  <span className="size-1.5 rounded-full bg-green-500 mr-1" /> Active
+                  <span className="size-1.5 rounded-full bg-green-500 mr-1 rtl:ml-1 rtl:mr-0" /> {t('settings.active')}
                 </Badge>
               </div>
 
               <Separator />
 
               <p className="text-xs text-muted-foreground leading-relaxed">
-                All systems check out. The API and data layer are fully connected.
+                {t('settings.healthDesc')}
               </p>
             </CardContent>
           </Card>

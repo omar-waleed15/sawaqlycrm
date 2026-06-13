@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { tasksApi } from '@/lib/api';
 import { Task } from '@/types';
 import TaskCard from '@/components/TaskCard';
@@ -21,13 +22,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import { Plus, Loader2, Trash2 } from 'lucide-react';
 
-function formatDateLabel(dateStr: string): string {
+function formatDateLabel(dateStr: string, locale: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 export default function TasksPage() {
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -83,7 +85,7 @@ export default function TasksPage() {
       await tasksApi.update(schedulingTask.id, { publish_date: newDate, publish_notes: newNotes } as unknown as Partial<Task>);
       closeScheduleModal();
     } catch {
-      alert('Failed to save publish schedule');
+      alert(t('tasks.failedSaveSchedule'));
       loadTasks();
     } finally {
       setSaving(false);
@@ -100,7 +102,7 @@ export default function TasksPage() {
       await tasksApi.update(schedulingTask.id, { publish_date: null, publish_notes: null } as unknown as Partial<Task>);
       closeScheduleModal();
     } catch {
-      alert('Failed to clear publish schedule');
+      alert(t('tasks.failedClearSchedule'));
       loadTasks();
     } finally {
       setSaving(false);
@@ -121,16 +123,16 @@ export default function TasksPage() {
     <div className="page-container fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">{isOwner ? 'All Tasks' : 'My Tasks'}</h1>
+          <h1 className="page-header-title">{isOwner ? t('tasks.title') : t('tasks.myTasks')}</h1>
           <p className="page-header-subtitle">
-            {isOwner ? 'Manage and track all team tasks' : 'Tasks assigned to you'}
+            {isOwner ? t('tasks.subtitle') : t('tasks.mySubtitle')}
           </p>
         </div>
         {isOwner && (
           <Link href="/dashboard/tasks/create">
             <Button>
               <Plus className="size-4" />
-              New Task
+              {t('tasks.createTask')}
             </Button>
           </Link>
         )}
@@ -146,7 +148,7 @@ export default function TasksPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          📋 Active Tasks
+          📋 {t('tasks.activeTasks')}
         </button>
         <button
           onClick={() => { setActiveTab('scheduled'); setStatusFilter(''); }}
@@ -156,7 +158,7 @@ export default function TasksPage() {
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          📅 Scheduled Tasks
+          📅 {t('tasks.scheduledTasks')}
           {scheduledCount > 0 && (
             <Badge className="text-[11px] h-5 px-1.5 bg-indigo-600 hover:bg-indigo-600">{scheduledCount}</Badge>
           )}
@@ -167,7 +169,7 @@ export default function TasksPage() {
       {activeTab === 'scheduled' && (
         <div className="bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-lg px-4 py-3 mb-5 text-sm text-violet-800 font-medium flex items-center gap-2">
           <span className="text-base">💡</span>
-          Click any task card to set or update its publish date. Scheduled tasks appear on the calendar as 📢 publication events.
+          {t('tasks.scheduledInfoBanner')}
         </div>
       )}
 
@@ -175,35 +177,35 @@ export default function TasksPage() {
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || '')}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="All Statuses" />
+            <SelectValue placeholder={t('tasks.allStatuses')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All {activeTab === 'active' ? 'Active ' : ''}Statuses</SelectItem>
-            <SelectItem value="todo">📝 To Do</SelectItem>
-            <SelectItem value="in_progress">⚡ In Progress</SelectItem>
-            <SelectItem value="submitted">📤 Submitted</SelectItem>
-            <SelectItem value="revision">🔄 Needs Revision</SelectItem>
-            {activeTab === 'scheduled' && <SelectItem value="completed">✅ Completed</SelectItem>}
+            <SelectItem value="">{activeTab === 'active' ? t('tasks.allActiveStatuses') : t('tasks.allStatuses')}</SelectItem>
+            <SelectItem value="todo">📝 {t('status.todo')}</SelectItem>
+            <SelectItem value="in_progress">⚡ {t('status.in_progress')}</SelectItem>
+            <SelectItem value="submitted">📤 {t('status.submitted')}</SelectItem>
+            <SelectItem value="revision">🔄 {t('status.revision')}</SelectItem>
+            {activeTab === 'scheduled' && <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>}
           </SelectContent>
         </Select>
 
         <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val || '')}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="All Priorities" />
+            <SelectValue placeholder={t('tasks.allPriorities')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Priorities</SelectItem>
-            <SelectItem value="urgent">🔴 Urgent</SelectItem>
-            <SelectItem value="high">🟠 High</SelectItem>
-            <SelectItem value="medium">🟡 Medium</SelectItem>
-            <SelectItem value="low">🟢 Low</SelectItem>
+            <SelectItem value="">{t('tasks.allPriorities')}</SelectItem>
+            <SelectItem value="urgent">🔴 {t('priority.urgent')}</SelectItem>
+            <SelectItem value="high">🟠 {t('priority.high')}</SelectItem>
+            <SelectItem value="medium">🟡 {t('priority.medium')}</SelectItem>
+            <SelectItem value="low">🟢 {t('priority.low')}</SelectItem>
           </SelectContent>
         </Select>
 
         <span className="text-sm text-muted-foreground ml-auto">
-          {filteredDisplayed.length} task{filteredDisplayed.length !== 1 ? 's' : ''}
+          {t('tasks.count', { count: filteredDisplayed.length })}
           {activeTab === 'scheduled' && scheduledCount > 0 && (
-            <span className="ml-2 text-green-700 font-semibold">· {scheduledCount} scheduled</span>
+            <span className="ml-2 text-green-700 font-semibold">{t('tasks.scheduledCount', { count: scheduledCount })}</span>
           )}
         </span>
       </div>
@@ -232,19 +234,19 @@ export default function TasksPage() {
       ) : (
         <div className="empty-state">
           <div className="empty-state-icon">{activeTab === 'scheduled' ? '📅' : '🔍'}</div>
-          <div className="empty-state-title">No tasks found</div>
+          <div className="empty-state-title">{t('tasks.noTasks')}</div>
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
-              ? 'Try adjusting your filters to see more tasks.'
+              ? t('tasks.adjustFilters')
               : isOwner
                 ? activeTab === 'scheduled'
-                  ? 'No tasks yet. Create tasks and schedule publish dates to build your content plan.'
-                  : 'Create your first task to get started.'
-                : 'No tasks assigned yet.'}
+                  ? t('tasks.noScheduledOwner')
+                  : t('tasks.noActiveOwner')
+                : t('tasks.noActiveMember')}
           </div>
           {isOwner && !statusFilter && !priorityFilter && activeTab !== 'scheduled' && (
             <Link href="/dashboard/tasks/create">
-              <Button><Plus className="size-4" /> Create Task</Button>
+              <Button><Plus className="size-4" /> {t('tasks.createTask')}</Button>
             </Link>
           )}
         </div>
@@ -256,7 +258,7 @@ export default function TasksPage() {
           {schedulingTask && (
             <>
               <DialogHeader className="flex flex-col gap-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Schedule Publication</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">{t('tasks.schedulePublish')}</p>
                 <DialogTitle className="text-lg font-bold text-foreground m-0">{schedulingTask.title}</DialogTitle>
               </DialogHeader>
 
@@ -265,23 +267,23 @@ export default function TasksPage() {
                   {schedulingTask.task_assignees && schedulingTask.task_assignees.length > 0 ? (
                     <span>👥 {schedulingTask.task_assignees.map(a => a.user?.name).filter(Boolean).join(', ')}</span>
                   ) : (
-                    <span>👤 Unassigned</span>
+                    <span>👤 {t('common.unassigned')}</span>
                   )}
                   {schedulingTask.content_type && <span>🎬 {schedulingTask.content_type}</span>}
                 </div>
 
                 {schedulingTask.publish_date ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2.5 text-sm text-green-700 font-semibold flex items-center gap-2">
-                    📢 Currently scheduled: {formatDateLabel(schedulingTask.publish_date.split('T')[0])}
+                    📢 {t('tasks.currentlyScheduled', { date: formatDateLabel(schedulingTask.publish_date.split('T')[0], locale) })}
                   </div>
                 ) : (
                   <div className="bg-muted border border-dashed border-border rounded-lg px-3 py-2.5 text-sm text-muted-foreground">
-                    🗓️ No publish date set — pick a date to add to the content plan.
+                    🗓️ {t('tasks.noPublishDateSet')}
                   </div>
                 )}
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="sched-date">Publish Date</Label>
+                  <Label htmlFor="sched-date">{t('tasks.publishDate')}</Label>
                   <Input
                     id="sched-date"
                     type="date"
@@ -292,27 +294,27 @@ export default function TasksPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="sched-notes">Publish Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Label htmlFor="sched-notes">{t('tasks.publishNotes')} <span className="text-muted-foreground font-normal">{t('common.optional')}</span></Label>
                   <Textarea
                     id="sched-notes"
                     rows={3}
-                    placeholder="e.g. Post on Instagram & TikTok at 6 PM…"
+                    placeholder={t('tasks.publishNotesPlaceholder')}
                     value={selectedNotes}
                     onChange={e => setSelectedNotes(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">The selected date will appear on the Calendar as a 📢 publication event.</p>
+                  <p className="text-xs text-muted-foreground">{t('tasks.calendarEventNote')}</p>
                 </div>
               </div>
 
               <DialogFooter className="-mx-6 -mb-6 mt-6 px-6 py-4 border-t flex gap-2 justify-end">
                 {schedulingTask.publish_date && (
                   <Button variant="outline" onClick={handleClearSchedule} disabled={saving} className="text-rose-600 border-rose-200 hover:bg-rose-50">
-                    <Trash2 className="size-3.5" /> Clear Date
+                    <Trash2 className="size-3.5" /> {t('tasks.clearDate')}
                   </Button>
                 )}
-                <Button variant="outline" onClick={closeScheduleModal} disabled={saving}>Cancel</Button>
+                <Button variant="outline" onClick={closeScheduleModal} disabled={saving}>{t('common.cancel')}</Button>
                 <Button onClick={handleSaveSchedule} disabled={saving || !selectedDate}>
-                  {saving ? <><Loader2 className="size-4 animate-spin" /> Saving…</> : '📅 Save Schedule'}
+                  {saving ? <><Loader2 className="size-4 animate-spin" /> {t('common.loading')}</> : `📅 ${t('tasks.scheduleSubmit')}`}
                 </Button>
               </DialogFooter>
             </>

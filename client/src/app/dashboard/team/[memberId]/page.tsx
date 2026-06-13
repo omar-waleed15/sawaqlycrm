@@ -4,6 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi } from '@/lib/api';
 import { Task, TaskAssignee, TaskStatus, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
@@ -38,9 +39,9 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return 'No due date';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+function formatDate(dateStr?: string, locale?: string, t?: any): string {
+  if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
+  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isOverdue(dateStr?: string, status?: string): boolean {
@@ -56,12 +57,12 @@ function getMemberStatus(task: Task, memberId: string): TaskStatus {
   return (getMemberAssignment(task, memberId)?.status || 'todo') as TaskStatus;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; icon: string; accentClass: string; bgClass: string; textClass: string }> = {
-  todo:        { label: 'To Do', icon: '📝', accentClass: 'bg-slate-400', bgClass: 'bg-slate-50 border-slate-100', textClass: 'text-slate-700' },
-  in_progress: { label: 'In Progress', icon: '⚡', accentClass: 'bg-blue-500', bgClass: 'bg-blue-50/50 border-blue-100', textClass: 'text-blue-700' },
-  submitted:   { label: 'Submitted', icon: '📤', accentClass: 'bg-green-500', bgClass: 'bg-green-50/50 border-green-100', textClass: 'text-green-700' },
-  revision:    { label: 'Needs Revision', icon: '🔄', accentClass: 'bg-orange-500', bgClass: 'bg-orange-50/50 border-orange-100', textClass: 'text-orange-700' },
-  completed:   { label: 'Completed', icon: '✅', accentClass: 'bg-purple-500', bgClass: 'bg-purple-50/50 border-purple-100', textClass: 'text-purple-700' },
+const STATUS_CONFIG: Record<string, { labelKey: string; icon: string; accentClass: string; bgClass: string; textClass: string }> = {
+  todo:        { labelKey: 'status.todo', icon: '📝', accentClass: 'bg-slate-400', bgClass: 'bg-slate-50 border-slate-100', textClass: 'text-slate-700' },
+  in_progress: { labelKey: 'status.in_progress', icon: '⚡', accentClass: 'bg-blue-500', bgClass: 'bg-blue-50/50 border-blue-100', textClass: 'text-blue-700' },
+  submitted:   { labelKey: 'status.submitted', icon: '📤', accentClass: 'bg-green-500', bgClass: 'bg-green-50/50 border-green-100', textClass: 'text-green-700' },
+  revision:    { labelKey: 'status.revision', icon: '🔄', accentClass: 'bg-orange-500', bgClass: 'bg-orange-50/50 border-orange-100', textClass: 'text-orange-700' },
+  completed:   { labelKey: 'status.completed', icon: '✅', accentClass: 'bg-purple-500', bgClass: 'bg-purple-50/50 border-purple-100', textClass: 'text-purple-700' },
 };
 
 const PRIORITY_WEIGHTS: Record<string, number> = {
@@ -81,6 +82,7 @@ const PRIORITY_BORDER_CLASSES: Record<string, string> = {
 export default function MemberTasksPage({ params }: { params: Promise<{ memberId: string }> }) {
   const { memberId } = use(params);
   const { user } = useAuth();
+  const { t, locale } = useLanguage();
   const router = useRouter();
 
   const [member, setMember] = useState<User | null>(null);
@@ -91,8 +93,6 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'title'>('dueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-
 
   useEffect(() => {
     if (user && user.role !== 'owner') {
@@ -120,8 +120,6 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     };
     load();
   }, [memberId, user, router]);
-
-
 
   if (user?.role !== 'owner') return null;
 
@@ -165,12 +163,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     : getProcessedTasks(tasks.filter(t => getMemberStatus(t, memberId) === activeStatus));
 
   const filterTabs = [
-    { key: 'all', label: 'All Tasks', count: tasks.length },
-    { key: 'todo', label: 'To Do', count: stats.todo },
-    { key: 'in_progress', label: 'In Progress', count: stats.inProgress },
-    { key: 'submitted', label: 'Submitted', count: stats.submitted },
-    { key: 'revision', label: 'Revision', count: stats.revision },
-    { key: 'completed', label: 'Done', count: stats.completed },
+    { key: 'all', label: t('memberDetail.allTasks'), count: tasks.length },
+    { key: 'todo', label: t('memberDetail.toDo'), count: stats.todo },
+    { key: 'in_progress', label: t('memberDetail.inProgress'), count: stats.inProgress },
+    { key: 'submitted', label: t('memberDetail.submitted'), count: stats.submitted },
+    { key: 'revision', label: t('memberDetail.revision'), count: stats.revision },
+    { key: 'completed', label: t('memberDetail.done'), count: stats.completed },
   ];
 
   if (loading) {
@@ -178,7 +176,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
       <div className="page-container flex items-center justify-center min-h-[300px]">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          <p className="text-sm text-muted-foreground">Loading member profile...</p>
+          <p className="text-sm text-muted-foreground">{t('memberDetail.loadingProfile')}</p>
         </div>
       </div>
     );
@@ -191,7 +189,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-6 text-xs text-muted-foreground font-medium">
         <Link href="/dashboard/team" className="hover:text-primary transition-colors flex items-center gap-1.5">
-          <ArrowLeft className="size-3" /> Team Management
+          <ArrowLeft className="size-3" /> {t('memberDetail.teamManagement')}
         </Link>
         <span>/</span>
         <span className="text-foreground font-semibold">{member.name}</span>
@@ -208,10 +206,10 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold tracking-tight">{member.name}</h1>
             <Badge variant={member.role === 'owner' ? 'destructive' : 'default'} className="text-[10px] py-0.5 px-2">
-              {member.role === 'owner' ? 'Admin' : member.role === 'sales' ? 'Sales' : 'Team Member'}
+              {member.role === 'owner' ? t('role.owner') : member.role === 'sales' ? t('role.sales') : t('role.teamMember')}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">Email: {member.email}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('memberDetail.email')} {member.email}</p>
         </div>
       </div>
 
@@ -219,7 +217,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
       {member.role === 'sales' && (
         <div className="mb-8 space-y-4">
           <div className="border-t border-dashed pt-6 mt-6" />
-          <h2 className="text-base font-bold text-foreground tracking-tight">Representative Intelligence & Achievements</h2>
+          <h2 className="text-base font-bold text-foreground tracking-tight">{t('memberDetail.repIntelligence')}</h2>
           <SalesDashboard salesRepId={memberId} />
         </div>
       )}
@@ -234,7 +232,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search tasks by name or description..."
+                placeholder={t('memberDetail.searchTasks')}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 w-full"
@@ -244,15 +242,15 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
             {/* Sort Controls & View Switcher */}
             <div className="flex items-center gap-3 flex-wrap justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-medium shrink-0">Sort by:</span>
+                <span className="text-xs text-muted-foreground font-medium shrink-0">{t('memberDetail.sortByLabel')}</span>
                 <Select value={sortBy} onValueChange={(v: string | null) => setSortBy(v as any || 'dueDate')}>
                   <SelectTrigger className="w-28 h-9 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="dueDate">Due Date</SelectItem>
-                    <SelectItem value="priority">Priority</SelectItem>
-                    <SelectItem value="title">Title</SelectItem>
+                    <SelectItem value="dueDate">{t('memberDetail.dueDateSort')}</SelectItem>
+                    <SelectItem value="priority">{t('memberDetail.prioritySort')}</SelectItem>
+                    <SelectItem value="title">{t('memberDetail.titleSort')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -273,7 +271,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                   onClick={() => setViewMode('list')}
                   className="h-7 text-xs font-semibold px-3 gap-1"
                 >
-                  <List className="size-3.5" /> List
+                  <List className="size-3.5" /> {t('memberDetail.list')}
                 </Button>
                 <Button
                   variant={viewMode === 'board' ? 'secondary' : 'ghost'}
@@ -281,7 +279,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                   onClick={() => setViewMode('board')}
                   className="h-7 text-xs font-semibold px-3 gap-1"
                 >
-                  <LayoutGrid className="size-3.5" /> Board
+                  <LayoutGrid className="size-3.5" /> {t('memberDetail.board')}
                 </Button>
               </div>
             </div>
@@ -321,13 +319,13 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
             {filteredTasks.length === 0 ? (
               <div className="border border-dashed border-border rounded-xl py-12 flex flex-col items-center justify-center text-center bg-muted/10">
                 <div className="size-12 rounded-full bg-muted flex items-center justify-center text-xl mb-3">📋</div>
-                <h3 className="font-semibold text-base mb-1">No tasks found</h3>
+                <h3 className="font-semibold text-base mb-1">{t('memberDetail.noTasks')}</h3>
                 <p className="text-xs text-muted-foreground max-w-sm px-4">
                   {searchQuery
-                    ? 'Try modifying your search query or sorting options.'
+                    ? t('memberDetail.noTasksSearch')
                     : activeStatus !== 'all'
-                    ? `${member.name} has no tasks marked as "${STATUS_CONFIG[activeStatus]?.label ?? activeStatus}".`
-                    : `${member.name} has not been assigned any tasks yet.`}
+                    ? t('memberDetail.noTasksStatus', { name: member.name, status: t('status.' + activeStatus) })
+                    : t('memberDetail.noTasksAssigned', { name: member.name })}
                 </p>
               </div>
             ) : viewMode === 'list' ? (
@@ -348,12 +346,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                               <PriorityBadge priority={task.priority} />
                               {overdue && (
                                 <Badge variant="destructive" className="text-[10px] gap-1 font-semibold">
-                                  <AlertTriangle className="size-2.5" /> Overdue
+                                  <AlertTriangle className="size-2.5" /> {t('common.overdue')}
                                 </Badge>
                               )}
                             </div>
                             <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                              <Calendar className="size-3.5" /> {formatDate(task.due_date)}
+                              <Calendar className="size-3.5" /> {formatDate(task.due_date, locale, t)}
                             </div>
                           </div>
 
@@ -377,7 +375,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                 <div className="flex items-start gap-2.5 bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-blue-900">
                                   <Zap className="size-4 text-blue-500 shrink-0 mt-0.5" />
                                   <div>
-                                    <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">Final Thoughts</div>
+                                    <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">{t('taskDetail.finalThoughts')}</div>
                                     <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{getMemberAssignment(task, memberId)?.completion_note}&rdquo;</p>
                                   </div>
                                 </div>
@@ -388,7 +386,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                 <div className="flex items-center justify-between gap-3 bg-green-50/50 border border-green-100 rounded-lg p-3 text-green-900 flex-wrap">
                                   <div className="flex items-center gap-2">
                                     <Upload className="size-4 text-green-500 shrink-0" />
-                                    <span className="text-xs font-semibold">Work has been submitted</span>
+                                    <span className="text-xs font-semibold">{t('taskDetail.workSubmitted')}</span>
                                   </div>
                                   <a
                                     href={getMemberAssignment(task, memberId)?.submission_link}
@@ -397,7 +395,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                     onClick={e => e.stopPropagation()}
                                     className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 py-1.5 px-3 rounded-md transition-colors"
                                   >
-                                    View Submission ↗
+                                    {t('taskDetail.viewSubmission')} ↗
                                   </a>
                                 </div>
                               )}
@@ -407,7 +405,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                 <div className="flex items-start gap-2.5 bg-orange-50/50 border border-orange-100 rounded-lg p-3 text-orange-950">
                                   <RefreshCw className="size-4 text-orange-500 shrink-0 mt-0.5" />
                                   <div>
-                                    <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">Revision Required</div>
+                                    <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">{t('taskDetail.revisionRequired')}</div>
                                     <p className="text-xs mt-0.5 leading-relaxed">{getMemberAssignment(task, memberId)?.feedback}</p>
                                   </div>
                                 </div>
@@ -437,7 +435,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm">{columnConfig.icon}</span>
                           <span className="text-xs font-bold text-foreground">
-                            {columnConfig.label}
+                            {t(columnConfig.labelKey)}
                           </span>
                         </div>
                         <Badge variant="outline" className="text-[10px] font-extrabold px-2 h-5">
@@ -449,7 +447,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                       <div className="flex flex-col gap-2.5 overflow-y-auto flex-1 pr-1 scrollbar-thin">
                         {columnTasks.length === 0 ? (
                           <div className="text-center py-10 text-[11px] text-muted-foreground/60 border border-dashed rounded-lg bg-card/50">
-                            No tasks
+                            {t('memberDetail.noTasksColumn')}
                           </div>
                         ) : (
                           columnTasks.map(task => {
@@ -466,7 +464,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
                                     {/* Due Date */}
                                     <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                                      <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date)}</span>
+                                      <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date, locale, t)}</span>
                                       {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
                                     </div>
 
@@ -474,17 +472,17 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                     {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback || ma?.completion_note); })() && (
                                       <div className="flex gap-1.5 border-t border-dashed pt-2 mt-1">
                                          {getMemberAssignment(task, memberId)?.completion_note && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title="Has completion note">
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title={t('taskDetail.finalThoughts')}>
                                              💭
                                            </Badge>
                                          )}
                                          {getMemberAssignment(task, memberId)?.submission_link && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title="Has submission">
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title={t('taskDetail.workSubmitted')}>
                                              📤
                                            </Badge>
                                          )}
                                          {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title="Revision notes present">
+                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title={t('taskDetail.revisionRequired')}>
                                              🔄
                                            </Badge>
                                          )}

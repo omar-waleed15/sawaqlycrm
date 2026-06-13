@@ -11,6 +11,7 @@ import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useLanguage } from '@/lib/i18n';
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,16 +25,18 @@ import {
   Loader2,
 } from 'lucide-react';
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
+function formatCurrency(amount: number, locale?: string): string {
+  const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
   }).format(amount);
+  return formatted.replace('US$', '$').replace('USD', '$').replace('دولار أمريكي', '$');
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+function formatDate(date: Date, locale?: string): string {
+  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 const getLocalDateString = (d: Date) => {
@@ -43,16 +46,10 @@ const getLocalDateString = (d: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const CYCLE_LABELS: Record<string, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
-  one_time: 'One-Time',
-};
-
 export default function CalendarPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
 
   // Calendar state
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
@@ -69,14 +66,23 @@ export default function CalendarPage() {
   const isOwner = user?.role === 'owner' || user?.role === 'sales';
   const isTaskAdmin = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
-  const isTaskCompleted = (t: Task) => {
-    const assignees = t.task_assignees || [];
+  const isTaskCompleted = (tTask: Task) => {
+    const assignees = tTask.task_assignees || [];
     if (assignees.length === 0) return false;
     if (!isTaskAdmin) {
       const myAssignee = assignees.find(a => a.user_id === user?.id);
       return myAssignee ? myAssignee.status === 'completed' : false;
     }
     return assignees.every(a => a.status === 'completed');
+  };
+
+  const getCycleLabel = (cycle: string) => {
+    switch (cycle) {
+      case 'monthly': return t('finance.monthly');
+      case 'quarterly': return t('finance.quarterly');
+      case 'yearly': return t('finance.yearly');
+      default: return t('finance.oneTime');
+    }
   };
 
   // Load data
@@ -281,8 +287,8 @@ export default function CalendarPage() {
         
         if (dayEvents) {
           totalTasksDue += dayEvents.tasks.length;
-          completedTasks += dayEvents.tasks.filter(t => isTaskCompleted(t)).length;
-          urgentTasks += dayEvents.tasks.filter(t => t.priority === 'urgent' && !isTaskCompleted(t)).length;
+          completedTasks += dayEvents.tasks.filter(tTask => isTaskCompleted(tTask)).length;
+          urgentTasks += dayEvents.tasks.filter(tTask => tTask.priority === 'urgent' && !isTaskCompleted(tTask)).length;
           
           if (isOwner) {
             dayEvents.payments.forEach(p => {
@@ -317,29 +323,29 @@ export default function CalendarPage() {
     setIsModalOpen(true);
   };
 
-  const currentMonthLabel = currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonthLabel = currentMonth.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="page-container fade-in">
+    <div className="page-container fade-in text-start">
       {/* Header */}
       <div className="page-header flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="page-header-left">
-          <h1 className="page-header-title">{isOwner ? 'Calendar Overview' : 'My Work Calendar'}</h1>
+          <h1 className="page-header-title">{isOwner ? t('calendar.title') : t('calendar.myCalendar')}</h1>
           <p className="page-header-subtitle">
-            {isOwner ? 'Track agency payment schedules, content publications, and project deadlines' : 'Track your assigned tasks and due dates'}
+            {isOwner ? t('calendar.subtitle') : t('calendar.mySubtitle')}
           </p>
         </div>
         
         {/* Navigation Controls */}
         <div className="flex items-center gap-2 bg-card border p-1 rounded-xl shadow-sm shrink-0 self-stretch sm:self-auto justify-between sm:justify-start">
           <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-            <ChevronLeft className="size-4" />
+            <ChevronLeft className="size-4 rtl:rotate-180" />
           </Button>
           <Button variant="secondary" size="sm" onClick={setToday} className="h-8 text-xs font-semibold px-3">
-            Today
+            {t('common.today')}
           </Button>
           <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-            <ChevronRight className="size-4" />
+            <ChevronRight className="size-4 rtl:rotate-180" />
           </Button>
           <span className="text-xs font-bold text-foreground px-3 select-none">{currentMonthLabel}</span>
         </div>
@@ -363,51 +369,51 @@ export default function CalendarPage() {
           {isOwner ? (
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <span className="text-sm font-medium text-muted-foreground">Projected Revenue</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('calendar.projectedRevenue')}</span>
                 <DollarSign className="size-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-extrabold text-green-600">{formatCurrency(monthStats.projectedRevenue)}</div>
+                <div className="text-2xl font-extrabold text-green-600">{formatCurrency(monthStats.projectedRevenue, locale)}</div>
                 <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                  Due in {currentMonth.toLocaleString('en-US', { month: 'short' })}
+                  {t('calendar.dueIn').replace('{month}', currentMonth.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' }))}
                 </p>
               </CardContent>
             </Card>
           ) : (
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <span className="text-sm font-medium text-muted-foreground">Urgent Actions</span>
+                <span className="text-sm font-medium text-muted-foreground">{t('calendar.urgentActions')}</span>
                 <AlertTriangle className="size-4 text-rose-500 animate-bounce" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-extrabold text-rose-600">{monthStats.urgentTasks}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">Urgent tasks pending</p>
+                <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">{t('calendar.urgentTasksPending')}</p>
               </CardContent>
             </Card>
           )}
           
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">Monthly Deadlines</span>
+              <span className="text-sm font-medium text-muted-foreground">{t('calendar.monthlyDeadlines')}</span>
               <ClipboardList className="size-4 text-indigo-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-extrabold">{monthStats.totalTasksDue}</div>
               <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                {isOwner ? 'Tasks ending this month' : 'Tasks assigned to you'}
+                {isOwner ? t('calendar.tasksEndingMonth') : t('calendar.tasksAssigned')}
               </p>
             </CardContent>
           </Card>
           
           <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">Completion Rate</span>
+              <span className="text-sm font-medium text-muted-foreground">{t('calendar.completionRate')}</span>
               <CheckCircle2 className="size-4 text-purple-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-extrabold text-purple-600">{monthStats.completionRate}%</div>
               <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                Completed: {monthStats.completedTasks} / {monthStats.totalTasksDue} tasks
+                {t('calendar.completedOf').replace('{completed}', monthStats.completedTasks.toString()).replace('{total}', monthStats.totalTasksDue.toString())}
               </p>
             </CardContent>
           </Card>
@@ -424,13 +430,21 @@ export default function CalendarPage() {
       {loading ? (
         <Card className="flex flex-col items-center justify-center min-h-[350px] gap-3">
           <Loader2 className="size-8 text-primary animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading calendar schedule...</p>
+          <p className="text-sm text-muted-foreground">{t('calendar.loadingSchedule')}</p>
         </Card>
       ) : (
         <Card className="overflow-hidden border border-border shadow-md">
           {/* Weekday Names Header */}
           <div className="grid grid-cols-7 border-b bg-muted/40 font-semibold text-xs text-muted-foreground select-none text-center py-2.5">
-            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+            {[
+              t('calendar.sunday'),
+              t('calendar.monday'),
+              t('calendar.tuesday'),
+              t('calendar.wednesday'),
+              t('calendar.thursday'),
+              t('calendar.friday'),
+              t('calendar.saturday')
+            ].map((day) => (
               <div key={day} className="truncate px-1">
                 {day.slice(0, 3)}
               </div>
@@ -457,7 +471,7 @@ export default function CalendarPage() {
                 <div
                   key={cell.key}
                   onClick={() => handleDayClick(cell.date)}
-                  className={`min-h-[100px] p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors relative ${
+                  className={`min-h-[100px] p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors relative text-start ${
                     cell.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/45 bg-muted/5'
                   }`}
                 >
@@ -488,7 +502,7 @@ export default function CalendarPage() {
                           title={`Payment ${isPaid ? '(Paid)' : '(Due)'}: $${amount} - ${contract.name}`}
                         >
                           {isPaid ? <CheckCircle2 className="size-2.5 shrink-0" /> : <DollarSign className="size-2 shrink-0" />}
-                          <span className={isPaid ? 'line-through opacity-70' : ''}>{formatCurrency(amount)}</span>
+                          <span className={isPaid ? 'line-through opacity-70' : ''}>{formatCurrency(amount, locale)}</span>
                         </div>
                       );
                     })}
@@ -506,32 +520,32 @@ export default function CalendarPage() {
                     ))}
 
                     {/* Publications */}
-                    {displayPublications.map(task => {
-                      const pubCompleted = isTaskCompleted(task);
+                    {displayPublications.map(tTask => {
+                      const pubCompleted = isTaskCompleted(tTask);
                       return (
                         <div
-                          key={`pub-${task.id}`}
+                          key={`pub-${tTask.id}`}
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
                             pubCompleted
                               ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
                               : 'bg-sky-50 border-sky-200 text-sky-700'
                           }`}
-                          title={`Publish${pubCompleted ? ' (Done)' : ''}: ${task.title}`}
+                          title={`Publish${pubCompleted ? ' (Done)' : ''}: ${tTask.title}`}
                         >
                           {pubCompleted ? <CheckCircle2 className="size-2.5 shrink-0" /> : <Megaphone className="size-2 shrink-0" />}
-                          <span className={pubCompleted ? 'line-through opacity-70' : ''}>{task.title}</span>
+                          <span className={pubCompleted ? 'line-through opacity-70' : ''}>{tTask.title}</span>
                         </div>
                       );
                     })}
 
                     {/* Tasks */}
-                    {displayTasks.map(task => {
-                      const isUrgent = task.priority === 'urgent';
-                      const isHigh = task.priority === 'high';
-                      const completed = isTaskCompleted(task);
+                    {displayTasks.map(tTask => {
+                      const isUrgent = tTask.priority === 'urgent';
+                      const isHigh = tTask.priority === 'high';
+                      const completed = isTaskCompleted(tTask);
                       return (
                         <div
-                          key={`task-${task.id}`}
+                          key={`task-${tTask.id}`}
                           className={`text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
                             completed
                               ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
@@ -541,10 +555,10 @@ export default function CalendarPage() {
                               ? 'bg-orange-50 border-orange-200 text-orange-700'
                               : 'bg-muted border-border text-muted-foreground'
                           }`}
-                          title={`Task${completed ? ' (Done)' : ''}: ${task.title}`}
+                          title={`Task${completed ? ' (Done)' : ''}: ${tTask.title}`}
                         >
                           {completed ? <CheckCircle2 className="size-2.5 shrink-0" /> : <span>☐</span>}
-                          <span className={completed ? 'line-through opacity-70' : ''}>{task.title}</span>
+                          <span className={completed ? 'line-through opacity-70' : ''}>{tTask.title}</span>
                         </div>
                       );
                     })}
@@ -552,7 +566,7 @@ export default function CalendarPage() {
                     {/* More indicator */}
                     {hasMore && (
                       <div className="text-[8px] font-extrabold text-muted-foreground text-center mt-auto bg-muted/40 py-0.5 rounded border border-dashed border-border/80">
-                        +{extraCount} more events
+                        {t('calendar.moreEvents').replace('{count}', extraCount.toString())}
                       </div>
                     )}
                   </div>
@@ -567,15 +581,15 @@ export default function CalendarPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={selectedDate ? formatDate(selectedDate) : 'Day Details'}
+        title={selectedDate ? formatDate(selectedDate, locale) : t('calendar.dayDetails')}
       >
         {selectedDate && (
-          <div className="flex flex-col gap-5 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-5 max-h-[70vh] overflow-y-auto pr-1 text-start">
             {/* Payments Section (Owners only) */}
             {isOwner && (
               <div className="flex flex-col gap-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
-                  <DollarSign className="size-3.5 text-green-500" /> Payments Scheduled ({selectedDayEvents.payments.length})
+                  <DollarSign className="size-3.5 text-green-500" /> {t('calendar.paymentsScheduled')} ({selectedDayEvents.payments.length})
                 </h3>
                 
                 {selectedDayEvents.payments.length > 0 ? (
@@ -589,23 +603,23 @@ export default function CalendarPage() {
                         <div key={contract.id} className={`flex items-center justify-between gap-3 p-3 rounded-lg border bg-card ${
                           isPaid ? 'border-l-4 border-l-emerald-500' : ''
                         }`}>
-                          <div className="overflow-hidden flex-1">
+                          <div className="overflow-hidden flex-1 text-start">
                             <div className="flex items-center gap-2">
                               {isPaid && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
                               <h4 className={`font-bold text-xs truncate ${isPaid ? 'line-through text-muted-foreground' : ''}`}>{contract.name}</h4>
-                              {isPaid && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Paid</Badge>}
+                              {isPaid && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">{t('finance.paid')}</Badge>}
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
-                              <span className="font-semibold text-green-600">{formatCurrency(amount)}</span>
+                              <span className="font-semibold text-green-600">{formatCurrency(amount, locale)}</span>
                               <span>•</span>
-                              <span className="truncate">Client: {contract.client?.name || 'N/A'}</span>
+                              <span className="truncate">{t('taskDetail.client')}: {contract.client?.name || 'N/A'}</span>
                               <span>•</span>
-                              <span className="capitalize">{CYCLE_LABELS[contract.billing_cycle] || contract.billing_cycle}</span>
+                              <span className="capitalize">{getCycleLabel(contract.billing_cycle)}</span>
                             </div>
                           </div>
                           {user?.role === 'owner' && (
                             <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/finance'); }} className="h-7 text-xs font-semibold shrink-0">
-                              Manage
+                              {t('common.manage')}
                             </Button>
                           )}
                         </div>
@@ -613,7 +627,7 @@ export default function CalendarPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No payments scheduled on this date.</p>
+                  <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noPayments')}</p>
                 )}
               </div>
             )}
@@ -622,28 +636,28 @@ export default function CalendarPage() {
             {isOwner && (
               <div className="flex flex-col gap-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
-                  <Calendar className="size-3.5 text-indigo-500" /> Meetings Scheduled ({selectedDayEvents.meetings?.length || 0})
+                  <Calendar className="size-3.5 text-indigo-500" /> {t('calendar.meetingsScheduled')} ({selectedDayEvents.meetings?.length || 0})
                 </h3>
                 
                 {selectedDayEvents.meetings && selectedDayEvents.meetings.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {selectedDayEvents.meetings.map(client => (
                       <div key={client.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
-                        <div className="overflow-hidden flex-1">
-                          <h4 className="font-bold text-xs">🤝 Meeting with {client.name}</h4>
+                        <div className="overflow-hidden flex-1 text-start">
+                          <h4 className="font-bold text-xs">{t('calendar.meetingWith').replace('{name}', client.name)}</h4>
                           <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
                             {client.company && (
                               <>
-                                <span>Company: {client.company}</span>
+                                <span>{t('calendar.companyLabel')} {client.company}</span>
                                 <span>•</span>
                               </>
                             )}
-                            <span>Phone: {client.phone}</span>
+                            <span>{t('calendar.phoneLabel')} {client.phone}</span>
                             {client.meeting_date && (
                               <>
                                 <span>•</span>
                                 <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                  Time: {new Date(client.meeting_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                  {t('calendar.timeLabel')} {new Date(client.meeting_date).toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </>
                             )}
@@ -655,13 +669,13 @@ export default function CalendarPage() {
                           onClick={() => { setIsModalOpen(false); router.push('/dashboard'); }} 
                           className="h-7 text-xs font-semibold shrink-0"
                         >
-                          View Lead
+                          {t('calendar.viewLead')}
                         </Button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No meetings scheduled on this date.</p>
+                  <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noMeetings')}</p>
                 )}
               </div>
             )}
@@ -669,97 +683,97 @@ export default function CalendarPage() {
             {/* Publications Section */}
             <div className="flex flex-col gap-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
-                <Megaphone className="size-3.5 text-sky-500" /> Publications Scheduled ({selectedDayEvents.publications.length})
+                <Megaphone className="size-3.5 text-sky-500" /> {t('calendar.publicationsScheduled')} ({selectedDayEvents.publications.length})
               </h3>
               {selectedDayEvents.publications.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {selectedDayEvents.publications.map(task => {
-                    const pubDone = isTaskCompleted(task);
+                  {selectedDayEvents.publications.map(tTask => {
+                    const pubDone = isTaskCompleted(tTask);
                     return (
-                      <div key={task.id} className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
+                      <div key={tTask.id} className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
                         pubDone ? 'border-l-emerald-500' : 'border-l-sky-500'
                       }`}>
-                        <div className="flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-hidden text-start">
                           <div className="flex items-center gap-2">
                             {pubDone && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
-                            <h4 className={`font-bold text-xs ${pubDone ? 'line-through text-muted-foreground' : ''}`}>{task.title}</h4>
-                            {pubDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Done</Badge>}
+                            <h4 className={`font-bold text-xs ${pubDone ? 'line-through text-muted-foreground' : ''}`}>{tTask.title}</h4>
+                            {pubDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">{t('calendar.doneLabel')}</Badge>}
                           </div>
-                          {task.description && (
+                          {tTask.description && (
                             <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                              {task.description}
+                              {tTask.description}
                             </p>
                           )}
-                          {task.publish_notes && (
+                          {tTask.publish_notes && (
                             <div className="bg-sky-50/50 border border-sky-100 rounded-md p-2 text-[10px] text-sky-800 italic mt-2">
-                              📝 {task.publish_notes}
+                              📝 {tTask.publish_notes}
                             </div>
                           )}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
-                          View
+                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${tTask.id}`); }} className="h-7 text-xs font-semibold shrink-0">
+                          {t('common.view')}
                         </Button>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No publications scheduled on this date.</p>
+                <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noPublications')}</p>
               )}
             </div>
 
             {/* Tasks Due Section */}
             <div className="flex flex-col gap-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
-                <ClipboardList className="size-3.5 text-indigo-500" /> Tasks Deadlines ({selectedDayEvents.tasks.length})
+                <ClipboardList className="size-3.5 text-indigo-500" /> {t('calendar.tasksDeadlines')} ({selectedDayEvents.tasks.length})
               </h3>
               {selectedDayEvents.tasks.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {selectedDayEvents.tasks.map(task => {
-                    const taskDone = isTaskCompleted(task);
+                  {selectedDayEvents.tasks.map(tTask => {
+                    const taskDone = isTaskCompleted(tTask);
                     return (
-                      <div key={task.id} className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
+                      <div key={tTask.id} className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
                         taskDone ? 'border-l-4 border-l-emerald-500' : ''
                       }`}>
-                        <div className="flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-hidden text-start">
                           <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             {taskDone && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
-                            <h4 className={`font-bold text-xs truncate max-w-[200px] ${taskDone ? 'line-through text-muted-foreground' : ''}`}>{task.title}</h4>
-                            {taskDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">Completed</Badge>}
-                            {!taskDone && <PriorityBadge priority={task.priority} />}
+                            <h4 className={`font-bold text-xs truncate max-w-[200px] ${taskDone ? 'line-through text-muted-foreground' : ''}`}>{tTask.title}</h4>
+                            {taskDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">{t('status.completed')}</Badge>}
+                            {!taskDone && <PriorityBadge priority={tTask.priority} />}
                             {!taskDone && (
                               isTaskAdmin ? (
-                                task.task_assignees && task.task_assignees.length > 0 ? (
+                                tTask.task_assignees && tTask.task_assignees.length > 0 ? (
                                   <Badge variant="outline" className="text-[10px] shrink-0 bg-indigo-50 text-indigo-700 border-indigo-200">
-                                    {task.task_assignees.filter(a => a.status === 'completed').length}/{task.task_assignees.length} done
+                                    {tTask.task_assignees.filter(a => a.status === 'completed').length}/{tTask.task_assignees.length} {t('calendar.doneLabel')}
                                   </Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-[10px] shrink-0">Unassigned</Badge>
+                                  <Badge variant="outline" className="text-[10px] shrink-0">{t('common.unassigned')}</Badge>
                                 )
                               ) : (
-                                <StatusBadge status={task.task_assignees?.find(a => a.user_id === user?.id)?.status || 'todo'} />
+                                <StatusBadge status={tTask.task_assignees?.find(a => a.user_id === user?.id)?.status || 'todo'} />
                               )
                             )}
                           </div>
-                          {task.description && !taskDone && (
+                          {tTask.description && !taskDone && (
                             <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                              {task.description}
+                              {tTask.description}
                             </p>
                           )}
                           {!taskDone && (
                             <div className="flex flex-col gap-1.5 mt-2">
                               <div className="flex items-center gap-1 text-[9px] text-muted-foreground flex-wrap">
-                                {task.content_type && (
+                                {tTask.content_type && (
                                   <>
-                                    <span>🎬 {task.content_type}</span>
+                                    <span>🎬 {t('contentType.' + tTask.content_type)}</span>
                                     <span>•</span>
                                   </>
                                 )}
-                                <span>👥 Assignees:</span>
+                                <span>👥 {t('calendar.assigneesLabel')}</span>
                               </div>
-                              {task.task_assignees && task.task_assignees.length > 0 ? (
+                              {tTask.task_assignees && tTask.task_assignees.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
-                                  {task.task_assignees.map(a => (
+                                  {tTask.task_assignees.map(a => (
                                     <div key={a.id} className="flex items-center gap-1.5 bg-muted px-2 py-1 rounded text-[10px]">
                                       <span className="font-semibold text-foreground">{a.user?.name || 'Unknown'}</span>
                                       <StatusBadge status={a.status} className="scale-90 origin-left" />
@@ -767,25 +781,25 @@ export default function CalendarPage() {
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground italic">No members assigned</span>
+                                <span className="text-[10px] text-muted-foreground italic">{t('calendar.noMembersAssigned')}</span>
                               )}
                             </div>
                           )}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${task.id}`); }} className="h-7 text-xs font-semibold shrink-0">
-                          Open
+                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${tTask.id}`); }} className="h-7 text-xs font-semibold shrink-0">
+                          {t('common.open')}
                         </Button>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground/60 italic py-2 pl-1">No task deadlines due on this date.</p>
+                <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noTaskDeadlines')}</p>
               )}
             </div>
 
             <div className="flex justify-end pt-3 border-t mt-2">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setIsModalOpen(false)}>{t('common.close')}</Button>
             </div>
           </div>
         )}

@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
 import { Menu, LogOut } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -37,7 +39,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          title="Open Menu"
+          title={t('nav.openMenu')}
         >
           <Menu className="size-6" />
         </button>
@@ -45,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="size-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-base shrink-0">
             S
           </div>
-          <span className="text-sm font-bold text-foreground tracking-tight">Sawaqly CRM</span>
+          <span className="text-sm font-bold text-foreground tracking-tight">{t('common.appName')}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0" title={`${user?.name} (${user?.role})`}>
@@ -54,7 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             onClick={logout}
             className="p-2 -mr-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
-            title="Sign out"
+            title={t('common.signOut')}
           >
             <LogOut className="size-5" />
           </button>

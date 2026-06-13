@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,12 +43,12 @@ export default function LoginPage() {
               S
             </div>
             <div>
-              <div className="text-lg font-bold tracking-tight">Sawaqly CRM</div>
-              <div className="text-xs text-muted-foreground">Marketing Agency Platform</div>
+              <div className="text-lg font-bold tracking-tight">{t('common.appName')}</div>
+              <div className="text-xs text-muted-foreground">{t('common.marketingAgency')}</div>
             </div>
           </div>
-          <h2 className="text-xl font-bold">Welcome back</h2>
-          <p className="text-sm text-muted-foreground">Sign in to your account to continue</p>
+          <h2 className="text-xl font-bold">{t('login.welcomeBack')}</h2>
+          <p className="text-sm text-muted-foreground">{t('login.signInToAccount')}</p>
         </CardHeader>
 
         <CardContent>
@@ -58,11 +60,11 @@ export default function LoginPage() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email address</Label>
+              <Label htmlFor="email">{t('login.emailAddress')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@sawaqly.com"
+                placeholder={t('login.emailPlaceholder')}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -72,11 +74,11 @@ export default function LoginPage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder={t('login.passwordPlaceholder')}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -88,9 +90,9 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Signing in...
+                  {t('login.signingIn')}
                 </>
-              ) : 'Sign In'}
+              ) : t('login.signIn')}
             </Button>
           </form>
         </CardContent>

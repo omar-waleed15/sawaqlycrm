@@ -6,22 +6,26 @@ import { useAuth } from '@/lib/auth';
 import { clientsApi, projectsApi, contractsApi, expensesApi, salariesApi, usersApi, financeAnalyticsApi } from '@/lib/api';
 import { Client, Project, Contract, FinanceStats, Expense, Salary, User, ExpenseCategory, FinanceAnalyticsPayload } from '@/types';
 import Modal from '@/components/Modal';
+import { useLanguage } from '@/lib/i18n';
+import { Loader2 } from 'lucide-react';
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
+function formatCurrency(amount: number, locale?: string): string {
+  const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
   }).format(amount);
+  return formatted.replace('US$', '$').replace('USD', '$').replace('دولار أمريكي', '$');
 }
 
-function formatDate(dateStr?: string): string {
+
+function formatDate(dateStr?: string, locale?: string): string {
   if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function getRenewalStatus(renewalDateStr?: string, status?: string): { label: string; color: string; bg: string; isAlert: boolean } {
-  if (!renewalDateStr || status !== 'active') return { label: 'Inactive', color: '#64748b', bg: '#f1f5f9', isAlert: false };
+function getRenewalStatus(renewalDateStr?: string, status?: string, t?: any): { label: string; color: string; bg: string; isAlert: boolean } {
+  if (!renewalDateStr || status !== 'active') return { label: t('clients.inactive'), color: '#64748b', bg: '#f1f5f9', isAlert: false };
   
   const today = new Date();
   const renewalDate = new Date(renewalDateStr);
@@ -29,33 +33,27 @@ function getRenewalStatus(renewalDateStr?: string, status?: string): { label: st
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
-    return { label: 'Overdue / Expired', color: '#e11d48', bg: '#fff1f2', isAlert: true };
+    return { label: t('common.overdue'), color: '#e11d48', bg: '#fff1f2', isAlert: true };
   } else if (diffDays <= 7) {
-    return { label: `Renewing in ${diffDays}d (Urgent)`, color: '#ea580c', bg: '#fff7ed', isAlert: true };
+    return { label: t('dashboard.needsAttention') + ` (${diffDays}d)`, color: '#ea580c', bg: '#fff7ed', isAlert: true };
   } else if (diffDays <= 30) {
-    return { label: `Renewing in ${diffDays}d`, color: '#d97706', bg: '#fef3c7', isAlert: true };
+    return { label: t('dashboard.needsAttention') + ` (${diffDays}d)`, color: '#d97706', bg: '#fef3c7', isAlert: true };
   }
-  return { label: 'Active', color: '#16a34a', bg: '#f0fdf4', isAlert: false };
+  return { label: t('clients.active'), color: '#16a34a', bg: '#f0fdf4', isAlert: false };
 }
 
-const CYCLE_LABELS: Record<string, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
-  one_time: 'One-Time',
-};
-
-const PROJECT_STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; accent: string }> = {
-  planning:  { label: '📝 To Do',          bg: '#f1f5f9', color: '#475569', accent: '#94a3b8' },
-  active:    { label: '⚡ In Progress',   bg: '#eff6ff', color: '#1d4ed8', accent: '#3b82f6' },
-  on_hold:   { label: '🔄 Needs Revision', bg: '#fff7ed', color: '#c2410c', accent: '#f97316' },
-  completed: { label: '✅ Completed',      bg: '#f5f3ff', color: '#6d28d9', accent: '#8b5cf6' },
+const PROJECT_STATUS_CONFIG: Record<string, { labelKey: string; bg: string; color: string; accent: string }> = {
+  planning:  { labelKey: 'clients.planning',       bg: '#f1f5f9', color: '#475569', accent: '#94a3b8' },
+  active:    { labelKey: 'status.in_progress',   bg: '#eff6ff', color: '#1d4ed8', accent: '#3b82f6' },
+  on_hold:   { labelKey: 'status.revision', bg: '#fff7ed', color: '#c2410c', accent: '#f97316' },
+  completed: { labelKey: 'status.completed',      bg: '#f5f3ff', color: '#6d28d9', accent: '#8b5cf6' },
 };
 
 
 export default function FinanceDashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t, locale } = useLanguage();
 
   // Navigation Guard
   useEffect(() => {
@@ -79,8 +77,6 @@ export default function FinanceDashboardPage() {
   // Analytics states
   const [analyticsData, setAnalyticsData] = useState<FinanceAnalyticsPayload | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
-
-  // Interactive analytics controls state
 
   // Chart interactivity states
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(null);
@@ -240,11 +236,11 @@ export default function FinanceDashboardPage() {
     try {
       if (!silent) setLoading(true);
       const [statsRes, clientsRes, projectsRes, contractsRes, usersRes] = await Promise.all([
-        contractsApi.stats().catch(err => ({ stats: null })),
-        clientsApi.list().catch(err => ({ clients: [] })),
-        projectsApi.list().catch(err => ({ projects: [] })),
-        contractsApi.list().catch(err => ({ contracts: [] })),
-        usersApi.list().catch(err => ({ users: [] })),
+        contractsApi.stats().catch(() => ({ stats: null })),
+        clientsApi.list().catch(() => ({ clients: [] })),
+        projectsApi.list().catch(() => ({ projects: [] })),
+        contractsApi.list().catch(() => ({ contracts: [] })),
+        usersApi.list().catch(() => ({ users: [] })),
       ]);
       if (statsRes.stats) setStats(statsRes.stats);
       setClients(clientsRes.clients || []);
@@ -283,8 +279,6 @@ export default function FinanceDashboardPage() {
   }, [user]);
 
   if (user?.role !== 'owner' && user?.role !== 'sales') return null;
-
-
 
   const resetProjectForm = (project?: Project) => {
     if (project) {
@@ -365,8 +359,6 @@ export default function FinanceDashboardPage() {
     }
     setErrorMsg('');
   };
-
-
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -467,19 +459,8 @@ export default function FinanceDashboardPage() {
     }
   };
 
-  // Delete Actions
-  const handleDeleteClient = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete client "${name}"? This will delete all their associated projects and contracts.`)) return;
-    try {
-      await clientsApi.delete(id);
-      loadData(true);
-    } catch (err) {
-      alert('Failed to delete client');
-    }
-  };
-
   const handleDeleteProject = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete project "${name}"?`)) return;
+    if (!confirm(t('finance.deleteProjectConfirm').replace('{name}', name))) return;
     try {
       await projectsApi.delete(id);
       loadData(true);
@@ -489,7 +470,7 @@ export default function FinanceDashboardPage() {
   };
 
   const handleDeleteContract = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete contract "${name}"?`)) return;
+    if (!confirm(t('finance.deleteContractConfirm').replace('{name}', name))) return;
     try {
       await contractsApi.delete(id);
       loadData(true);
@@ -579,7 +560,7 @@ export default function FinanceDashboardPage() {
   };
 
   const handleDeleteExpense = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete expense "${title}"?`)) return;
+    if (!confirm(t('finance.deleteExpenseConfirm').replace('{title}', title))) return;
     try {
       await expensesApi.delete(id);
       loadData(true);
@@ -591,11 +572,10 @@ export default function FinanceDashboardPage() {
   // Salaries CRUD handlers
   const resetSalaryForm = (salary?: Salary) => {
     if (salary) {
-      // Use paid_date if available, otherwise derive a date from the stored month
       const derivedDate = salary.paid_date
         ? salary.paid_date.split('T')[0]
         : salary.month
-          ? salary.month.substring(0, 10) // already YYYY-MM-DD (first of month)
+          ? salary.month.substring(0, 10)
           : new Date().toISOString().split('T')[0];
       setSalaryForm({
         user_id: salary.user_id,
@@ -614,7 +594,6 @@ export default function FinanceDashboardPage() {
       setSelectedSalary(salary);
       setModalMode('edit');
     } else {
-      // Default to the 1st of the currently selected filter month
       const defaultDate = expenseMonthFilter
         ? `${expenseMonthFilter}-01`
         : new Date().toISOString().split('T')[0];
@@ -640,9 +619,7 @@ export default function FinanceDashboardPage() {
       setErrorMsg('Team Member, Amount, and Payment Date are required');
       return;
     }
-    // Derive month (YYYY-MM-01) from the payment date
     const monthStr = salaryForm.paid_date.substring(0, 7) + '-01';
-    // Validate installments for one-time
     if (!salaryForm.is_recurring) {
       const totalInst = salaryInstallmentRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
       const totalAmt = Number(salaryForm.amount);
@@ -714,7 +691,7 @@ export default function FinanceDashboardPage() {
   };
 
   const handleDeleteSalary = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete salary record for "${name}"?`)) return;
+    if (!confirm(t('finance.deleteSalaryConfirm').replace('{name}', name))) return;
     try {
       await salariesApi.delete(id);
       loadData(true);
@@ -723,7 +700,14 @@ export default function FinanceDashboardPage() {
     }
   };
 
-
+  const getCycleLabel = (cycle: string) => {
+    switch (cycle) {
+      case 'monthly': return t('finance.monthly');
+      case 'quarterly': return t('finance.quarterly');
+      case 'yearly': return t('finance.yearly');
+      default: return t('finance.oneTime');
+    }
+  };
 
   const filteredProjectsList = projects.filter(p =>
     p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
@@ -739,7 +723,7 @@ export default function FinanceDashboardPage() {
   // Calculated arrays
   const activeContractsList = contracts.filter(c => c.status === 'active');
   const alertRenewals = activeContractsList
-    .map(c => ({ contract: c, status: getRenewalStatus(c.renewal_date, c.status) }))
+    .map(c => ({ contract: c, status: getRenewalStatus(c.renewal_date, c.status, t) }))
     .filter(item => item.status.isAlert)
     .sort((a, b) => {
       if (!a.contract.renewal_date) return 1;
@@ -751,7 +735,7 @@ export default function FinanceDashboardPage() {
     if (analyticsLoading) {
       return (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-          <div className="spinner" />
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
       );
     }
@@ -768,8 +752,8 @@ export default function FinanceDashboardPage() {
           margin: '20px 0'
         }}>
           <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📊</div>
-          <h3>No financial data found</h3>
-          <p style={{ marginTop: 6, fontSize: '0.875rem' }}>Add active contracts, expenses, or salary payments to generate insights.</p>
+          <h3>{t('finance.noFinancialData')}</h3>
+          <p style={{ marginTop: 6, fontSize: '0.875rem' }}>{t('finance.addDataHint')}</p>
         </div>
       );
     }
@@ -782,8 +766,8 @@ export default function FinanceDashboardPage() {
         let label = cat.key.toUpperCase();
         let color = '#94a3b8';
         let emoji = '📦';
-        if (cat.key === 'salary' || cat.key === 'salaries') { label = 'Salaries'; color = '#6366f1'; emoji = '👤'; }
-        else if (cat.key === 'ads') { label = 'Ad Spend'; color = '#f97316'; emoji = '📣'; }
+        if (cat.key === 'salary' || cat.key === 'salaries') { label = t('finance.salariesTab').replace('💸 ', ''); color = '#6366f1'; emoji = '👤'; }
+        else if (cat.key === 'ads') { label = t('contentType.story'); color = '#f97316'; emoji = '📣'; }
         else if (cat.key === 'software') { label = 'Software'; color = '#3b82f6'; emoji = '🖥️'; }
         else if (cat.key === 'office') { label = 'Office'; color = '#64748b'; emoji = '🏢'; }
         else if (cat.key === 'freelancer') { label = 'Freelancers'; color = '#8b5cf6'; emoji = '🧑‍💻'; }
@@ -798,6 +782,7 @@ export default function FinanceDashboardPage() {
     const radius = 50;
     const circumference = 2 * Math.PI * radius;
     let cumulativePercentage = 0;
+
     const donutSlices = donutCategories.map(cat => {
       const percentage = totalExpForDonut > 0 ? cat.value / totalExpForDonut : 0;
       const strokeLength = percentage * circumference;
@@ -823,49 +808,49 @@ export default function FinanceDashboardPage() {
 
     // 4. Receivables Aging list
     const overdueList = [
-      { key: 'overdue90Plus', label: '💀 90+ Days Overdue', color: '#e11d48', bg: '#fff1f2', items: analyticsData.receivablesAging.overdue90Plus },
-      { key: 'overdue61_90', label: '🚨 61-90 Days Overdue', color: '#ea580c', bg: '#fff7ed', items: analyticsData.receivablesAging.overdue61_90 },
-      { key: 'overdue31_60', label: '🔥 31-60 Days Overdue', color: '#d97706', bg: '#fef3c7', items: analyticsData.receivablesAging.overdue31_60 },
-      { key: 'overdue1_30', label: '⚠️ 1-30 Days Overdue', color: '#4f46e5', bg: '#ede9fe', items: analyticsData.receivablesAging.overdue1_30 },
-      { key: 'current', label: '📅 Current / Upcoming Invoices', color: '#16a34a', bg: '#f0fdf4', items: analyticsData.receivablesAging.current }
+      { key: 'overdue90Plus', label: '💀 90+ ' + t('common.overdue'), color: '#e11d48', bg: '#fff1f2', items: analyticsData.receivablesAging.overdue90Plus },
+      { key: 'overdue61_90', label: '🚨 61-90 ' + t('common.overdue'), color: '#ea580c', bg: '#fff7ed', items: analyticsData.receivablesAging.overdue61_90 },
+      { key: 'overdue31_60', label: '🔥 31-60 ' + t('common.overdue'), color: '#d97706', bg: '#fef3c7', items: analyticsData.receivablesAging.overdue31_60 },
+      { key: 'overdue1_30', label: '⚠️ 1-30 ' + t('common.overdue'), color: '#4f46e5', bg: '#ede9fe', items: analyticsData.receivablesAging.overdue1_30 },
+      { key: 'current', label: '📅 ' + t('finance.renewalDate'), color: '#16a34a', bg: '#f0fdf4', items: analyticsData.receivablesAging.current }
     ];
 
     const hasAgingRecords = overdueList.some(list => list.items.length > 0);
 
     const monthLabelFull = (m: string) => {
       const [y, mo] = m.split('-');
-      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
     };
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }} className="text-start">
 
         {/* 📊 KPI BLOCK */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
           <div className="stat-card" style={{ '--stat-accent': '#6366f1', '--stat-icon-bg': '#ede9fe' } as React.CSSProperties}>
-            <div className="stat-label">Monthly Recurring Rev (MRR)</div>
-            <div className="stat-value">{formatCurrency(analyticsData.kpis.mrr)}</div>
+            <div className="stat-label">{t('finance.monthlyRevenue')}</div>
+            <div className="stat-value">{formatCurrency(analyticsData.kpis.mrr, locale)}</div>
           </div>
           <div className="stat-card" style={{ '--stat-accent': '#10b981', '--stat-icon-bg': '#e6f4ea' } as React.CSSProperties}>
-            <div className="stat-label">LTM Revenue (Collected)</div>
-            <div className="stat-value">{formatCurrency(ltmRevenue)}</div>
+            <div className="stat-label">{t('finance.ltmRevenue')}</div>
+            <div className="stat-value">{formatCurrency(ltmRevenue, locale)}</div>
           </div>
           <div className="stat-card" style={{ '--stat-accent': '#ef4444', '--stat-icon-bg': '#fce8e6' } as React.CSSProperties}>
-            <div className="stat-label">LTM Expenses (Filtered)</div>
-            <div className="stat-value">{formatCurrency(ltmExpenses)}</div>
+            <div className="stat-label">{t('finance.ltmExpenses')}</div>
+            <div className="stat-value">{formatCurrency(ltmExpenses, locale)}</div>
           </div>
           <div className="stat-card" style={{
             '--stat-accent': ltmNetProfit >= 0 ? '#10b981' : '#ef4444',
             '--stat-icon-bg': ltmNetProfit >= 0 ? '#e6f4ea' : '#fce8e6'
           } as React.CSSProperties}>
-            <div className="stat-label">LTM Net Profit (Filtered)</div>
-            <div className="stat-value" style={{ color: ltmNetProfit >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(ltmNetProfit)}</div>
+            <div className="stat-label">{t('finance.ltmNetProfit')}</div>
+            <div className="stat-value" style={{ color: ltmNetProfit >= 0 ? '#10b981' : '#ef4444' }}>{formatCurrency(ltmNetProfit, locale)}</div>
           </div>
           <div className="stat-card" style={{
             '--stat-accent': ltmMargin >= 25 ? '#10b981' : ltmMargin >= 10 ? '#f59e0b' : '#ef4444',
             '--stat-icon-bg': ltmMargin >= 25 ? '#e6f4ea' : ltmMargin >= 10 ? '#fffbeb' : '#fce8e6'
           } as React.CSSProperties}>
-            <div className="stat-label">LTM Profit Margin</div>
+            <div className="stat-label">{t('finance.ltmMargin')}</div>
             <div className="stat-value">{ltmMargin.toFixed(1)}%</div>
           </div>
         </div>
@@ -882,8 +867,8 @@ export default function FinanceDashboardPage() {
             boxShadow: 'var(--shadow-sm)',
             position: 'relative'
           }}>
-            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>12-Month Financial Performance</h3>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>Comparing monthly revenue vs expenses and profit margin trend</p>
+            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>{t('finance.revenueVsExpenses')}</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>{t('finance.projections')}</p>
 
             <div style={{ position: 'relative' }}>
               <svg viewBox={`0 0 ${barChartWidth} ${barChartHeight}`} width="100%" height="auto">
@@ -906,7 +891,7 @@ export default function FinanceDashboardPage() {
                     <g key={i}>
                       <line x1={paddingLeft} y1={y} x2={barChartWidth - paddingRight} y2={y} stroke="#e2e8f0" strokeDasharray="3 3" />
                       <text x={paddingLeft - 8} y={y + 3} textAnchor="end" fontSize="9" fill="#94a3b8" fontWeight="600">
-                        {formatCurrency(tickVal)}
+                        {formatCurrency(tickVal, locale)}
                       </text>
                     </g>
                   );
@@ -941,13 +926,13 @@ export default function FinanceDashboardPage() {
 
                       {/* Profit Dot */}
                       <circle
-                        cx={x}
-                        cy={getY(d.computedProfit)}
-                        r={hoveredBarIdx === i ? 6 : 4}
-                        fill={d.computedProfit >= 0 ? '#10b981' : '#ef4444'}
-                        stroke="#fff"
-                        strokeWidth="1.5"
-                        style={{ transition: 'all 0.2s' }}
+                         cx={x}
+                         cy={getY(d.computedProfit)}
+                         r={hoveredBarIdx === i ? 6 : 4}
+                         fill={d.computedProfit >= 0 ? '#10b981' : '#ef4444'}
+                         stroke="#fff"
+                         strokeWidth="1.5"
+                         style={{ transition: 'all 0.2s' }}
                       />
                     </g>
                   );
@@ -971,7 +956,7 @@ export default function FinanceDashboardPage() {
                   const label = (() => {
                     const [year, month] = d.month.split('-');
                     const date = new Date(Number(year), Number(month) - 1, 1);
-                    return date.toLocaleDateString('en-US', { month: 'short' });
+                    return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' });
                   })();
 
                   return (
@@ -1007,17 +992,17 @@ export default function FinanceDashboardPage() {
                     {monthLabelFull(monthly[hoveredBarIdx].month)}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Revenue:</span>
-                    <span style={{ fontWeight: 800, color: '#34d399' }}>{formatCurrency(monthly[hoveredBarIdx].computedRevenue)}</span>
+                    <span>{t('finance.monthlyRevenue')}:</span>
+                    <span style={{ fontWeight: 800, color: '#34d399' }}>{formatCurrency(monthly[hoveredBarIdx].computedRevenue, locale)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Expenses:</span>
-                    <span style={{ fontWeight: 800, color: '#f87171' }}>{formatCurrency(monthly[hoveredBarIdx].computedExpenses)}</span>
+                    <span>{t('finance.expenses')}:</span>
+                    <span style={{ fontWeight: 800, color: '#f87171' }}>{formatCurrency(monthly[hoveredBarIdx].computedExpenses, locale)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 4, paddingTop: 4 }}>
-                    <span>Net Profit:</span>
+                    <span>{t('finance.netProfit')}:</span>
                     <span style={{ fontWeight: 800, color: monthly[hoveredBarIdx].computedProfit >= 0 ? '#34d399' : '#f87171' }}>
-                      {formatCurrency(monthly[hoveredBarIdx].computedProfit)}
+                      {formatCurrency(monthly[hoveredBarIdx].computedProfit, locale)}
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.6875rem', color: '#94a3b8' }}>
@@ -1044,15 +1029,15 @@ export default function FinanceDashboardPage() {
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 12, fontSize: '0.75rem', fontWeight: 700 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: 'url(#greenGrad)' }} />
-                <span>Revenue</span>
+                <span>{t('finance.monthlyRevenue')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: 'url(#redGrad)' }} />
-                <span>Expenses</span>
+                <span>{t('finance.expenses')}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
-                <span>Net Profit Dot</span>
+                <span>{t('finance.netProfit')}</span>
               </div>
             </div>
           </div>
@@ -1067,8 +1052,8 @@ export default function FinanceDashboardPage() {
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>Expense Structure</h3>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>Categorized operational outlays for the selected timeframe</p>
+            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>{t('finance.expenseBreakdown')}</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>{t('finance.expenseBreakdown')}</p>
 
             <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 32 }}>
               
@@ -1113,12 +1098,12 @@ export default function FinanceDashboardPage() {
                   padding: 10
                 }}>
                   <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', textAlign: 'center', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {hoveredDonutIdx !== null ? donutSlices[hoveredDonutIdx].label : 'Total Outflow'}
+                    {hoveredDonutIdx !== null ? donutSlices[hoveredDonutIdx].label : t('finance.totalExpenses')}
                   </span>
                   <span style={{ fontSize: '1.0625rem', fontWeight: 800, color: 'var(--color-text-primary)', marginTop: 2 }}>
                     {hoveredDonutIdx !== null 
-                      ? formatCurrency(donutSlices[hoveredDonutIdx].value) 
-                      : formatCurrency(totalExpForDonut)}
+                      ? formatCurrency(donutSlices[hoveredDonutIdx].value, locale) 
+                      : formatCurrency(totalExpForDonut, locale)}
                   </span>
                   {hoveredDonutIdx !== null && (
                     <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: donutSlices[hoveredDonutIdx].color, marginTop: 1 }}>
@@ -1151,13 +1136,13 @@ export default function FinanceDashboardPage() {
                       <span style={{ fontSize: '0.78125rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{slice.label}</span>
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <span style={{ fontSize: '0.78125rem', fontWeight: 800 }}>{formatCurrency(slice.value)}</span>
+                      <span style={{ fontSize: '0.78125rem', fontWeight: 800 }}>{formatCurrency(slice.value, locale)}</span>
                       <span style={{ fontSize: '0.625rem', color: slice.color, fontWeight: 700 }}>{((slice.percentage) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 ))}
                 {donutSlices.length === 0 && (
-                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)', padding: '20px 0' }}>No outlays logged.</div>
+                  <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)', padding: '20px 0' }}>{t('finance.noFinancialData')}</div>
                 )}
               </div>
 
@@ -1174,8 +1159,8 @@ export default function FinanceDashboardPage() {
           padding: 20,
           boxShadow: 'var(--shadow-sm)'
         }}>
-          <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>Receivables Aging Analysis</h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>Outstanding contract installments categorized by age of overdue status</p>
+          <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>{t('finance.receivablesAging')}</h3>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>{t('finance.receivablesAging')}</p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {hasAgingRecords ? (
@@ -1205,23 +1190,23 @@ export default function FinanceDashboardPage() {
                       <table className="table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0 }}>
                         <thead>
                           <tr>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'left' }}>Client</th>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'left' }}>Contract</th>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'left' }}>Due Date</th>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'center' }}>Overdue</th>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'right' }}>Amount</th>
-                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'right' }}>Action</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'start' }}>{t('taskDetail.client')}</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'start' }}>{t('finance.contractName')}</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'start' }}>{t('finance.date')}</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'center' }}>{t('common.overdue')}</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'end' }}>{t('finance.amount')}</th>
+                            <th style={{ padding: '8px 16px', fontSize: '0.75rem', textAlign: 'end' }}>{t('finance.status')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {list.items.map((record: any) => (
                             <tr key={record.installmentId} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem' }}>
+                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', textAlign: 'start' }}>
                                 <strong>{record.clientName}</strong>
                                 {record.company && <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>{record.company}</div>}
                               </td>
-                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem' }}>{record.contractName}</td>
-                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', color: '#64748b' }}>{formatDate(record.dueDate)}</td>
+                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', textAlign: 'start' }}>{record.contractName}</td>
+                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', color: '#64748b', textAlign: 'start' }}>{formatDate(record.dueDate, locale)}</td>
                               <td style={{ padding: '10px 16px', fontSize: '0.8125rem', textAlign: 'center' }}>
                                 {record.daysOverdue > 0 ? (
                                   <span style={{ color: list.color, fontWeight: 700 }}>{record.daysOverdue} days</span>
@@ -1229,17 +1214,17 @@ export default function FinanceDashboardPage() {
                                   <span style={{ color: '#16a34a', fontWeight: 600 }}>In {Math.abs(record.daysOverdue)} days</span>
                                 )}
                               </td>
-                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', fontWeight: 800, textAlign: 'right', color: 'var(--color-primary)' }}>
-                                {formatCurrency(record.amount)}
+                              <td style={{ padding: '10px 16px', fontSize: '0.8125rem', fontWeight: 800, textAlign: 'end', color: 'var(--color-primary)' }}>
+                                {formatCurrency(record.amount, locale)}
                               </td>
-                              <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                              <td style={{ padding: '10px 16px', textAlign: 'end' }}>
                                 <button
                                   type="button"
                                   className="btn btn-outline-primary"
                                   onClick={() => handleToggleInstallmentPaid(record.contractId, record.installmentId, true)}
                                   style={{ padding: '4px 10px', fontSize: '0.6875rem', fontWeight: 700 }}
                                 >
-                                  Mark Paid
+                                  {t('finance.paid')}
                                 </button>
                               </td>
                             </tr>
@@ -1280,8 +1265,8 @@ export default function FinanceDashboardPage() {
           padding: 20,
           boxShadow: 'var(--shadow-sm)'
         }}>
-          <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>Top Clients Value Ranking</h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>Won client accounts ordered by their annualized contract value portfolio</p>
+          <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>{t('finance.topClients')}</h3>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>{t('finance.topClients')}</p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
             {analyticsData.topClients.map((client, idx) => (
@@ -1316,7 +1301,7 @@ export default function FinanceDashboardPage() {
                   {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'start' }}>
                   <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={client.name}>
                     {client.name}
                   </div>
@@ -1328,8 +1313,8 @@ export default function FinanceDashboardPage() {
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--color-primary)' }}>{formatCurrency(client.totalRevenue)}</div>
+                <div style={{ textAlign: 'end', flexShrink: 0 }}>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 900, color: 'var(--color-primary)' }}>{formatCurrency(client.totalRevenue, locale)}</div>
                   <div style={{ fontSize: '0.625rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Annual Booking</div>
                 </div>
               </div>
@@ -1346,19 +1331,19 @@ export default function FinanceDashboardPage() {
 
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="loading-spinner"><div className="spinner" /></div>
+      <div className="page-container flex items-center justify-center min-h-[400px]">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="page-container fade-in" style={{ paddingBottom: 60 }}>
+    <div className="page-container fade-in text-start" style={{ paddingBottom: 60 }}>
       {/* ── Page Header ── */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">Clients & Finance</h1>
-          <p className="page-header-subtitle">Manage business contracts, project billing budgets, and client relationships</p>
+          <h1 className="page-header-title">{t('finance.title')}</h1>
+          <p className="page-header-subtitle">{t('finance.subtitle')}</p>
         </div>
       </div>
 
@@ -1377,7 +1362,7 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('clients')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Active Clients</div>
+            <div className="stat-label">{t('dashboard.totalClients')}</div>
             <div className="stat-value">{clients.filter(c => c.pipeline_stage === 'won').length}</div>
           </div>
 
@@ -1393,7 +1378,7 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('projects')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Active Projects</div>
+            <div className="stat-label">{t('finance.activeProjects')}</div>
             <div className="stat-value">{stats.activeProjects}</div>
           </div>
 
@@ -1409,8 +1394,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('revenue')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Monthly Revenue (MRR)</div>
-            <div className="stat-value">{formatCurrency(stats.monthlyRevenue)}</div>
+            <div className="stat-label">{t('finance.monthlyRevenue')}</div>
+            <div className="stat-value">{formatCurrency(stats.monthlyRevenue, locale)}</div>
           </div>
 
           {/* Card 4: Upcoming Renewals */}
@@ -1425,7 +1410,7 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('renewals')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Renewals Due (30 Days)</div>
+            <div className="stat-label">{t('finance.upcomingRenewals')}</div>
             <div className="stat-value">{stats.upcomingRenewalsCount}</div>
           </div>
 
@@ -1441,8 +1426,8 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('expenses')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Total Expenses This Month</div>
-            <div className="stat-value">{formatCurrency(stats.totalExpensesThisMonth || 0)}</div>
+            <div className="stat-label">{t('finance.totalExpenses')}</div>
+            <div className="stat-value">{formatCurrency(stats.totalExpensesThisMonth || 0, locale)}</div>
           </div>
 
           {/* Card 6: Net Profit */}
@@ -1457,9 +1442,9 @@ export default function FinanceDashboardPage() {
             onMouseEnter={() => setHoveredCard('netprofit')}
             onMouseLeave={() => setHoveredCard(null)}
           >
-            <div className="stat-label">Net Profit</div>
+            <div className="stat-label">{t('finance.netProfit')}</div>
             <div className="stat-value" style={{ color: (stats.netProfitThisMonth || 0) >= 0 ? '#16a34a' : '#ef4444' }}>
-              {formatCurrency(stats.netProfitThisMonth || 0)}
+              {formatCurrency(stats.netProfitThisMonth || 0, locale)}
             </div>
           </div>
         </div>
@@ -1474,10 +1459,10 @@ export default function FinanceDashboardPage() {
         overflowX: 'auto',
       }}>
         {[
-          { id: 'overview', label: '📊 Dashboard Overview' },
-          { id: 'analytics', label: '📊 Financial Analytics' },
-          { id: 'contracts', label: '💼 Contracts & Subscriptions' },
-          { id: 'expenses', label: '💸 Expenses & Salaries' },
+          { id: 'overview', label: '📊 ' + t('finance.overview') },
+          { id: 'analytics', label: '📊 ' + t('finance.analytics') },
+          { id: 'contracts', label: '💼 ' + t('finance.contracts') },
+          { id: 'expenses', label: '💸 ' + t('finance.expenses') },
         ].map(tab => (
           <button
             key={tab.id}
@@ -1505,7 +1490,7 @@ export default function FinanceDashboardPage() {
       
       {/* 1. OVERVIEW TAB */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }} className="grid-md-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }} className="grid-md-2 text-start">
           {/* Left Column: Quick lists */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* Quick Clients list */}
@@ -1517,9 +1502,9 @@ export default function FinanceDashboardPage() {
               boxShadow: 'var(--shadow-sm)',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Recent Clients</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>{t('clients.clientsList')}</h3>
                 <button onClick={() => router.push('/dashboard/clients')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
-                  View All
+                  {t('dashboard.viewAll')}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1528,17 +1513,17 @@ export default function FinanceDashboardPage() {
                     <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem' }}>
                       {c.name.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, textAlign: 'start' }}>
                       <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{c.company || 'Private client'}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{c.company || t('clients.privateClient')}</div>
                     </div>
                     <span className={`badge ${c.status === 'active' ? 'badge-completed' : 'badge-todo'}`} style={{ fontSize: '0.6875rem' }}>
-                      {c.status}
+                      {c.status === 'active' ? t('clients.active') : t('clients.inactive')}
                     </span>
                   </div>
                 ))}
                 {clients.filter(c => c.pipeline_stage === 'won').length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>No clients registered yet.</div>
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>{t('clients.noClientsFound')}</div>
                 )}
               </div>
             </div>
@@ -1552,26 +1537,26 @@ export default function FinanceDashboardPage() {
               boxShadow: 'var(--shadow-sm)',
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Running Projects</h3>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>{t('clients.projectsList')}</h3>
                 <button onClick={() => router.push('/dashboard/clients')} style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600 }}>
-                  View All
+                  {t('dashboard.viewAll')}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {projects.filter(p => p.status === 'active').slice(0, 4).map(p => (
                   <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-                    <div>
+                    <div style={{ textAlign: 'start' }}>
                       <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{p.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>For: {p.client?.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>{t('taskDetail.client')}: {p.client?.name}</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(p.budget)}</div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>Budget</div>
+                    <div style={{ textAlign: 'end' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(p.budget, locale)}</div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--color-text-muted)' }}>{t('clients.budget')}</div>
                     </div>
                   </div>
                 ))}
                 {projects.filter(p => p.status === 'active').length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>No active projects.</div>
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>{t('clients.noProjects')}</div>
                 )}
               </div>
             </div>
@@ -1588,7 +1573,7 @@ export default function FinanceDashboardPage() {
             flexDirection: 'column',
             height: 'fit-content',
           }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>Upcoming Billing Renewals</h3>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 16 }}>{t('finance.renewalAlerts')}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {alertRenewals.map(item => (
                 <div
@@ -1599,13 +1584,14 @@ export default function FinanceDashboardPage() {
                     background: item.status.bg,
                     border: `1px solid ${item.status.color}30`,
                     borderLeft: `4px solid ${item.status.color}`,
+                    borderRight: `4px solid ${item.status.color}`,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 6,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text-primary)', textAlign: 'start' }}>
                       {item.contract.name}
                     </div>
                     <span style={{
@@ -1620,11 +1606,11 @@ export default function FinanceDashboardPage() {
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>
-                    <span>Client: <strong>{item.contract.client?.name}</strong></span>
-                    <span>Renewal Date: <strong>{formatDate(item.contract.renewal_date)}</strong></span>
+                    <span>{t('taskDetail.client')}: <strong>{item.contract.client?.name}</strong></span>
+                    <span>{t('finance.renewalDate')}: <strong>{formatDate(item.contract.renewal_date, locale)}</strong></span>
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 800, color: item.status.color, marginTop: 4 }}>
-                    {formatCurrency(item.contract.amount)} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>/ {item.contract.billing_cycle}</span>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 800, color: item.status.color, marginTop: 4, textAlign: 'start' }}>
+                    {formatCurrency(item.contract.amount, locale)} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>/ {getCycleLabel(item.contract.billing_cycle)}</span>
                   </div>
                 </div>
               ))}
@@ -1637,8 +1623,7 @@ export default function FinanceDashboardPage() {
                   borderRadius: 'var(--radius-lg)',
                 }}>
                   <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>✅</div>
-                  <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>All renewals up to date</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>No active contracts due for renewal in the next 30 days.</div>
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{t('finance.noAlerts')}</div>
                 </div>
               )}
             </div>
@@ -1646,26 +1631,24 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      {/* Clients & Projects tabs are moved to standalone Clients page */}
-
       {/* 5. CONTRACTS TAB */}
       {activeTab === 'contracts' && (
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
           {/* Actions panel */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }}>🔍</span>
+              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', right: 'auto' }}>🔍</span>
               <input
                 type="text"
-                className="form-input"
-                placeholder="Search contracts by name or client..."
+                className="form-input pl-9 pr-9"
+                placeholder={t('finance.searchContracts')}
                 value={contractSearch}
                 onChange={e => setContractSearch(e.target.value)}
-                style={{ paddingLeft: 38, marginBottom: 0 }}
+                style={{ marginBottom: 0 }}
               />
             </div>
             <button className="btn btn-primary" onClick={() => { resetContractForm(); setContractModalOpen(true); }} disabled={clients.filter(c => c.pipeline_stage === 'won').length === 0}>
-              ＋ Add Contract
+              ＋ {t('finance.addContract')}
             </button>
           </div>
 
@@ -1673,31 +1656,31 @@ export default function FinanceDashboardPage() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
-                  <th style={{ padding: '12px 16px' }}>Contract Name</th>
-                  <th style={{ padding: '12px 16px' }}>Client</th>
-                  <th style={{ padding: '12px 16px' }}>Project Link</th>
-                  <th style={{ padding: '12px 16px' }}>Amount</th>
-                  <th style={{ padding: '12px 16px' }}>Type</th>
-                  <th style={{ padding: '12px 16px' }}>Cycle</th>
-                  <th style={{ padding: '12px 16px' }}>Status</th>
-                  <th style={{ padding: '12px 16px' }}>Renewal Date</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'start', color: 'var(--color-text-muted)' }}>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.contractName')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('taskDetail.client')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('taskDetail.project')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.amount')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.category')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.billingCycle')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.status')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.renewalDate')}</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'end' }}>{t('finance.category')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredContractsList.map(c => {
-                  const ren = getRenewalStatus(c.renewal_date, c.status);
+                  const ren = getRenewalStatus(c.renewal_date, c.status, t);
                   return (
                     <Fragment key={c.id}>
-                      <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafbfc'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}>
-                        <td style={{ padding: '16px 16px', fontWeight: 600 }}>{c.name}</td>
-                        <td style={{ padding: '16px 16px' }}>{c.client?.name}</td>
-                        <td style={{ padding: '16px 16px', color: c.project ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }}>
+                        <td style={{ padding: '16px 16px', fontWeight: 600, textAlign: 'start' }}>{c.name}</td>
+                        <td style={{ padding: '16px 16px', textAlign: 'start' }}>{c.client?.name}</td>
+                        <td style={{ padding: '16px 16px', color: c.project ? 'var(--color-text-primary)' : 'var(--color-text-muted)', textAlign: 'start' }}>
                           {c.project ? c.project.name : 'None / Retainer'}
                         </td>
-                        <td style={{ padding: '16px 16px', fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(c.amount)}</td>
-                        <td style={{ padding: '16px 16px' }}>
+                        <td style={{ padding: '16px 16px', fontWeight: 700, color: 'var(--color-primary)', textAlign: 'start' }}>{formatCurrency(c.amount, locale)}</td>
+                        <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             <span style={{
                               display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -1706,7 +1689,7 @@ export default function FinanceDashboardPage() {
                               color: c.is_recurring ? '#6d28d9' : '#15803d',
                               border: `1px solid ${c.is_recurring ? '#c4b5fd' : '#86efac'}`,
                             }}>
-                              {c.is_recurring ? '🔄 Recurring' : '💳 One-Time'}
+                              {c.is_recurring ? '🔄 ' + t('finance.recurring') : '💳 ' + t('finance.oneTime')}
                             </span>
                             {!c.is_recurring && c.installments && c.installments.length > 0 && (
                               <button
@@ -1726,20 +1709,20 @@ export default function FinanceDashboardPage() {
                                   width: 'fit-content'
                                 }}
                               >
-                                🗓️ {c.installments.filter(i => i.paid).length}/{c.installments.length} Paid {expandedContractId === c.id ? '▲' : '▼'}
+                                🗓️ {c.installments.filter(i => i.paid).length}/{c.installments.length} {t('finance.paid')} {expandedContractId === c.id ? '▲' : '▼'}
                               </button>
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '16px 16px' }}>
-                          {c.is_recurring ? (CYCLE_LABELS[c.billing_cycle] || c.billing_cycle) : '—'}
+                        <td style={{ padding: '16px 16px', textAlign: 'start' }}>
+                          {c.is_recurring ? getCycleLabel(c.billing_cycle) : '—'}
                         </td>
-                        <td style={{ padding: '16px 16px' }}>
+                        <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                           <span className={`badge ${c.status === 'active' ? 'badge-completed' : 'badge-todo'}`}>
-                            {c.status}
+                            {c.status === 'active' ? t('clients.active') : c.status === 'expired' ? t('clients.inactive') : t('clients.onHold')}
                           </span>
                         </td>
-                        <td style={{ padding: '16px 16px' }}>
+                        <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                           {c.is_recurring ? (
                             <span style={{
                               padding: '3px 8px',
@@ -1749,16 +1732,16 @@ export default function FinanceDashboardPage() {
                               backgroundColor: ren.bg,
                               color: ren.color,
                             }}>
-                              {formatDate(c.renewal_date)}
+                              {formatDate(c.renewal_date, locale)}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>N/A</span>
                           )}
                         </td>
-                        <td style={{ padding: '16px 16px', textAlign: 'right' }}>
+                        <td style={{ padding: '16px 16px', textAlign: 'end' }}>
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => { resetContractForm(c); setContractModalOpen(true); }}>Edit</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteContract(c.id, c.name)}>Delete</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { resetContractForm(c); setContractModalOpen(true); }}>{t('common.edit')}</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteContract(c.id, c.name)}>{t('common.delete')}</button>
                           </div>
                         </td>
                       </tr>
@@ -1777,7 +1760,7 @@ export default function FinanceDashboardPage() {
                                   Installment Payments Breakdown
                                 </h4>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                  Total: {formatCurrency(c.amount)} | Paid: <span style={{ color: '#16a34a' }}>{formatCurrency(c.installments.filter(i => i.paid).reduce((sum, inst) => sum + inst.amount, 0))}</span>
+                                  Total: {formatCurrency(c.amount, locale)} | Paid: <span style={{ color: '#16a34a' }}>{formatCurrency(c.installments.filter(i => i.paid).reduce((sum, inst) => sum + inst.amount, 0), locale)}</span>
                                 </span>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
@@ -1798,7 +1781,7 @@ export default function FinanceDashboardPage() {
                                   >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: inst.paid ? '#15803d' : 'var(--color-text-primary)' }}>
-                                        {formatCurrency(inst.amount)}
+                                        {formatCurrency(inst.amount, locale)}
                                       </span>
                                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: inst.paid ? '#15803d' : 'var(--color-text-secondary)' }}>
                                         <input
@@ -1807,14 +1790,14 @@ export default function FinanceDashboardPage() {
                                           onChange={(e) => handleToggleInstallmentPaid(c.id, inst.id, e.target.checked)}
                                           style={{ cursor: 'pointer' }}
                                         />
-                                        Paid
+                                        {t('finance.paid')}
                                       </label>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <span>📅 Due:</span> {formatDate(inst.due_date)}
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4, textAlign: 'start' }}>
+                                      <span>📅 Due:</span> {formatDate(inst.due_date, locale)}
                                     </div>
                                     {inst.note && (
-                                      <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 4, marginTop: 2 }}>
+                                      <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 4, marginTop: 2, textAlign: 'start' }}>
                                         Note: {inst.note}
                                       </div>
                                     )}
@@ -1847,8 +1830,8 @@ export default function FinanceDashboardPage() {
           {/* Sub Tab selection */}
           <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', gap: 16 }}>
             {[
-              { id: 'expenses', label: '💸 General Expenses' },
-              { id: 'salaries', label: '👤 Team Salaries' },
+              { id: 'expenses', label: '💸 ' + t('finance.expensesTab') },
+              { id: 'salaries', label: '👤 ' + t('finance.salariesTab') },
             ].map(sub => (
               <button
                 key={sub.id}
@@ -1881,8 +1864,8 @@ export default function FinanceDashboardPage() {
                     onChange={e => setExpenseCategoryFilter(e.target.value)}
                     style={{ marginBottom: 0 }}
                   >
-                    <option value="">All Categories</option>
-                    <option value="ads">📣 Ads</option>
+                    <option value="">{t('finance.allCategories')}</option>
+                    <option value="ads">📣 AdsSpend</option>
                     <option value="software">🖥️ Software</option>
                     <option value="office">🏢 Office</option>
                     <option value="freelancer">🧑‍💻 Freelancer</option>
@@ -1904,7 +1887,7 @@ export default function FinanceDashboardPage() {
                   className="btn btn-primary"
                   onClick={() => { resetExpenseForm(); setExpenseModalOpen(true); }}
                 >
-                  ＋ Add Expense
+                  ＋ {t('finance.addExpense')}
                 </button>
               </div>
 
@@ -1919,16 +1902,16 @@ export default function FinanceDashboardPage() {
                 borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--color-border)'
               }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-text-secondary)', alignSelf: 'center', marginRight: 8 }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-text-secondary)', alignSelf: 'center', marginRight: 8, marginLeft: 8 }}>
                   Categorized Spend:
                 </div>
                 {[
-                  { key: 'salary', label: '👤 Salaries', color: '#6366f1' },
-                  { key: 'ads', label: '📣 Ads', color: '#ea580c' },
+                  { key: 'salary', label: '👤 ' + t('finance.salariesTab'), color: '#6366f1' },
+                  { key: 'ads', label: '📣 Ads Spend', color: '#ea580c' },
                   { key: 'software', label: '🖥️ Software', color: '#2563eb' },
                   { key: 'office', label: '🏢 Office', color: '#475569' },
                   { key: 'freelancer', label: '🧑‍💻 Freelancers', color: '#7c3aed' },
-                  { key: 'other', label: '📦 Other', color: '#6b7280' }
+                  { key: 'other', label: '📦 ' + t('contentType.other'), color: '#6b7280' }
                 ].map(item => {
                   const total = item.key === 'salary'
                     ? (salaries.reduce((sum, s) => sum + s.amount, 0) + expenses.filter(e => e.category === 'salary').reduce((sum, e) => sum + e.amount, 0))
@@ -1947,7 +1930,7 @@ export default function FinanceDashboardPage() {
                     }}>
                       <span style={{ color: item.color }}>●</span>
                       <span>{item.label}:</span>
-                      <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(total)}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(total, locale)}</span>
                     </div>
                   );
                 })}
@@ -1962,10 +1945,11 @@ export default function FinanceDashboardPage() {
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   marginLeft: 'auto',
+                  marginRight: 'auto',
                   color: 'var(--color-primary)'
                 }}>
                   <span>Total General Expenses:</span>
-                  <span>{formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0))}</span>
+                  <span>{formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0), locale)}</span>
                 </div>
               </div>
 
@@ -1974,12 +1958,12 @@ export default function FinanceDashboardPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
-                      <th style={{ padding: '12px 16px' }}>Expense Details</th>
-                      <th style={{ padding: '12px 16px' }}>Category</th>
-                      <th style={{ padding: '12px 16px' }}>Date</th>
-                      <th style={{ padding: '12px 16px' }}>Payment Type</th>
-                      <th style={{ padding: '12px 16px' }}>Amount</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>Expense Details</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.category')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.date')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>Payment Type</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.amount')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'end' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1987,12 +1971,12 @@ export default function FinanceDashboardPage() {
                       .filter(e => e.category !== 'salary')
                       .filter(e => !expenseCategoryFilter || e.category === expenseCategoryFilter)
                       .map(e => (
-                        <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }} onMouseEnter={el => el.currentTarget.style.backgroundColor = '#fafbfc'} onMouseLeave={el => el.currentTarget.style.backgroundColor = 'transparent'}>
-                          <td style={{ padding: '16px 16px' }}>
+                        <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <div style={{ fontWeight: 600 }}>{e.title}</div>
                             {e.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>{e.note}</div>}
                           </td>
-                          <td style={{ padding: '16px 16px' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             {e.category === 'salary' && '👤 Salary'}
                             {e.category === 'ads' && '📣 Ads'}
                             {e.category === 'software' && '🖥️ Software'}
@@ -2000,8 +1984,8 @@ export default function FinanceDashboardPage() {
                             {e.category === 'freelancer' && '🧑‍💻 Freelancer'}
                             {e.category === 'other' && '📦 Other'}
                           </td>
-                          <td style={{ padding: '16px 16px' }}>{formatDate(e.date)}</td>
-                          <td style={{ padding: '16px 16px' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>{formatDate(e.date, locale)}</td>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <span style={{
                               display: 'inline-flex',
                               padding: '2px 8px',
@@ -2011,16 +1995,16 @@ export default function FinanceDashboardPage() {
                               backgroundColor: e.is_recurring ? '#ede9fe' : '#f1f5f9',
                               color: e.is_recurring ? '#6d28d9' : '#475569',
                             }}>
-                              {e.is_recurring ? `🔄 Recurring (${e.recurrence})` : '💳 One-Time'}
+                              {e.is_recurring ? `🔄 ${t('finance.recurring')} (${e.recurrence})` : '💳 ' + t('finance.oneTime')}
                             </span>
                           </td>
-                          <td style={{ padding: '16px 16px', fontWeight: 700, color: '#ef4444' }}>
-                            -{formatCurrency(e.amount)}
+                          <td style={{ padding: '16px 16px', fontWeight: 700, color: '#ef4444', textAlign: 'start' }}>
+                            -{formatCurrency(e.amount, locale)}
                           </td>
-                          <td style={{ padding: '16px 16px', textAlign: 'right' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'end' }}>
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button className="btn btn-secondary btn-sm" onClick={() => { resetExpenseForm(e); setExpenseModalOpen(true); }}>Edit</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteExpense(e.id, e.title)}>Delete</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => { resetExpenseForm(e); setExpenseModalOpen(true); }}>{t('common.edit')}</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteExpense(e.id, e.title)}>{t('common.delete')}</button>
                             </div>
                           </td>
                         </tr>
@@ -2056,11 +2040,11 @@ export default function FinanceDashboardPage() {
                   fontWeight: 600,
                   color: 'var(--color-text-secondary)'
                 }}>
-                  <div>Total Salary Cost: <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(salaries.reduce((sum, s) => sum + s.amount, 0))}</span></div>
+                  <div>Total Salary Cost: <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(salaries.reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
                   <div>•</div>
-                  <div>Paid: <span style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0))}</span></div>
+                  <div>Paid: <span style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
                   <div>•</div>
-                  <div>Unpaid: <span style={{ fontWeight: 700, color: '#ea580c' }}>{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount, 0))}</span></div>
+                  <div>Unpaid: <span style={{ fontWeight: 700, color: '#ea580c' }}>{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <button
@@ -2069,7 +2053,7 @@ export default function FinanceDashboardPage() {
                   onClick={() => { resetSalaryForm(); setSalaryModalOpen(true); }}
                   disabled={usersList.length === 0}
                 >
-                  ＋ Record Salary Payment
+                  ＋ {t('finance.addSalary')}
                 </button>
               </div>
 
@@ -2078,20 +2062,20 @@ export default function FinanceDashboardPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
-                      <th style={{ padding: '12px 16px' }}>Team Member</th>
-                      <th style={{ padding: '12px 16px' }}>Amount</th>
-                      <th style={{ padding: '12px 16px' }}>Payment Type</th>
-                      <th style={{ padding: '12px 16px' }}>Paid Date</th>
-                      <th style={{ padding: '12px 16px' }}>Status</th>
-                      <th style={{ padding: '12px 16px' }}>Note</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.teamMember')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.amount')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>Payment Type</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.paymentDate')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.status')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.note')}</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'end' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {salaries.map(s => (
                       <Fragment key={s.id}>
-                        <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }} onMouseEnter={el => el.currentTarget.style.backgroundColor = '#fafbfc'} onMouseLeave={el => el.currentTarget.style.backgroundColor = 'transparent'}>
-                          <td style={{ padding: '16px 16px' }}>
+                        <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                               {s.user?.avatar_url ? (
                                 <img src={s.user.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
@@ -2100,19 +2084,19 @@ export default function FinanceDashboardPage() {
                                   {s.user?.name ? s.user.name.charAt(0).toUpperCase() : '?'}
                                 </div>
                               )}
-                              <div>
+                              <div style={{ textAlign: 'start' }}>
                                 <div style={{ fontWeight: 600 }}>{s.user?.name || 'Unknown User'}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'capitalize' }}>{s.user?.role?.replace('_', ' ') || 'member'}</div>
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding: '16px 16px', fontWeight: 700 }}>
-                            {formatCurrency(s.amount)}
+                          <td style={{ padding: '16px 16px', fontWeight: 700, textAlign: 'start' }}>
+                            {formatCurrency(s.amount, locale)}
                           </td>
-                          <td style={{ padding: '16px 16px' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 10, fontSize: '0.6875rem', fontWeight: 700, backgroundColor: s.is_recurring ? '#ede9fe' : '#f0fdf4', color: s.is_recurring ? '#6d28d9' : '#15803d' }}>
-                                {s.is_recurring ? `🔄 Recurring (${s.recurrence || 'monthly'})` : '💳 One-Time'}
+                                {s.is_recurring ? `🔄 ${t('finance.recurring')} (${s.recurrence || 'monthly'})` : '💳 ' + t('finance.oneTime')}
                               </span>
                               {!s.is_recurring && s.installments && s.installments.length > 0 && (
                                 <button
@@ -2120,15 +2104,15 @@ export default function FinanceDashboardPage() {
                                   onClick={() => setExpandedSalaryId(expandedSalaryId === s.id ? null : s.id)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 12, fontSize: '0.6875rem', fontWeight: 600, backgroundColor: expandedSalaryId === s.id ? 'var(--color-primary-light)' : 'var(--color-bg)', color: expandedSalaryId === s.id ? 'var(--color-primary)' : 'var(--color-text-secondary)', border: '1px solid var(--color-border)', cursor: 'pointer', width: 'fit-content' }}
                                 >
-                                  🗓️ {s.installments.filter(i => i.paid).length}/{s.installments.length} Paid {expandedSalaryId === s.id ? '▲' : '▼'}
+                                  🗓️ {s.installments.filter(i => i.paid).length}/{s.installments.length} {t('finance.paid')} {expandedSalaryId === s.id ? '▲' : '▼'}
                                 </button>
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '16px 16px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>
-                            {s.paid_date ? formatDate(s.paid_date) : '—'}
+                          <td style={{ padding: '16px 16px', fontSize: '0.8125rem', color: 'var(--color-text-secondary)', textAlign: 'start' }}>
+                            {s.paid_date ? formatDate(s.paid_date, locale) : '—'}
                           </td>
-                          <td style={{ padding: '16px 16px' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
                               <input
                                 type="checkbox"
@@ -2137,17 +2121,17 @@ export default function FinanceDashboardPage() {
                                 style={{ cursor: 'pointer', width: 16, height: 16 }}
                               />
                               <span style={{ color: s.paid ? '#16a34a' : '#ea580c', fontSize: '0.8125rem' }}>
-                                {s.paid ? '✅ Paid' : '⬜ Unpaid'}
+                                {s.paid ? t('finance.paid') : t('finance.unpaid')}
                               </span>
                             </label>
                           </td>
-                          <td style={{ padding: '16px 16px', color: 'var(--color-text-secondary)', fontSize: '0.8125rem' }}>
+                          <td style={{ padding: '16px 16px', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textAlign: 'start' }}>
                             {s.note || '—'}
                           </td>
-                          <td style={{ padding: '16px 16px', textAlign: 'right' }}>
+                          <td style={{ padding: '16px 16px', textAlign: 'end' }}>
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button className="btn btn-secondary btn-sm" onClick={() => { resetSalaryForm(s); setSalaryModalOpen(true); }}>Edit</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSalary(s.id, s.user?.name || 'this member')}>Delete</button>
+                              <button className="btn btn-secondary btn-sm" onClick={() => { resetSalaryForm(s); setSalaryModalOpen(true); }}>{t('common.edit')}</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSalary(s.id, s.user?.name || 'this member')}>{t('common.delete')}</button>
                             </div>
                           </td>
                         </tr>
@@ -2158,21 +2142,21 @@ export default function FinanceDashboardPage() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                   <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>Salary Installments</h4>
                                   <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                    Total: {formatCurrency(s.amount)} | Paid: <span style={{ color: '#16a34a' }}>{formatCurrency(s.installments.filter(i => i.paid).reduce((sum, i) => sum + i.amount, 0))}</span>
+                                    Total: {formatCurrency(s.amount, locale)} | Paid: <span style={{ color: '#16a34a' }}>{formatCurrency(s.installments.filter(i => i.paid).reduce((sum, i) => sum + i.amount, 0), locale)}</span>
                                   </span>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                                   {s.installments.map(inst => (
                                     <div key={inst.id} style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', padding: 12, background: inst.paid ? '#f0fdf4' : 'var(--color-surface)', borderColor: inst.paid ? '#bbf7d0' : 'var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 700, color: inst.paid ? '#15803d' : 'var(--color-text-primary)' }}>{formatCurrency(inst.amount)}</span>
+                                        <span style={{ fontWeight: 700, color: inst.paid ? '#15803d' : 'var(--color-text-primary)' }}>{formatCurrency(inst.amount, locale)}</span>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: inst.paid ? '#15803d' : 'var(--color-text-secondary)' }}>
                                           <input type="checkbox" checked={inst.paid} onChange={e => handleToggleSalaryInstallmentPaid(s.id, inst.id, e.target.checked)} style={{ cursor: 'pointer' }} />
-                                          Paid
+                                          {t('finance.paid')}
                                         </label>
                                       </div>
-                                      {inst.due_date && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>📅 Due: {formatDate(inst.due_date)}</div>}
-                                      {inst.note && <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 4 }}>Note: {inst.note}</div>}
+                                      {inst.due_date && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', textAlign: 'start' }}>📅 Due: {formatDate(inst.due_date, locale)}</div>}
+                                      {inst.note && <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 4, textAlign: 'start' }}>Note: {inst.note}</div>}
                                     </div>
                                   ))}
                                 </div>
@@ -2201,11 +2185,11 @@ export default function FinanceDashboardPage() {
 
       {/* ── PROJECT MODAL ── */}
       <Modal isOpen={projectModalOpen} onClose={() => setProjectModalOpen(false)} title={modalMode === 'create' ? 'Create Project' : 'Edit Project'}>
-        <form onSubmit={handleProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleProjectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
           {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
 
-          <div className="form-group">
-            <label className="form-label">Client *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.selectClient')} *</label>
             <select className="form-select" value={projectForm.client_id} onChange={e => setProjectForm({ ...projectForm, client_id: e.target.value })} required>
               {clients.filter(c => c.pipeline_stage === 'won').map(c => (
                 <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
@@ -2213,58 +2197,58 @@ export default function FinanceDashboardPage() {
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Project Name *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.projectName')} *</label>
             <input type="text" className="form-input" placeholder="e.g. Summer Q3 Campaign" value={projectForm.name} onChange={e => setProjectForm({ ...projectForm, name: e.target.value })} required />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Description</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.projectDescription')}</label>
             <textarea className="form-textarea" placeholder="Brief outline of the project scope..." rows={3} value={projectForm.description} onChange={e => setProjectForm({ ...projectForm, description: e.target.value })} />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Budget ($) *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.budget')} ($) *</label>
             <input type="number" className="form-input" placeholder="e.g. 5000" value={projectForm.budget} onChange={e => setProjectForm({ ...projectForm, budget: e.target.value })} />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Project Status</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.statusLabel')}</label>
             <select className="form-select" value={projectForm.status} onChange={e => setProjectForm({ ...projectForm, status: e.target.value as any })}>
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="on_hold">On Hold</option>
-              <option value="completed">Completed</option>
+              <option value="planning">{t('clients.planning')}</option>
+              <option value="active">{t('clients.active')}</option>
+              <option value="on_hold">{t('clients.onHold')}</option>
+              <option value="completed">{t('status.completed')}</option>
             </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Start Date</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }} className="text-start">
+            <div className="form-group text-start">
+              <label className="form-label">{t('clients.startDate')}</label>
               <input type="date" className="form-input" value={projectForm.start_date} onChange={e => setProjectForm({ ...projectForm, start_date: e.target.value })} />
             </div>
-            <div className="form-group">
-              <label className="form-label">End Date</label>
+            <div className="form-group text-start">
+              <label className="form-label">{t('clients.endDate')}</label>
               <input type="date" className="form-input" value={projectForm.end_date} onChange={e => setProjectForm({ ...projectForm, end_date: e.target.value })} />
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setProjectModalOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setProjectModalOpen(false)}>{t('common.cancel')}</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : modalMode === 'create' ? 'Create Project' : 'Save Changes'}
+              {submitting ? t('clients.savingProgress') : modalMode === 'create' ? t('finance.createProjectBtn') : t('common.saveChanges')}
             </button>
           </div>
         </form>
       </Modal>
 
       {/* ── CONTRACT MODAL ── */}
-      <Modal isOpen={contractModalOpen} onClose={() => setContractModalOpen(false)} title={modalMode === 'create' ? 'Create Contract / Subscription' : 'Edit Contract'}>
-        <form onSubmit={handleContractSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Modal isOpen={contractModalOpen} onClose={() => setContractModalOpen(false)} title={modalMode === 'create' ? t('finance.createContract') : t('finance.editContract')}>
+        <form onSubmit={handleContractSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
           {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
 
-          <div className="form-group">
-            <label className="form-label">Client *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('clients.selectClient')} *</label>
             <select className="form-select" value={contractForm.client_id} onChange={e => setContractForm({ ...contractForm, client_id: e.target.value, project_id: '' })} required>
               {clients.filter(c => c.pipeline_stage === 'won').map(c => (
                 <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
@@ -2272,7 +2256,7 @@ export default function FinanceDashboardPage() {
             </select>
           </div>
 
-          <div className="form-group">
+          <div className="form-group text-start">
             <label className="form-label">Link to Project (Optional)</label>
             <select className="form-select" value={contractForm.project_id} onChange={e => setContractForm({ ...contractForm, project_id: e.target.value })}>
               <option value="">None (General Agency Retainer)</option>
@@ -2284,96 +2268,72 @@ export default function FinanceDashboardPage() {
             </select>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Contract/Service Name *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.contractName')} *</label>
             <input type="text" className="form-input" placeholder="e.g. SEO Monthly Optimization" value={contractForm.name} onChange={e => setContractForm({ ...contractForm, name: e.target.value })} required />
           </div>
 
           {/* Payment Type Toggle: Recurring vs One-Time */}
-          <div className="form-group">
+          <div className="form-group text-start">
             <label className="form-label">Payment Type *</label>
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              {[{ value: true, label: '🔄 Recurring', desc: 'Counted in MRR' }, { value: false, label: '💳 One-Time', desc: 'Not in MRR' }].map(opt => (
+              {[{ value: true, label: '🔄 ' + t('finance.recurring'), desc: 'Counted in MRR' }, { value: false, label: '💳 ' + t('finance.oneTime'), desc: 'Not in MRR' }].map(opt => (
                 <button
                   key={String(opt.value)}
                   type="button"
                   onClick={() => setContractForm({ ...contractForm, is_recurring: opt.value, billing_cycle: opt.value ? 'monthly' : 'one_time' as any })}
                   style={{
-                    flex: 1,
-                    padding: '12px 16px',
-                    borderRadius: 'var(--radius-md)',
+                    flex: 1, padding: '10px 12px', borderRadius: 'var(--radius-md)', textAlign: 'start',
                     border: `2px solid ${contractForm.is_recurring === opt.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
                     background: contractForm.is_recurring === opt.value ? 'var(--color-primary-light)' : 'var(--color-surface)',
-                    color: contractForm.is_recurring === opt.value ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.2s',
+                    cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{opt.label}</div>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.75, marginTop: 2 }}>{opt.desc}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.875rem', color: contractForm.is_recurring === opt.value ? 'var(--color-primary)' : 'var(--color-text-primary)' }}>{opt.label}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 2 }}>{opt.desc}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: contractForm.is_recurring ? '1fr 1fr' : '1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Amount ($) *</label>
-              <input type="number" className="form-input" placeholder="e.g. 1500" value={contractForm.amount} onChange={e => setContractForm({ ...contractForm, amount: e.target.value })} required />
+          {/* Billing Cycle (if recurring) */}
+          {contractForm.is_recurring && (
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.billingCycle')}</label>
+              <select className="form-select" value={contractForm.billing_cycle} onChange={e => setContractForm({ ...contractForm, billing_cycle: e.target.value as any })}>
+                <option value="monthly">{t('finance.monthly')}</option>
+                <option value="quarterly">{t('finance.quarterly')}</option>
+                <option value="yearly">{t('finance.yearly')}</option>
+              </select>
             </div>
-            {contractForm.is_recurring && (
-              <div className="form-group">
-                <label className="form-label">Billing Cycle *</label>
-                <select className="form-select" value={contractForm.billing_cycle} onChange={e => setContractForm({ ...contractForm, billing_cycle: e.target.value as any })} required>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </div>
-            )}
+          )}
+
+          {/* Contract Amount */}
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.amount')} ($) *</label>
+            <input type="number" className="form-input" placeholder="e.g. 1500" value={contractForm.amount} onChange={e => setContractForm({ ...contractForm, amount: e.target.value })} required />
           </div>
 
+          {/* One-Time installments support */}
           {!contractForm.is_recurring && (
-            <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 16, background: '#fafbfc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>Split into Installments</h4>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    Divide this one-time payment into multiple custom installments.
-                  </p>
-                </div>
-                <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, cursor: 'pointer' }}>
+            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 14 }} className="text-start">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 700, fontSize: '0.875rem' }}>
                   <input
                     type="checkbox"
                     checked={installmentsEnabled}
-                    onChange={e => {
-                      setInstallmentsEnabled(e.target.checked);
-                      if (e.target.checked && (installmentRows.length === 0 || (installmentRows.length === 1 && !installmentRows[0].amount))) {
-                        setInstallmentRows([{ amount: '', due_date: '', note: '' }]);
-                      }
-                    }}
-                    style={{ opacity: 0, width: 0, height: 0 }}
+                    onChange={e => setInstallmentsEnabled(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
                   />
-                  <span style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: installmentsEnabled ? 'var(--color-primary)' : '#ccc',
-                    borderRadius: 24, transition: '0.2s',
-                    display: 'flex', alignItems: 'center'
-                  }}>
-                    <span style={{
-                      position: 'absolute', height: 18, width: 18, left: installmentsEnabled ? 22 : 4, bottom: 3,
-                      backgroundColor: 'white', borderRadius: '50%', transition: '0.2s'
-                    }} />
-                  </span>
+                  💳 {t('finance.installments')}
                 </label>
               </div>
 
               {installmentsEnabled && (
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {installmentRows.map((row, idx) => (
-                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <div style={{ flex: 3 }}>
                           <input
                             type="number"
@@ -2439,7 +2399,7 @@ export default function FinanceDashboardPage() {
                       className="btn btn-secondary btn-sm"
                       onClick={() => setInstallmentRows([...installmentRows, { amount: '', due_date: '', note: '' }])}
                     >
-                      ＋ Add Installment
+                      ＋ {t('finance.addInstallment')}
                     </button>
                     <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
                       Total sum: <span style={{ color: 'var(--color-primary)' }}>
@@ -2452,30 +2412,30 @@ export default function FinanceDashboardPage() {
             </div>
           )}
 
-          <div className="form-group">
+          <div className="form-group text-start">
             <label className="form-label">Contract Status</label>
             <select className="form-select" value={contractForm.status} onChange={e => setContractForm({ ...contractForm, status: e.target.value as any })}>
-              <option value="active">Active</option>
-              <option value="expired">Expired</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="active">{t('clients.active')}</option>
+              <option value="expired">{t('clients.inactive')}</option>
+              <option value="cancelled">{t('clients.onHold')}</option>
             </select>
           </div>
 
           {contractForm.is_recurring && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Start Date</label>
+              <div className="form-group text-start">
+                <label className="form-label">{t('finance.startDate')}</label>
                 <input type="date" className="form-input" value={contractForm.start_date} onChange={e => setContractForm({ ...contractForm, start_date: e.target.value })} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Renewal Date</label>
+              <div className="form-group text-start">
+                <label className="form-label">{t('finance.renewalDate')}</label>
                 <input type="date" className="form-input" value={contractForm.renewal_date} onChange={e => setContractForm({ ...contractForm, renewal_date: e.target.value })} />
               </div>
             </div>
           )}
           {!contractForm.is_recurring && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
+              <div className="form-group text-start">
                 <label className="form-label">Service Date (Optional)</label>
                 <input type="date" className="form-input" value={contractForm.start_date} onChange={e => setContractForm({ ...contractForm, start_date: e.target.value })} />
               </div>
@@ -2483,21 +2443,21 @@ export default function FinanceDashboardPage() {
           )}
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setContractModalOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setContractModalOpen(false)}>{t('common.cancel')}</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : modalMode === 'create' ? 'Create Contract' : 'Save Changes'}
+              {submitting ? t('clients.savingProgress') : modalMode === 'create' ? t('finance.createContract') : t('common.saveChanges')}
             </button>
           </div>
         </form>
       </Modal>
 
       {/* ── EXPENSE MODAL ── */}
-      <Modal isOpen={expenseModalOpen} onClose={() => setExpenseModalOpen(false)} title={modalMode === 'create' ? 'Record Expense' : 'Edit Expense'}>
-        <form onSubmit={handleExpenseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Modal isOpen={expenseModalOpen} onClose={() => setExpenseModalOpen(false)} title={modalMode === 'create' ? t('finance.createExpense') : t('finance.editExpense')}>
+        <form onSubmit={handleExpenseSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
           {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
 
-          <div className="form-group">
-            <label className="form-label">Expense Title *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.expenseTitle')} *</label>
             <input
               type="text"
               className="form-input"
@@ -2509,8 +2469,8 @@ export default function FinanceDashboardPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Amount ($) *</label>
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.amount')} ($) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -2522,15 +2482,15 @@ export default function FinanceDashboardPage() {
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Category *</label>
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.category')} *</label>
               <select
                 className="form-select"
                 value={expenseForm.category}
                 onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value as ExpenseCategory })}
                 required
               >
-                <option value="ads">📣 Ads</option>
+                <option value="ads">📣 Ads Spend</option>
                 <option value="software">🖥️ Software</option>
                 <option value="office">🏢 Office</option>
                 <option value="freelancer">🧑‍💻 Freelancer</option>
@@ -2539,8 +2499,8 @@ export default function FinanceDashboardPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Date *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.date')} *</label>
             <input
               type="date"
               className="form-input"
@@ -2550,8 +2510,8 @@ export default function FinanceDashboardPage() {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Note (Optional)</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.note')} (Optional)</label>
             <textarea
               className="form-textarea"
               placeholder="Any details or receipt links..."
@@ -2561,7 +2521,7 @@ export default function FinanceDashboardPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className="form-group text-start">
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
               <input
                 type="checkbox"
@@ -2574,36 +2534,36 @@ export default function FinanceDashboardPage() {
           </div>
 
           {expenseForm.is_recurring && (
-            <div className="form-group">
+            <div className="form-group text-start">
               <label className="form-label">Recurrence Interval</label>
               <select
                 className="form-select"
                 value={expenseForm.recurrence}
                 onChange={e => setExpenseForm({ ...expenseForm, recurrence: e.target.value as 'monthly' | 'yearly' })}
               >
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
+                <option value="monthly">{t('finance.monthly')}</option>
+                <option value="yearly">{t('finance.yearly')}</option>
               </select>
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setExpenseModalOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setExpenseModalOpen(false)}>{t('common.cancel')}</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : modalMode === 'create' ? 'Add Expense' : 'Save Changes'}
+              {submitting ? t('clients.savingProgress') : modalMode === 'create' ? t('finance.createExpense') : t('common.saveChanges')}
             </button>
           </div>
         </form>
       </Modal>
 
       {/* ── SALARY MODAL ── */}
-      <Modal isOpen={salaryModalOpen} onClose={() => setSalaryModalOpen(false)} title={modalMode === 'create' ? 'Record Salary Payment' : 'Edit Salary Record'}>
-        <form onSubmit={handleSalarySubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Modal isOpen={salaryModalOpen} onClose={() => setSalaryModalOpen(false)} title={modalMode === 'create' ? t('finance.createSalary') : t('finance.editSalary')}>
+        <form onSubmit={handleSalarySubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
           {errorMsg && <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>{errorMsg}</div>}
 
           {/* Team Member */}
-          <div className="form-group">
-            <label className="form-label">Team Member *</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.teamMember')} *</label>
             <select className="form-select" value={salaryForm.user_id} onChange={e => setSalaryForm({ ...salaryForm, user_id: e.target.value })} required disabled={modalMode === 'edit'}>
               {modalMode === 'create' && <option value="" disabled>Select team member...</option>}
               {usersList.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role.replace('_', ' ')})</option>)}
@@ -2612,12 +2572,12 @@ export default function FinanceDashboardPage() {
 
           {/* Amount + Payment Date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Amount ($) *</label>
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.amount')} ($) *</label>
               <input type="number" className="form-input" placeholder="2000" value={salaryForm.amount} onChange={e => setSalaryForm({ ...salaryForm, amount: e.target.value })} required />
             </div>
-            <div className="form-group">
-              <label className="form-label">Payment Date *</label>
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.paymentDate')} *</label>
               <input
                 type="date"
                 className="form-input"
@@ -2633,16 +2593,16 @@ export default function FinanceDashboardPage() {
           </div>
 
           {/* Payment Type */}
-          <div className="form-group">
+          <div className="form-group text-start">
             <label className="form-label">Payment Type *</label>
             <div style={{ display: 'flex', gap: 10 }}>
-              {[{ val: true, label: '🔄 Recurring', desc: 'Monthly / Yearly auto-recurring' }, { val: false, label: '💳 One-Time', desc: 'Single or installment payment' }].map(opt => (
+              {[{ val: true, label: '🔄 ' + t('finance.recurring'), desc: 'Monthly / Yearly auto-recurring' }, { val: false, label: '💳 ' + t('finance.oneTime'), desc: 'Single or installment payment' }].map(opt => (
                 <button
                   key={String(opt.val)}
                   type="button"
                   onClick={() => setSalaryForm({ ...salaryForm, is_recurring: opt.val })}
                   style={{
-                    flex: 1, padding: '10px 12px', borderRadius: 'var(--radius-md)', textAlign: 'left',
+                    flex: 1, padding: '10px 12px', borderRadius: 'var(--radius-md)', textAlign: 'start',
                     border: `2px solid ${salaryForm.is_recurring === opt.val ? 'var(--color-primary)' : 'var(--color-border)'}`,
                     background: salaryForm.is_recurring === opt.val ? 'var(--color-primary-light)' : 'var(--color-surface)',
                     cursor: 'pointer', transition: 'all 0.15s',
@@ -2657,20 +2617,20 @@ export default function FinanceDashboardPage() {
 
           {/* Recurrence (if recurring) */}
           {salaryForm.is_recurring && (
-            <div className="form-group">
+            <div className="form-group text-start">
               <label className="form-label">Recurrence Cycle</label>
               <select className="form-select" value={salaryForm.recurrence} onChange={e => setSalaryForm({ ...salaryForm, recurrence: e.target.value as 'monthly' | 'yearly' })}>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
+                <option value="monthly">{t('finance.monthly')}</option>
+                <option value="yearly">{t('finance.yearly')}</option>
               </select>
             </div>
           )}
 
           {/* Installments (if one-time) */}
           {!salaryForm.is_recurring && (
-            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 14 }}>
+            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 14 }} className="text-start">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <label className="form-label" style={{ margin: 0 }}>💳 Installments <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>(optional — leave empty for lump-sum)</span></label>
+                <label className="form-label" style={{ margin: 0 }}>💳 {t('finance.installments')} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>(optional — leave empty for lump-sum)</span></label>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSalaryInstallmentRows(prev => [...prev, { amount: '', due_date: '', paid: false, note: '' }])}>＋ Add</button>
               </div>
               {salaryInstallmentRows.map((row, idx) => (
@@ -2683,30 +2643,30 @@ export default function FinanceDashboardPage() {
               ))}
               {salaryInstallmentRows.length > 0 && salaryInstallmentRows[0].amount && (
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>
-                  Installments total: <strong>{formatCurrency(salaryInstallmentRows.reduce((s, r) => s + (Number(r.amount) || 0), 0))}</strong> of <strong>{formatCurrency(Number(salaryForm.amount) || 0)}</strong>
+                  Installments total: <strong>{formatCurrency(salaryInstallmentRows.reduce((s, r) => s + (Number(r.amount) || 0), 0), locale)}</strong> of <strong>{formatCurrency(Number(salaryForm.amount) || 0, locale)}</strong>
                 </div>
               )}
             </div>
           )}
 
           {/* Mark as Paid */}
-          <div className="form-group">
+          <div className="form-group text-start">
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
               <input type="checkbox" checked={salaryForm.paid} onChange={e => setSalaryForm({ ...salaryForm, paid: e.target.checked })} style={{ cursor: 'pointer', width: 16, height: 16 }} />
-              ✅ Mark as Paid
+              ✅ {t('finance.paid')}
             </label>
           </div>
 
           {/* Note */}
-          <div className="form-group">
-            <label className="form-label">Note (Optional)</label>
+          <div className="form-group text-start">
+            <label className="form-label">{t('finance.note')} (Optional)</label>
             <textarea className="form-textarea" placeholder="e.g. Paid via Bank Transfer, includes bonus..." rows={2} value={salaryForm.note} onChange={e => setSalaryForm({ ...salaryForm, note: e.target.value })} />
           </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setSalaryModalOpen(false)}>Cancel</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setSalaryModalOpen(false)}>{t('common.cancel')}</button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : modalMode === 'create' ? 'Record Salary' : 'Save Changes'}
+              {submitting ? t('clients.savingProgress') : modalMode === 'create' ? t('finance.createSalary') : t('common.saveChanges')}
             </button>
           </div>
         </form>
