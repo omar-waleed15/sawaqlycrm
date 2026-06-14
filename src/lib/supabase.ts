@@ -14,3 +14,9 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Public client — uses anon key, respects RLS
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Helper function to create temporary isolated client instances for login
+export const createTempClient = () => createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+

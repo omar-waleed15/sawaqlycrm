@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAdmin, createTempClient } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -14,10 +14,12 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   }
 
   try {
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+    const tempClient = createTempClient();
+    const { data, error } = await tempClient.auth.signInWithPassword({
       email,
       password,
     });
+
 
     if (error || !data.user || !data.session) {
       res.status(401).json({ error: 'Invalid email or password' });
