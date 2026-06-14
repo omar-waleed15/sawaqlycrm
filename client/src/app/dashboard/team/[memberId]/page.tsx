@@ -336,8 +336,12 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                   const overdue = isOverdue(task.due_date, mStatus);
 
                   return (
-                    <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
-                      <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5`}>
+                    <div
+                      key={task.id}
+                      onClick={() => router.push(`/dashboard/tasks/${task.id}`)}
+                      className="block cursor-pointer"
+                    >
+                      <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} hover:-translate-y-0.5`}>
                         <CardContent className="p-5 flex flex-col gap-4">
                           {/* Badges & Date Header */}
                           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -414,7 +418,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                           )}
                         </CardContent>
                       </Card>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

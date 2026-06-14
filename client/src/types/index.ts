@@ -21,6 +21,7 @@ export interface TaskAssignee {
   submission_link?: string;
   completion_note?: string;
   feedback?: string;
+  rating?: number;
   assigned_at: string;
   updated_at: string;
 }

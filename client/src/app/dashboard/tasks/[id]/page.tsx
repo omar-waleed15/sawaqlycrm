@@ -71,6 +71,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
   const [submittingReview, setSubmittingReview] = useState<Record<string, boolean>>({});
   const [activeRevisionUserId, setActiveRevisionUserId] = useState<string | null>(null);
+  const [activeApprovalUserId, setActiveApprovalUserId] = useState<string | null>(null);
+  const [approvalRating, setApprovalRating] = useState<Record<string, number>>({});
+  const [approvalFeedback, setApprovalFeedback] = useState<Record<string, string>>({});
 
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -159,8 +162,15 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const handleApprove = async (userId: string) => {
     setSubmittingReview(prev => ({ ...prev, [userId]: true }));
     try {
-      const data = await tasksApi.updateAssignee(id, userId, { status: 'completed' });
+      const rating = approvalRating[userId] || 10;
+      const feedback = approvalFeedback[userId]?.trim() || undefined;
+      const data = await tasksApi.updateAssignee(id, userId, {
+        status: 'completed',
+        rating,
+        feedback,
+      });
       setTask(data.task);
+      setActiveApprovalUserId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -427,6 +437,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-green-800">{t('taskDetail.approvedDesc')}</p>
+                    {myAssignment.rating !== undefined && myAssignment.rating !== null && (
+                      <div className="text-xs font-bold text-green-700 bg-white/60 border border-green-200 rounded px-2.5 py-1 w-fit mt-2 flex items-center gap-1">
+                        ⭐ {t('taskDetail.rating')}: {myAssignment.rating}/10
+                      </div>
+                    )}
                     {myAssignment.completion_note && (
                       <div className="mt-3 border-t border-green-200 pt-3">
                         <span className="text-sm font-semibold text-green-700 block mb-1">💭 {t('taskDetail.finalThoughts')}</span>
@@ -493,6 +508,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                 <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{a.completion_note}</p>
                               </div>
                             )}
+
+                            {a.rating !== undefined && a.rating !== null && (
+                              <div className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1 w-fit mt-1 flex items-center gap-1">
+                                ⭐ {t('taskDetail.rating')}: {a.rating}/10
+                              </div>
+                            )}
                             
                             {/* Feedback if exists */}
                             {a.feedback && (
@@ -517,13 +538,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         {/* Admin Action Buttons */}
                         {isOwner && a.status === 'submitted' && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
-                            {!isWritingFeedback ? (
+                            {!isWritingFeedback && !activeApprovalUserId ? (
                               <>
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-xs text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
-                                  onClick={() => setActiveRevisionUserId(a.user_id)}
+                                  onClick={() => {
+                                    setActiveRevisionUserId(a.user_id);
+                                    setActiveApprovalUserId(null);
+                                  }}
                                   disabled={isSubmitting}
                                 >
                                   <RotateCcw className="size-3.5" /> {t('taskDetail.requestRevision')}
@@ -531,13 +555,17 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                 <Button
                                   size="sm"
                                   className="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold"
-                                  onClick={() => handleApprove(a.user_id)}
+                                  onClick={() => {
+                                    setActiveApprovalUserId(a.user_id);
+                                    setActiveRevisionUserId(null);
+                                    setApprovalRating(prev => ({ ...prev, [a.user_id]: 10 }));
+                                  }}
                                   disabled={isSubmitting}
                                 >
-                                  {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />} {t('taskDetail.approveWork')}
+                                  <CheckCircle2 className="size-3.5" /> {t('taskDetail.approveWork')}
                                 </Button>
                               </>
-                            ) : (
+                            ) : isWritingFeedback ? (
                               <div className="flex flex-col gap-2 w-full mt-2">
                                 <Label htmlFor={`feedback-${a.user_id}`} className="text-xs font-bold text-orange-700">
                                   {t('taskDetail.revisionInstructions')}
@@ -571,7 +599,61 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   </Button>
                                 </div>
                               </div>
-                            )}
+                            ) : activeApprovalUserId === a.user_id ? (
+                              <div className="flex flex-col gap-2 w-full mt-2">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  <div className="flex flex-col gap-1">
+                                    <Label htmlFor={`rating-${a.user_id}`} className="text-xs font-bold text-green-700">
+                                      {t('taskDetail.chooseRating')}
+                                    </Label>
+                                    <select
+                                      id={`rating-${a.user_id}`}
+                                      className="h-9 w-28 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                      value={approvalRating[a.user_id] || 10}
+                                      onChange={e => setApprovalRating(prev => ({ ...prev, [a.user_id]: Number(e.target.value) }))}
+                                    >
+                                      {[...Array(10)].map((_, i) => (
+                                        <option key={10 - i} value={10 - i}>{10 - i}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="flex-1 flex flex-col gap-1 min-w-[200px]">
+                                    <Label htmlFor={`approval-feedback-${a.user_id}`} className="text-xs font-bold text-green-700">
+                                      {t('taskDetail.approvalFeedbackLabel')}
+                                    </Label>
+                                    <Input
+                                      id={`approval-feedback-${a.user_id}`}
+                                      placeholder={t('taskDetail.approvalFeedbackPlaceholder')}
+                                      value={approvalFeedback[a.user_id] || ''}
+                                      onChange={e => setApprovalFeedback(prev => ({ ...prev, [a.user_id]: e.target.value }))}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-2 justify-end mt-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setActiveApprovalUserId(null);
+                                      setApprovalFeedback(prev => ({ ...prev, [a.user_id]: '' }));
+                                    }}
+                                    disabled={isSubmitting}
+                                  >
+                                    {t('common.cancel')}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold"
+                                    onClick={() => handleApprove(a.user_id)}
+                                    disabled={isSubmitting}
+                                  >
+                                    {isSubmitting ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />} {t('taskDetail.confirmApproval')}
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         )}
                       </div>

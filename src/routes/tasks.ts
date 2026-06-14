@@ -16,6 +16,7 @@ const TASK_SELECT = `
     submission_link,
     completion_note,
     feedback,
+    rating,
     assigned_at,
     updated_at,
     user:profiles(id, name, email, avatar_url)
@@ -476,12 +477,19 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
 // PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
 router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
-  const { status, feedback } = req.body;
+  const { status, feedback, rating } = req.body;
 
   try {
     const updates: Record<string, unknown> = {};
     if (status !== undefined) updates.status = status;
     if (feedback !== undefined) updates.feedback = feedback;
+    if (rating !== undefined) {
+      if (rating !== null && (typeof rating !== 'number' || rating < 1 || rating > 10)) {
+        res.status(400).json({ error: 'Rating must be an integer between 1 and 10' });
+        return;
+      }
+      updates.rating = rating;
+    }
     updates.updated_at = new Date().toISOString();
 
     const { error } = await supabaseAdmin

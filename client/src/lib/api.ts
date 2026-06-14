@@ -104,7 +104,7 @@ export const tasksApi = {
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
   removeAssignee: (taskId: string, userId: string) =>
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'DELETE' }),
-  updateAssignee: (taskId: string, userId: string, data: { status?: string; feedback?: string }) =>
+  updateAssignee: (taskId: string, userId: string, data: { status?: string; feedback?: string; rating?: number }) =>
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
 };
 

@@ -760,6 +760,11 @@ export const ar: Record<string, string> = {
   'taskDetail.sendMessage': 'إرسال الرسالة',
   'taskDetail.taskDetails': 'تفاصيل المهمة',
   'taskDetail.assignedToCount': 'مُعيَّنة إلى ({count})',
+  'taskDetail.rating': 'التقييم',
+  'taskDetail.chooseRating': 'اختر التقييم (1-10)',
+  'taskDetail.approvalFeedbackLabel': 'ملاحظات الموافقة (اختياري)',
+  'taskDetail.approvalFeedbackPlaceholder': 'أضف ملاحظات أو ثناء أو تعليقات...',
+  'taskDetail.confirmApproval': 'تأكيد وموافقة',
 
   // Added for Daily Focus Page
   'daily.todaysSchedule': 'جدول اليوم',

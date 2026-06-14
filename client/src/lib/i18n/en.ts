@@ -760,6 +760,11 @@ export const en: Record<string, string> = {
   'taskDetail.sendMessage': 'Send Message',
   'taskDetail.taskDetails': 'Task Details',
   'taskDetail.assignedToCount': 'Assigned To ({count})',
+  'taskDetail.rating': 'Rating',
+  'taskDetail.chooseRating': 'Choose Rating (1-10)',
+  'taskDetail.approvalFeedbackLabel': 'Approval Feedback (Optional)',
+  'taskDetail.approvalFeedbackPlaceholder': 'Add notes, praise, or remarks...',
+  'taskDetail.confirmApproval': 'Confirm & Approve',
 
   // Added for Daily Focus Page
   'daily.todaysSchedule': "Today's Schedule",
