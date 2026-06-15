@@ -716,6 +716,15 @@ export const ar: Record<string, string> = {
   'tasks.clearDate': 'مسح التاريخ',
   'tasks.failedSaveSchedule': 'فشل حفظ جدول النشر',
   'tasks.failedClearSchedule': 'فشل مسح جدول النشر',
+  'tasks.archivedTasks': 'المهام المؤرشفة',
+  'tasks.noArchivedTasks': 'لم يتم العثور على مهام مؤرشفة.',
+  'tasks.archiveSuccess': 'تم أرشفة المهمة بنجاح!',
+  'tasks.unarchiveSuccess': 'تم استعادة المهمة بنجاح!',
+  'taskDetail.archiveTask': 'أرشفة المهمة',
+  'taskDetail.unarchiveTask': 'استعادة المهمة',
+  'taskDetail.archiveConfirm': 'هل أنت متأكد من أرشفة هذه المهمة؟',
+  'taskDetail.unarchiveConfirm': 'هل أنت متأكد من استعادة هذه المهمة؟',
+  'taskDetail.archivedBadge': 'مؤرشفة',
 
   // Added for Task Detail Page
   'taskDetail.expiring': 'تنتهي الصلاحية قريباً...',

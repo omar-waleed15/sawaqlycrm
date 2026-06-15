@@ -51,6 +51,7 @@ export interface Task {
   task_assignees?: TaskAssignee[];
   attachments?: Attachment[];
   comments?: Comment[];
+  is_archived?: boolean;
   created_at: string;
   updated_at: string;
 }

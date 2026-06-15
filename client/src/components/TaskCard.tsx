@@ -77,6 +77,11 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
           {/* Right: Priority & Due Date */}
           <div className="flex flex-col items-end gap-1.5 shrink-0 select-none">
             <div className="flex items-center gap-1.5">
+              {task.is_archived && (
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-semibold py-0 px-1.5 h-5 flex items-center justify-center">
+                  🗄️ {t('taskDetail.archivedBadge')}
+                </Badge>
+              )}
               {task.content_type && (
                 <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
                   📦 {t(`contentType.${task.content_type}`)}

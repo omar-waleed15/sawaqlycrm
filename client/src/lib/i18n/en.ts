@@ -716,6 +716,15 @@ export const en: Record<string, string> = {
   'tasks.clearDate': 'Clear Date',
   'tasks.failedSaveSchedule': 'Failed to save publish schedule',
   'tasks.failedClearSchedule': 'Failed to clear publish schedule',
+  'tasks.archivedTasks': 'Archived Tasks',
+  'tasks.noArchivedTasks': 'No archived tasks found.',
+  'tasks.archiveSuccess': 'Task archived successfully!',
+  'tasks.unarchiveSuccess': 'Task restored successfully!',
+  'taskDetail.archiveTask': 'Archive Task',
+  'taskDetail.unarchiveTask': 'Restore Task',
+  'taskDetail.archiveConfirm': 'Are you sure you want to archive this task?',
+  'taskDetail.unarchiveConfirm': 'Are you sure you want to restore this task?',
+  'taskDetail.archivedBadge': 'Archived',
 
   // Added for Task Detail Page
   'taskDetail.expiring': 'expiring...',

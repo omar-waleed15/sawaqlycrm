@@ -211,6 +211,23 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     } catch (err) { console.error(err); }
   };
 
+  // Admin: archive/unarchive task
+  const handleToggleArchive = async (archiveState: boolean) => {
+    const confirmMsg = archiveState ? t('taskDetail.archiveConfirm') : t('taskDetail.unarchiveConfirm');
+    if (!confirm(confirmMsg)) return;
+    setStatusUpdating(true);
+    try {
+      const data = await tasksApi.update(id, { is_archived: archiveState } as any);
+      setTask(data.task);
+      alert(archiveState ? t('tasks.archiveSuccess') : t('tasks.unarchiveSuccess'));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update task archive status');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-container">
@@ -239,6 +256,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         <div className="flex-1" />
         {canAdminister && (
           <>
+            {user?.role !== 'moderation' && (
+              <Button variant="outline" size="sm" onClick={() => handleToggleArchive(!task.is_archived)} disabled={statusUpdating}>
+                🗄️ {task.is_archived ? t('taskDetail.unarchiveTask') : t('taskDetail.archiveTask')}
+              </Button>
+            )}
             <Link href={`/dashboard/tasks/${id}/edit`}>
               <Button variant="outline" size="sm">
                 <Pencil className="size-4" /> {t('common.edit')}
@@ -254,11 +276,19 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       <div className="task-detail-layout">
         {/* Main Content */}
         <div className="task-detail-main flex flex-col gap-4">
+          {task.is_archived && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800 text-sm font-semibold flex items-center gap-2">
+              🗄️ {t('taskDetail.archivedBadge')}
+            </div>
+          )}
           {/* Title & Badges */}
           <Card>
             <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-4">
               <div className="flex flex-wrap gap-2">
                 <PriorityBadge priority={task.priority} />
+                {task.is_archived && (
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">🗄️ {t('taskDetail.archivedBadge')}</Badge>
+                )}
 
                 {isOverdue && (
                   <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">⚠ {t('common.overdue')}</Badge>

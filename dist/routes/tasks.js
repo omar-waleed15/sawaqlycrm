@@ -49,13 +49,15 @@ async function canAdministerTask(userId, role, taskId) {
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     try {
-        const { status, priority, assignee_id } = req.query;
+        const { status, priority, assignee_id, archived } = req.query;
         const userRole = req.user.role;
+        const showArchived = archived === 'true' && userRole !== 'moderation';
         if (isTaskAdmin(userRole)) {
             // Admin/TL: see all tasks (optionally filter by assignee)
             let query = supabase_1.supabaseAdmin
                 .from('tasks')
                 .select(TASK_SELECT)
+                .eq('is_archived', showArchived)
                 .order('created_at', { ascending: false });
             if (priority)
                 query = query.eq('priority', priority);
@@ -76,7 +78,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             res.json({ tasks });
         }
         else {
-            // Member: only see tasks they're assigned to
+            // Member: only see tasks they're assigned to (excluding archived tasks)
             const { data: assignments, error: aErr } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
                 .select('task_id')
@@ -94,6 +96,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 .from('tasks')
                 .select(TASK_SELECT)
                 .in('id', taskIds)
+                .eq('is_archived', false)
                 .order('created_at', { ascending: false });
             if (priority)
                 query = query.eq('priority', priority);
@@ -122,6 +125,7 @@ router.get('/daily', auth_1.authMiddleware, async (req, res) => {
             .from('tasks')
             .select(TASK_SELECT)
             .eq('due_date', today)
+            .eq('is_archived', false)
             .order('created_at', { ascending: false });
         const { data, error } = await query;
         if (error) {
@@ -147,7 +151,7 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
         // Fetch task_assignees with task due_date
         let query = supabase_1.supabaseAdmin
             .from('task_assignees')
-            .select('status, task:tasks(due_date)');
+            .select('status, task:tasks(due_date, is_archived)');
         if (!isAdmin) {
             query = query.eq('user_id', req.user.id);
         }
@@ -156,7 +160,8 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
             res.status(500).json({ error: error.message });
             return;
         }
-        const items = assignments || [];
+        // Filter out archived tasks from stats calculations
+        const items = (assignments || []).filter((a) => !a.task?.is_archived);
         const total = items.length;
         const completed = items.filter((a) => a.status === 'completed').length;
         const inProgress = items.filter((a) => a.status === 'in_progress').length;
@@ -300,7 +305,7 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
         }
         if (admin) {
             // Admin: update shared task fields
-            const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id } = req.body;
+            const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id, is_archived } = req.body;
             const updates = {};
             if (title !== undefined)
                 updates.title = title;
@@ -324,6 +329,13 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
                 updates.client_id = client_id || null;
             if (project_id !== undefined)
                 updates.project_id = project_id || null;
+            if (is_archived !== undefined) {
+                if (req.user.role === 'moderation') {
+                    res.status(403).json({ error: 'Access denied. Moderators cannot archive or unarchive tasks.' });
+                    return;
+                }
+                updates.is_archived = is_archived;
+            }
             updates.updated_at = new Date().toISOString();
             const { error: updateError } = await supabase_1.supabaseAdmin
                 .from('tasks')

@@ -34,7 +34,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'active' | 'scheduled'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'archived'>('active');
 
   const [schedulingTask, setSchedulingTask] = useState<Task | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -44,15 +44,22 @@ export default function TasksPage() {
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   useEffect(() => {
+    if (activeTab === 'archived' && user?.role === 'moderation') {
+      setActiveTab('active');
+      return;
+    }
     loadTasks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter, priorityFilter, activeTab, user]);
 
   const loadTasks = () => {
     setLoading(true);
     const params: Record<string, string> = {};
     if (statusFilter) params.status = statusFilter;
     if (priorityFilter) params.priority = priorityFilter;
+    if (activeTab === 'archived') {
+      params.archived = 'true';
+    }
     tasksApi.list(params)
       .then(data => setTasks(data.tasks))
       .catch(console.error)
@@ -163,6 +170,18 @@ export default function TasksPage() {
             <Badge className="text-[11px] h-5 px-1.5 bg-indigo-600 hover:bg-indigo-600">{scheduledCount}</Badge>
           )}
         </button>
+        {isOwner && user?.role !== 'moderation' && (
+          <button
+            onClick={() => { setActiveTab('archived'); setStatusFilter(''); }}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'archived'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🗄️ {t('tasks.archivedTasks')}
+          </button>
+        )}
       </div>
 
       {/* Scheduled info banner */}
@@ -233,18 +252,20 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">{activeTab === 'scheduled' ? '📅' : '🔍'}</div>
-          <div className="empty-state-title">{t('tasks.noTasks')}</div>
+          <div className="empty-state-icon">{activeTab === 'scheduled' ? '📅' : activeTab === 'archived' ? '🗄️' : '🔍'}</div>
+          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : t('tasks.noTasks')}</div>
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
               ? t('tasks.adjustFilters')
               : isOwner
                 ? activeTab === 'scheduled'
                   ? t('tasks.noScheduledOwner')
-                  : t('tasks.noActiveOwner')
+                  : activeTab === 'archived'
+                    ? t('tasks.noArchivedTasks')
+                    : t('tasks.noActiveOwner')
                 : t('tasks.noActiveMember')}
           </div>
-          {isOwner && !statusFilter && !priorityFilter && activeTab !== 'scheduled' && (
+          {isOwner && !statusFilter && !priorityFilter && activeTab === 'active' && (
             <Link href="/dashboard/tasks/create">
               <Button><Plus className="size-4" /> {t('tasks.createTask')}</Button>
             </Link>

@@ -88,7 +88,7 @@ export const usersApi = {
 
 // Tasks
 export const tasksApi = {
-  list: (params?: { status?: string; priority?: string; assignee_id?: string }) => {
+  list: (params?: { status?: string; priority?: string; assignee_id?: string; archived?: string }) => {
     const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return request<{ tasks: import('@/types').Task[] }>(`/tasks${query}`);
   },
