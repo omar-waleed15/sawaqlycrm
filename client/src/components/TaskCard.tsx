@@ -37,7 +37,11 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
   const { t, locale } = useLanguage();
   const assignees = task.task_assignees || [];
   const overdue = isOverdue(task.due_date, assignees);
-  const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+  const myAssignment = task.task_assignees?.find(a => a.user_id === user?.id);
+  const isOwner = user?.role === 'owner' || (
+    (user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') &&
+    !myAssignment
+  );
 
   const submittedCount = assignees.filter(a => a.status === 'submitted').length;
   const totalAssignees = assignees.length;
@@ -164,7 +168,7 @@ export default function TaskCard({ task, onScheduleClick }: TaskCardProps) {
         </div>
 
         {/* Schedule Action Button */}
-        {onScheduleClick && !task.publish_date && (
+        {onScheduleClick && isOwner && !task.publish_date && (
           <div className="mt-3 pt-3 border-t border-dashed border-border">
             <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-md py-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors">
               🗓️ {t('tasks.clickToSchedule')}

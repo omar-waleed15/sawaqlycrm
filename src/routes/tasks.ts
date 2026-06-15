@@ -28,6 +28,28 @@ function isTaskAdmin(role: string): boolean {
   return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
 
+// Helper: check if user is allowed to administer a specific task (must NOT be assigned to it if they are team_leader, moderation, or account_manager)
+async function canAdministerTask(userId: string, role: string, taskId: string): Promise<boolean> {
+  if (role === 'owner') return true;
+  if (!['team_leader', 'moderation', 'account_manager'].includes(role)) return false;
+
+  // Check if they are in the assignees list
+  const { data, error } = await supabaseAdmin
+    .from('task_assignees')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error checking task assignment for administration check:', error);
+    return false;
+  }
+
+  // They can administer only if they are NOT in the assignees list
+  return !data;
+}
+
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -294,7 +316,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 // PUT /api/tasks/:id — Update task (shared fields for admin, own assignment for members)
 router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const admin = isTaskAdmin(req.user!.role);
+  const admin = await canAdministerTask(req.user!.id, req.user!.role, id as string);
 
   try {
     // Verify task exists
@@ -417,6 +439,11 @@ router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: Aut
     return;
   }
 
+  if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
+    res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+    return;
+  }
+
   try {
     const { error } = await supabaseAdmin
       .from('task_assignees')
@@ -450,6 +477,11 @@ router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: Aut
 router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
 
+  if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
+    res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+    return;
+  }
+
   try {
     const { error } = await supabaseAdmin
       .from('task_assignees')
@@ -478,6 +510,11 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
 router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
   const { status, feedback, rating } = req.body;
+
+  if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
+    res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+    return;
+  }
 
   try {
     const updates: Record<string, unknown> = {};
@@ -518,6 +555,11 @@ router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (r
 // DELETE /api/tasks/:id — Delete task (owner or team leader)
 router.delete('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
+
+  if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
+    res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+    return;
+  }
 
   try {
     const { error } = await supabaseAdmin

@@ -16,6 +16,7 @@ const TASK_SELECT = `
     submission_link,
     completion_note,
     feedback,
+    rating,
     assigned_at,
     updated_at,
     user:profiles(id, name, email, avatar_url)
@@ -24,6 +25,26 @@ const TASK_SELECT = `
 // Helper: check if user is admin/TL
 function isTaskAdmin(role) {
     return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
+}
+// Helper: check if user is allowed to administer a specific task (must NOT be assigned to it if they are team_leader, moderation, or account_manager)
+async function canAdministerTask(userId, role, taskId) {
+    if (role === 'owner')
+        return true;
+    if (!['team_leader', 'moderation', 'account_manager'].includes(role))
+        return false;
+    // Check if they are in the assignees list
+    const { data, error } = await supabase_1.supabaseAdmin
+        .from('task_assignees')
+        .select('id')
+        .eq('task_id', taskId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (error) {
+        console.error('Error checking task assignment for administration check:', error);
+        return false;
+    }
+    // They can administer only if they are NOT in the assignees list
+    return !data;
 }
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
@@ -265,7 +286,7 @@ router.get('/:id', auth_1.authMiddleware, async (req, res) => {
 // PUT /api/tasks/:id — Update task (shared fields for admin, own assignment for members)
 router.put('/:id', auth_1.authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const admin = isTaskAdmin(req.user.role);
+    const admin = await canAdministerTask(req.user.id, req.user.role, id);
     try {
         // Verify task exists
         const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
@@ -392,6 +413,10 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
         res.status(400).json({ error: 'user_id is required' });
         return;
     }
+    if (!(await canAdministerTask(req.user.id, req.user.role, id))) {
+        res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+        return;
+    }
     try {
         const { error } = await supabase_1.supabaseAdmin
             .from('task_assignees')
@@ -424,6 +449,10 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
 // DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin/TL only)
 router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
     const { id, userId } = req.params;
+    if (!(await canAdministerTask(req.user.id, req.user.role, id))) {
+        res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+        return;
+    }
     try {
         const { error } = await supabase_1.supabaseAdmin
             .from('task_assignees')
@@ -453,13 +482,24 @@ router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.owner
 // PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
 router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
     const { id, userId } = req.params;
-    const { status, feedback } = req.body;
+    const { status, feedback, rating } = req.body;
+    if (!(await canAdministerTask(req.user.id, req.user.role, id))) {
+        res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+        return;
+    }
     try {
         const updates = {};
         if (status !== undefined)
             updates.status = status;
         if (feedback !== undefined)
             updates.feedback = feedback;
+        if (rating !== undefined) {
+            if (rating !== null && (typeof rating !== 'number' || rating < 1 || rating > 10)) {
+                res.status(400).json({ error: 'Rating must be an integer between 1 and 10' });
+                return;
+            }
+            updates.rating = rating;
+        }
         updates.updated_at = new Date().toISOString();
         const { error } = await supabase_1.supabaseAdmin
             .from('task_assignees')
@@ -489,6 +529,10 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrT
 // DELETE /api/tasks/:id — Delete task (owner or team leader)
 router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
     const { id } = req.params;
+    if (!(await canAdministerTask(req.user.id, req.user.role, id))) {
+        res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
+        return;
+    }
     try {
         const { error } = await supabase_1.supabaseAdmin
             .from('tasks')

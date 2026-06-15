@@ -61,6 +61,17 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       projectsApi.list(),
     ]).then(([taskData, usersData, projectsData]) => {
       const t = taskData.task;
+      const myA = t.task_assignees?.find((a: any) => a.user_id === user?.id);
+
+      const isOwnerRole = user?.role === 'owner';
+      const isOtherAdminRole = user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+      const isAssigned = !!myA;
+
+      if (!isOwnerRole && (!isOtherAdminRole || isAssigned)) {
+        router.replace(`/dashboard/tasks/${id}`);
+        return;
+      }
+
       setForm({
         title: t.title,
         description: t.description || '',

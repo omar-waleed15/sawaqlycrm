@@ -82,6 +82,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);
 
+  const canAdminister = user?.role === 'owner' || (
+    (user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') &&
+    !myAssignment
+  );
+
   const loadTask = async () => {
     try {
       const [taskData, commentsData] = await Promise.all([
@@ -232,7 +237,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           <ArrowLeft className="size-4" /> {t('common.back')}
         </Button>
         <div className="flex-1" />
-        {isOwner && (
+        {canAdminister && (
           <>
             <Link href={`/dashboard/tasks/${id}/edit`}>
               <Button variant="outline" size="sm">
@@ -324,7 +329,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           {/* ============================================================ */}
           {/* MEMBER VIEW: Own Assignment Panel */}
           {/* ============================================================ */}
-          {!isOwner && myAssignment && (
+          {!canAdminister && myAssignment && (
             <>
               {/* Feedback from admin */}
               {myAssignment.feedback && myAssignment.status === 'revision' && (
@@ -536,7 +541,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         )}
 
                         {/* Admin Action Buttons */}
-                        {isOwner && a.status === 'submitted' && (
+                        {canAdminister && a.status === 'submitted' && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
                             {!isWritingFeedback && !activeApprovalUserId ? (
                               <>

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.supabase = exports.supabaseAdmin = void 0;
+exports.createTempClient = exports.supabase = exports.supabaseAdmin = void 0;
 const supabase_js_1 = require("@supabase/supabase-js");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -16,3 +16,8 @@ exports.supabaseAdmin = (0, supabase_js_1.createClient)(supabaseUrl, supabaseSer
 });
 // Public client — uses anon key, respects RLS
 exports.supabase = (0, supabase_js_1.createClient)(supabaseUrl, supabaseAnonKey);
+// Helper function to create temporary isolated client instances for login
+const createTempClient = () => (0, supabase_js_1.createClient)(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+});
+exports.createTempClient = createTempClient;

@@ -12,7 +12,8 @@ router.post('/login', async (req, res) => {
         return;
     }
     try {
-        const { data, error } = await supabase_1.supabaseAdmin.auth.signInWithPassword({
+        const tempClient = (0, supabase_1.createTempClient)();
+        const { data, error } = await tempClient.auth.signInWithPassword({
             email,
             password,
         });
