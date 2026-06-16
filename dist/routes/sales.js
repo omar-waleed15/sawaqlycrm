@@ -205,6 +205,36 @@ router.post('/leads', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (re
         res.status(500).json({ error: 'Failed to create lead(s)' });
     }
 });
+// GET /api/sales/leads/:leadId — Get a single lead with their details and call logs (owner or sales)
+router.get('/leads/:leadId', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+    const { leadId } = req.params;
+    const salesRepId = req.user.id;
+    try {
+        const { data: lead, error: fetchErr } = await supabase_1.supabaseAdmin
+            .from('clients')
+            .select('*')
+            .eq('id', leadId)
+            .single();
+        if (fetchErr || !lead) {
+            res.status(404).json({ error: 'Lead not found' });
+            return;
+        }
+        if (req.user.role !== 'owner' && lead.sales_rep_id !== salesRepId) {
+            res.status(403).json({ error: 'Access denied' });
+            return;
+        }
+        // Fetch call logs for this lead
+        const { data: callLogs } = await supabase_1.supabaseAdmin
+            .from('sales_call_logs')
+            .select('*')
+            .eq('client_id', leadId)
+            .order('call_date', { ascending: false });
+        res.json({ lead, callLogs: callLogs || [] });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to fetch lead details' });
+    }
+});
 // POST /api/sales/leads/:leadId/calls — Log a call outcome and comments (owner or sales)
 router.post('/leads/:leadId/calls', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
     const { leadId } = req.params;

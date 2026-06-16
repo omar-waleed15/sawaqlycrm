@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const isTaskAdmin = isOwner || isTeamLeader || isModerator || isAccountManager;
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [recentTasks, setRecentTasks] = useState<Task[]>([]);
   const [financeStats, setFinanceStats] = useState<FinanceStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,7 @@ export default function DashboardPage() {
       tasksApi.list(),
     ]).then(([statsData, tasksData]) => {
       setStats(statsData.stats);
+      setAllTasks(tasksData.tasks);
       setRecentTasks(tasksData.tasks.slice(0, 6));
     }).catch(console.error)
       .finally(() => setLoading(false));
@@ -81,7 +83,31 @@ export default function DashboardPage() {
       .finally(() => setAnalyticsLoading(false));
   }, [showFinanceAndClients]);
 
-  // Pipeline calculations removed
+  // Personal workload calculation
+  const myTasks = allTasks.filter(task => 
+    task.task_assignees?.some(a => a.user_id === user?.id)
+  );
+
+  const myActiveTasks = myTasks.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return myAssignee?.status !== 'completed';
+  });
+
+  const myInProgressCount = myTasks.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return myAssignee?.status === 'in_progress';
+  }).length;
+
+  const myCompletedCount = myTasks.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return myAssignee?.status === 'completed';
+  }).length;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const myOverdueCount = myTasks.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return task.due_date && task.due_date < todayStr && myAssignee?.status !== 'completed';
+  }).length;
 
   const today = new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -162,62 +188,134 @@ export default function DashboardPage() {
         <div className="space-y-8">
           {/* KPI ROW: Task Overview */}
           {showTasks && stats && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Total Tasks */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <span className="text-sm font-medium text-muted-foreground">{t('dashboard.totalTasks')}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-extrabold">{stats.total}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                    {t('dashboard.allAssignedObjectives')}
-                  </p>
-                </CardContent>
-              </Card>
+            <div className="space-y-6">
+              {isTaskAdmin && (
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-[-8px]">
+                  👥 {locale === 'ar' ? 'إحصائيات الفريق' : 'Team Workload Overview'}
+                </h3>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Total Tasks */}
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.totalTasks')}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-extrabold">{stats.total}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                      {t('dashboard.allAssignedObjectives')}
+                    </p>
+                  </CardContent>
+                </Card>
 
-              {/* In Progress */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <span className="text-sm font-medium text-muted-foreground">{t('dashboard.inProgress')}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-extrabold">{stats.inProgress}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                    {t('dashboard.activeWorkCurrentlyActive')}
-                  </p>
-                </CardContent>
-              </Card>
+                {/* In Progress */}
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.inProgress')}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-extrabold">{stats.inProgress}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                      {t('dashboard.activeWorkCurrentlyActive')}
+                    </p>
+                  </CardContent>
+                </Card>
 
-              {/* Completed */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <span className="text-sm font-medium text-muted-foreground">{t('status.completed')}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-extrabold text-violet-600">{stats.completed}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                    {t('dashboard.tasksSuccessfullyDelivered')}
-                  </p>
-                </CardContent>
-              </Card>
+                {/* Completed */}
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <span className="text-sm font-medium text-muted-foreground">{t('status.completed')}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-extrabold text-violet-600">{stats.completed}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                      {t('dashboard.tasksSuccessfullyDelivered')}
+                    </p>
+                  </CardContent>
+                </Card>
 
-              {/* Overdue */}
-              <Card className={`hover:shadow-md transition-all duration-200 ${
-                stats.overdue > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
-              }`}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <span className="text-sm font-medium text-muted-foreground">{t('dashboard.overdueTasks')}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-3xl font-extrabold ${stats.overdue > 0 ? 'text-rose-600' : ''}`}>
-                    {stats.overdue}
+                {/* Overdue */}
+                <Card className={`hover:shadow-md transition-all duration-200 ${
+                  stats.overdue > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
+                }`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.overdueTasks')}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-3xl font-extrabold ${stats.overdue > 0 ? 'text-rose-600' : ''}`}>
+                      {stats.overdue}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                      {t('dashboard.incompletePastDeadline')}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Personal Workload Overview (Management only) */}
+              {isTaskAdmin && (
+                <div className="space-y-4 pt-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-[-8px]">
+                    👤 {locale === 'ar' ? 'إحصائياتي الشخصية' : 'My Workload Overview'}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* My Active Tasks */}
+                    <Card className="hover:shadow-md transition-shadow border-indigo-100 bg-indigo-50/10 dark:bg-indigo-950/5">
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي النشطة' : 'My Active Tasks'}</span>
+                        <ClipboardList className="size-4 text-indigo-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">{myActiveTasks.length}</div>
+                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                          {locale === 'ar' ? 'المهام المسندة إلي وغير المنتهية' : 'Pending tasks assigned to me'}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* My In Progress */}
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي قيد التنفيذ' : 'My In Progress'}</span>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">{myInProgressCount}</div>
+                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                          {locale === 'ar' ? 'المهام التي أعمل عليها حالياً' : 'Tasks I am currently working on'}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* My Completed */}
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي المكتملة' : 'My Completed'}</span>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-extrabold text-green-600 dark:text-green-400">{myCompletedCount}</div>
+                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                          {locale === 'ar' ? 'المهام التي أنجزتها بنجاح' : 'Tasks I have successfully completed'}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* My Overdue */}
+                    <Card className={`hover:shadow-md transition-all duration-200 ${
+                      myOverdueCount > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
+                    }`}>
+                      <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي المتأخرة' : 'My Overdue'}</span>
+                      </CardHeader>
+                      <CardContent>
+                        <div className={`text-3xl font-extrabold ${myOverdueCount > 0 ? 'text-rose-600' : ''}`}>{myOverdueCount}</div>
+                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                          {locale === 'ar' ? 'مهام متأخرة تجاوزت الموعد المحدد' : 'Incomplete tasks past deadline'}
+                        </p>
+                      </CardContent>
+                    </Card>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                    {t('dashboard.incompletePastDeadline')}
-                  </p>
-                </CardContent>
-              </Card>
+                </div>
+              )}
             </div>
           )}
 
@@ -337,6 +435,25 @@ export default function DashboardPage() {
               </Card>
             </div>
           )}
+        </div>
+      )}
+      {/* MY ASSIGNED TASKS (For Admins/TLs/Management who have tasks assigned to them) */}
+      {showTasks && !loading && isTaskAdmin && myActiveTasks.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <span className="size-2 rounded-full bg-indigo-500 animate-pulse" />
+              {locale === 'ar' ? 'مهامي النشطة المسندة إلي' : 'My Active Assigned Tasks'}
+              <Badge variant="secondary" className="text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                {myActiveTasks.length}
+              </Badge>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {myActiveTasks.slice(0, 6).map(task => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </div>
         </div>
       )}
 

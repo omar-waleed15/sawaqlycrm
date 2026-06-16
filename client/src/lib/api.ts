@@ -213,6 +213,8 @@ export const financeAnalyticsApi = {
 // Sales API
 export const salesApi = {
   getDashboard: (userId?: string) => request<import('@/types').SalesDashboardData>(`/sales/dashboard${userId ? `?userId=${userId}` : ''}`),
+  getLead: (leadId: string) =>
+    request<{ lead: import('@/types').Client; callLogs: import('@/types').SalesCallLog[] }>(`/sales/leads/${leadId}`),
   getTarget: (userId: string, month: string) =>
     request<{ target: import('@/types').SalesTarget | null }>(`/sales/target/${userId}/${month}`),
   setTarget: (userId: string, month: string, targetAmount: number) =>

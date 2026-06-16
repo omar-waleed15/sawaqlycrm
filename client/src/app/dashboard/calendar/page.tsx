@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, contractsApi, clientsApi } from '@/lib/api';
-import { Task, Contract, Client } from '@/types';
+import { tasksApi, contractsApi, clientsApi, salesApi } from '@/lib/api';
+import { Task, Contract, Client, SalesCallLog } from '@/types';
 import Modal from '@/components/Modal';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,10 @@ import {
   Calendar,
   Megaphone,
   Loader2,
+  Phone,
+  Mail,
+  Building2,
+  Clock,
 } from 'lucide-react';
 
 function formatCurrency(amount: number, locale?: string): string {
@@ -46,6 +50,15 @@ const getLocalDateString = (d: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; color: string; bg: string }> = {
+  new_lead:          { labelKey: 'sales.newLead',       color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
+  contacted:         { labelKey: 'sales.contacted',      color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200' },
+  meeting_scheduled: { labelKey: 'sales.meetingScheduled', color: 'text-indigo-700', bg: 'bg-indigo-100 border-indigo-200' },
+  meeting_done:      { labelKey: 'sales.meetingDone',    color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200' },
+  won:               { labelKey: 'sales.won',            color: 'text-green-700', bg: 'bg-green-100 border-green-200' },
+  lost:              { labelKey: 'sales.lost',           color: 'text-rose-700', bg: 'bg-rose-100 border-rose-200' },
+};
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -62,6 +75,34 @@ export default function CalendarPage() {
   // Modal state
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Lead Details Modal state
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [leadDetail, setLeadDetail] = useState<Client | null>(null);
+  const [leadLogs, setLeadLogs] = useState<SalesCallLog[]>([]);
+  const [loadingLead, setLoadingLead] = useState(false);
+
+  const handleViewLead = async (leadId: string) => {
+    setIsModalOpen(false);
+    setSelectedLeadId(leadId);
+    setLoadingLead(true);
+    try {
+      const res = await salesApi.getLead(leadId);
+      setLeadDetail(res.lead);
+      setLeadLogs(res.callLogs);
+    } catch (err) {
+      console.error('Failed to fetch lead details:', err);
+      const fallbackClient = clients.find(c => c.id === leadId);
+      if (fallbackClient) {
+        setLeadDetail(fallbackClient);
+        setLeadLogs([]);
+      } else {
+        setError('Failed to fetch lead details.');
+      }
+    } finally {
+      setLoadingLead(false);
+    }
+  };
 
   const isOwner = user?.role === 'owner' || user?.role === 'sales';
   const isTaskAdmin = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
@@ -666,7 +707,7 @@ export default function CalendarPage() {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => { setIsModalOpen(false); router.push('/dashboard'); }} 
+                          onClick={() => handleViewLead(client.id)} 
                           className="h-7 text-xs font-semibold shrink-0"
                         >
                           {t('calendar.viewLead')}
@@ -801,6 +842,159 @@ export default function CalendarPage() {
             <div className="flex justify-end pt-3 border-t mt-2">
               <Button variant="outline" onClick={() => setIsModalOpen(false)}>{t('common.close')}</Button>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Lead Detail Modal */}
+      <Modal
+        isOpen={selectedLeadId !== null}
+        onClose={() => {
+          setSelectedLeadId(null);
+          setLeadDetail(null);
+          setLeadLogs([]);
+        }}
+        title={`📋 ${t('sales.prospectDetails')}`}
+        maxWidth={500}
+      >
+        {loadingLead ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3">
+            <Loader2 className="size-8 text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
+          </div>
+        ) : leadDetail ? (
+          <div className="flex flex-col gap-4 text-start">
+            {/* Lead Status / Stage */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={`text-xs py-0.5 px-2 font-bold uppercase ${
+                    (PIPELINE_STAGE_CONFIG[leadDetail.pipeline_stage] || PIPELINE_STAGE_CONFIG.new_lead).bg
+                  } ${
+                    (PIPELINE_STAGE_CONFIG[leadDetail.pipeline_stage] || PIPELINE_STAGE_CONFIG.new_lead).color
+                  }`}
+                >
+                  {t((PIPELINE_STAGE_CONFIG[leadDetail.pipeline_stage] || PIPELINE_STAGE_CONFIG.new_lead).labelKey)}
+                </Badge>
+                {leadDetail.company && (
+                  <span className="text-xs font-semibold text-muted-foreground bg-muted border px-2 py-0.5 rounded flex items-center gap-1">
+                    <Building2 className="size-3" /> {leadDetail.company}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {locale === 'ar' ? 'الاسم: ' : 'Name: '} <span className="font-bold text-foreground">{leadDetail.name}</span>
+              </span>
+            </div>
+
+            {/* Contact Details Card */}
+            <div className="bg-muted/30 border rounded-xl p-3.5 flex flex-col gap-3">
+              {leadDetail.phone && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <div className="size-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Phone className="size-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'الهاتف' : 'Phone'}</div>
+                    <a href={`tel:${leadDetail.phone}`} className="text-xs font-semibold text-foreground hover:underline">
+                      {leadDetail.phone}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {leadDetail.email && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <div className="size-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Mail className="size-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('sales.emailLabel')}</div>
+                    <span className="text-xs font-semibold text-foreground">{leadDetail.email}</span>
+                  </div>
+                </div>
+              )}
+              {leadDetail.meeting_date && (
+                <div className="flex items-center gap-2.5 text-sm">
+                  <div className="size-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Calendar className="size-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'تاريخ الاجتماع' : 'Meeting Date'}</div>
+                    <span className="text-xs font-semibold text-foreground">
+                      {new Date(leadDetail.meeting_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Call Logs timeline */}
+            <div className="space-y-3.5">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1">
+                <Clock className="size-3" /> {t('sales.callLogs')}
+              </h4>
+              {leadLogs.length > 0 ? (
+                <div className="relative border-l-2 border-border pl-4 ml-2 space-y-4 max-h-[180px] overflow-y-auto pr-1">
+                  {leadLogs.map(log => {
+                    const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
+                    return (
+                      <div key={log.id} className="relative text-xs">
+                        <div className="absolute left-[-22px] top-1 size-2 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-sm" />
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center justify-between font-bold text-muted-foreground flex-wrap gap-1 text-[10px]">
+                            <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
+                            <span>
+                              {new Date(log.call_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">
+                            {log.notes || <span className="italic text-muted-foreground/50">{t('sales.noComments')}</span>}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground/50 italic py-2">
+                  {t('sales.noCallLogs')}
+                </p>
+              )}
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex justify-end gap-2 pt-3 border-t mt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedLeadId(null);
+                  setLeadDetail(null);
+                  setLeadLogs([]);
+                  router.push('/dashboard');
+                }}
+                className="text-xs font-semibold"
+              >
+                {locale === 'ar' ? 'الذهاب للوحة التحكم' : 'Go to Dashboard'}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setSelectedLeadId(null);
+                  setLeadDetail(null);
+                  setLeadLogs([]);
+                }}
+                className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {t('common.close')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6 text-xs text-muted-foreground">
+            {locale === 'ar' ? 'لم يتم العثور على بيانات العميل المحتمل' : 'No lead details found.'}
           </div>
         )}
       </Modal>
