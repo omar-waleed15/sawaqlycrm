@@ -166,32 +166,80 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
     const today = new Date().toISOString().split('T')[0];
     const isAdmin = isTaskAdmin(req.user!.role);
 
-    // Fetch task_assignees with task due_date
-    let query = supabaseAdmin
-      .from('task_assignees')
-      .select('status, task:tasks(due_date, is_archived)');
+    if (isAdmin) {
+      // Admin: count unique active tasks
+      const { data: tasks, error } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          id,
+          due_date,
+          task_assignees(status)
+        `)
+        .eq('is_archived', false);
 
-    if (!isAdmin) {
-      query = query.eq('user_id', req.user!.id);
+      if (error) { res.status(500).json({ error: error.message }); return; }
+
+      let total = 0;
+      let completed = 0;
+      let inProgress = 0;
+      let submitted = 0;
+      let todo = 0;
+      let overdue = 0;
+
+      for (const t of (tasks || [])) {
+        total++;
+        const assignees = t.task_assignees || [];
+        
+        // Check if overdue
+        const hasUncompleted = assignees.length === 0 || assignees.some((a: any) => a.status !== 'completed');
+        if (t.due_date && t.due_date < today && hasUncompleted) {
+          overdue++;
+        }
+
+        if (assignees.length === 0) {
+          todo++;
+          continue;
+        }
+
+        const allCompleted = assignees.every((a: any) => a.status === 'completed');
+        const anyInProgress = assignees.some((a: any) => a.status === 'in_progress' || a.status === 'revision');
+        const anySubmitted = assignees.some((a: any) => a.status === 'submitted');
+
+        if (allCompleted) {
+          completed++;
+        } else if (anyInProgress) {
+          inProgress++;
+        } else if (anySubmitted) {
+          submitted++;
+        } else {
+          todo++;
+        }
+      }
+
+      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
+    } else {
+      // Member: only see stats for their own assignments
+      const { data: assignments, error } = await supabaseAdmin
+        .from('task_assignees')
+        .select('status, task:tasks(due_date, is_archived)')
+        .eq('user_id', req.user!.id);
+
+      if (error) { res.status(500).json({ error: error.message }); return; }
+
+      // Filter out archived tasks from stats calculations
+      const items = (assignments || []).filter((a: any) => !a.task?.is_archived);
+      const total = items.length;
+      const completed = items.filter((a: any) => a.status === 'completed').length;
+      const inProgress = items.filter((a: any) => a.status === 'in_progress' || a.status === 'revision').length;
+      const submitted = items.filter((a: any) => a.status === 'submitted').length;
+      const todo = items.filter((a: any) => a.status === 'todo').length;
+      const overdue = items.filter((a: any) => {
+        const dueDate = a.task?.due_date;
+        return dueDate && dueDate < today && a.status !== 'completed';
+      }).length;
+
+      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
     }
-
-    const { data: assignments, error } = await query;
-
-    if (error) { res.status(500).json({ error: error.message }); return; }
-
-    // Filter out archived tasks from stats calculations
-    const items = (assignments || []).filter((a: any) => !a.task?.is_archived);
-    const total = items.length;
-    const completed = items.filter((a: any) => a.status === 'completed').length;
-    const inProgress = items.filter((a: any) => a.status === 'in_progress').length;
-    const submitted = items.filter((a: any) => a.status === 'submitted').length;
-    const todo = items.filter((a: any) => a.status === 'todo').length;
-    const overdue = items.filter((a: any) => {
-      const dueDate = a.task?.due_date;
-      return dueDate && dueDate < today && a.status !== 'completed';
-    }).length;
-
-    res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch stats' });
   }

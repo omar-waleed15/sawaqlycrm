@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   // Load task data
-  useEffect(() => {
+  const loadDashboardTasks = () => {
     if (!showTasks) { setLoading(false); return; }
     Promise.all([
       tasksApi.stats(),
@@ -72,6 +72,10 @@ export default function DashboardPage() {
       setRecentTasks(tasksData.tasks.slice(0, 6));
     }).catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadDashboardTasks();
   }, [showTasks]);
 
   // Load owner/sales analytics data
@@ -423,7 +427,14 @@ export default function DashboardPage() {
                       {recentTasks
                         .filter(t => t.status !== 'completed' && (t.priority === 'urgent' || t.priority === 'high'))
                         .slice(0, 3)
-                        .map(task => <TaskCard key={task.id} task={task} />)
+                        .map(task => (
+                          <TaskCard 
+                            key={task.id} 
+                            task={task} 
+                            onTaskUpdated={loadDashboardTasks}
+                            onTaskDeleted={loadDashboardTasks}
+                          />
+                        ))
                       }
                     </div>
                   ) : (
@@ -451,7 +462,12 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {myActiveTasks.slice(0, 6).map(task => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onTaskUpdated={loadDashboardTasks}
+                onTaskDeleted={loadDashboardTasks}
+              />
             ))}
           </div>
         </div>
@@ -471,7 +487,14 @@ export default function DashboardPage() {
 
           {recentTasks.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {recentTasks.map(task => <TaskCard key={task.id} task={task} />)}
+              {recentTasks.map(task => (
+                <TaskCard 
+                  key={task.id} 
+                  task={task} 
+                  onTaskUpdated={loadDashboardTasks}
+                  onTaskDeleted={loadDashboardTasks}
+                />
+              ))}
             </div>
           ) : (
             <Card className="border-dashed py-12 text-center flex flex-col items-center justify-center">

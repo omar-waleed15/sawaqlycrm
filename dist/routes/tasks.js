@@ -148,30 +148,79 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
         const isAdmin = isTaskAdmin(req.user.role);
-        // Fetch task_assignees with task due_date
-        let query = supabase_1.supabaseAdmin
-            .from('task_assignees')
-            .select('status, task:tasks(due_date, is_archived)');
-        if (!isAdmin) {
-            query = query.eq('user_id', req.user.id);
+        if (isAdmin) {
+            // Admin: count unique active tasks
+            const { data: tasks, error } = await supabase_1.supabaseAdmin
+                .from('tasks')
+                .select(`
+          id,
+          due_date,
+          task_assignees(status)
+        `)
+                .eq('is_archived', false);
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            let total = 0;
+            let completed = 0;
+            let inProgress = 0;
+            let submitted = 0;
+            let todo = 0;
+            let overdue = 0;
+            for (const t of (tasks || [])) {
+                total++;
+                const assignees = t.task_assignees || [];
+                // Check if overdue
+                const hasUncompleted = assignees.length === 0 || assignees.some((a) => a.status !== 'completed');
+                if (t.due_date && t.due_date < today && hasUncompleted) {
+                    overdue++;
+                }
+                if (assignees.length === 0) {
+                    todo++;
+                    continue;
+                }
+                const allCompleted = assignees.every((a) => a.status === 'completed');
+                const anyInProgress = assignees.some((a) => a.status === 'in_progress' || a.status === 'revision');
+                const anySubmitted = assignees.some((a) => a.status === 'submitted');
+                if (allCompleted) {
+                    completed++;
+                }
+                else if (anyInProgress) {
+                    inProgress++;
+                }
+                else if (anySubmitted) {
+                    submitted++;
+                }
+                else {
+                    todo++;
+                }
+            }
+            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
         }
-        const { data: assignments, error } = await query;
-        if (error) {
-            res.status(500).json({ error: error.message });
-            return;
+        else {
+            // Member: only see stats for their own assignments
+            const { data: assignments, error } = await supabase_1.supabaseAdmin
+                .from('task_assignees')
+                .select('status, task:tasks(due_date, is_archived)')
+                .eq('user_id', req.user.id);
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            // Filter out archived tasks from stats calculations
+            const items = (assignments || []).filter((a) => !a.task?.is_archived);
+            const total = items.length;
+            const completed = items.filter((a) => a.status === 'completed').length;
+            const inProgress = items.filter((a) => a.status === 'in_progress' || a.status === 'revision').length;
+            const submitted = items.filter((a) => a.status === 'submitted').length;
+            const todo = items.filter((a) => a.status === 'todo').length;
+            const overdue = items.filter((a) => {
+                const dueDate = a.task?.due_date;
+                return dueDate && dueDate < today && a.status !== 'completed';
+            }).length;
+            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
         }
-        // Filter out archived tasks from stats calculations
-        const items = (assignments || []).filter((a) => !a.task?.is_archived);
-        const total = items.length;
-        const completed = items.filter((a) => a.status === 'completed').length;
-        const inProgress = items.filter((a) => a.status === 'in_progress').length;
-        const submitted = items.filter((a) => a.status === 'submitted').length;
-        const todo = items.filter((a) => a.status === 'todo').length;
-        const overdue = items.filter((a) => {
-            const dueDate = a.task?.due_date;
-            return dueDate && dueDate < today && a.status !== 'completed';
-        }).length;
-        res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch stats' });

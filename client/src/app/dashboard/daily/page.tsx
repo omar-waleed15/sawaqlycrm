@@ -13,11 +13,15 @@ export default function DailyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadDailyTasks = () => {
     tasksApi.daily()
       .then(data => setTasks(data.tasks))
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadDailyTasks();
   }, []);
 
   const today = new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
@@ -82,7 +86,14 @@ export default function DailyTasksPage() {
         </div>
       ) : tasks.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">
-          {tasks.map(task => <TaskCard key={task.id} task={task} />)}
+          {tasks.map(task => (
+            <TaskCard 
+              key={task.id} 
+              task={task} 
+              onTaskUpdated={loadDailyTasks}
+              onTaskDeleted={loadDailyTasks}
+            />
+          ))}
         </div>
       ) : (
         <Card className="border-dashed py-16 text-center max-w-md mx-auto mt-4">

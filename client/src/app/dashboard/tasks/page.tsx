@@ -247,6 +247,12 @@ export default function TasksPage() {
               key={task.id}
               task={task}
               onScheduleClick={activeTab === 'scheduled' ? openScheduleModal : undefined}
+              onTaskUpdated={(updatedTask) => {
+                setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+              }}
+              onTaskDeleted={(deletedTaskId) => {
+                setTasks(prev => prev.filter(t => t.id !== deletedTaskId));
+              }}
             />
           ))}
         </div>
