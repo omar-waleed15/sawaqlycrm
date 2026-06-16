@@ -84,6 +84,13 @@ export const usersApi = {
   update: (id: string, data: Partial<{ name: string; role: string }>) =>
     request<{ user: import('@/types').User }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
+  performance: (startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<{ performance: import('@/types').UserPerformanceRecord[] }>(`/users/performance${query}`);
+  },
 };
 
 // Tasks

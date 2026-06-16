@@ -364,3 +364,25 @@ export interface SalesDashboardData {
   historicalDeals: Client[];
   callLogs: SalesCallLog[];
 }
+
+export interface UserTaskPerformanceStats {
+  totalTasks: number;
+  completedTasks: number;
+  incompleteTasks: number;
+  completionRate: number;
+  averageRating: number | null;
+}
+
+export interface UserSalesPerformanceStats {
+  leadsManaged: number;
+  callsLogged: number;
+  dealsWon: number;
+  closedRevenue: number;
+  conversionRate: number;
+}
+
+export interface UserPerformanceRecord {
+  user: User;
+  taskStats: UserTaskPerformanceStats;
+  salesStats: UserSalesPerformanceStats;
+}
