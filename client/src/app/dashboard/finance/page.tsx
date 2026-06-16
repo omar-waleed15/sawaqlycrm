@@ -72,11 +72,29 @@ export default function FinanceDashboardPage() {
   const [installmentsEnabled, setInstallmentsEnabled] = useState(false);
   const [installmentRows, setInstallmentRows] = useState<{ amount: string; due_date: string; note: string; id?: string; paid?: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'contracts' | 'expenses'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'contracts' | 'expenses' | 'report'>('overview');
 
   // Analytics states
   const [analyticsData, setAnalyticsData] = useState<FinanceAnalyticsPayload | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  // Custom Reports states
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [reportLineItems, setReportLineItems] = useState<any[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [reportSelectedCategories, setReportSelectedCategories] = useState<string[]>([
+    'recurring_contracts',
+    'one_time_contracts',
+    'salaries',
+    'ads',
+    'software',
+    'office',
+    'freelancer',
+    'other'
+  ]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   // Chart interactivity states
   const [hoveredBarIdx, setHoveredBarIdx] = useState<number | null>(null);
@@ -260,6 +278,39 @@ export default function FinanceDashboardPage() {
     }
   };
 
+  const loadCustomReport = async (start: string, end: string) => {
+    if (!start || !end) return;
+    try {
+      setReportLoading(true);
+      const data = await financeAnalyticsApi.customReport(start, end);
+      setReportLineItems(data.lineItems || []);
+    } catch (err) {
+      console.error('Failed to load custom report:', err);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Initialize custom report date range on mount (local timezone)
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const formatDateStr = (date: Date) => {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    setReportStartDate(formatDateStr(firstDay));
+    setReportEndDate(formatDateStr(now));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'report' && reportStartDate && reportEndDate) {
+      loadCustomReport(reportStartDate, reportEndDate);
+    }
+  }, [activeTab, reportStartDate, reportEndDate]);
+
   useEffect(() => {
     if ((user?.role === 'owner' || user?.role === 'sales') && activeTab === 'expenses') {
       loadExpensesAndSalaries(expenseMonthFilter);
@@ -271,6 +322,557 @@ export default function FinanceDashboardPage() {
       loadAnalytics();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (user?.role === 'owner' || user?.role === 'sales') {
+      loadData();
+    }
+  }, [user]);
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'recurring_contracts': return '🔄 ' + t('finance.recurring');
+      case 'one_time_contracts': return '💳 ' + t('finance.oneTime');
+      case 'salaries': return '👤 ' + t('finance.salariesTab');
+      case 'ads': return '📣 Ads';
+      case 'software': return '🖥️ Software';
+      case 'office': return '🏢 Office';
+      case 'freelancer': return '🧑‍💻 Freelancer';
+      default: return '📦 ' + (cat.charAt(0).toUpperCase() + cat.slice(1));
+    }
+  };
+
+  const filteredLineItems = useMemo(() => {
+    return reportLineItems.filter(item => {
+      // 1. Filter by category checkbox
+      if (!reportSelectedCategories.includes(item.category)) return false;
+
+      // 2. Filter by search query (case insensitive)
+      if (reportSearchQuery) {
+        const query = reportSearchQuery.toLowerCase();
+        const nameMatch = item.name.toLowerCase().includes(query);
+        const notesMatch = item.notes && item.notes.toLowerCase().includes(query);
+        if (!nameMatch && !notesMatch) return false;
+      }
+
+      return true;
+    });
+  }, [reportLineItems, reportSelectedCategories, reportSearchQuery]);
+
+  const reportKPIs = useMemo(() => {
+    let income = 0;
+    let expensesSum = 0;
+
+    filteredLineItems.forEach(item => {
+      if (item.type === 'income') {
+        income += item.amount;
+      } else {
+        expensesSum += item.amount;
+      }
+    });
+
+    const netProfit = income - expensesSum;
+    const margin = income > 0 ? Math.round((netProfit / income) * 1000) / 10 : 0;
+
+    return { income, expensesSum, netProfit, margin };
+  }, [filteredLineItems]);
+
+  const renderReportTab = () => {
+    const categoriesList = [
+      { key: 'recurring_contracts', label: '🔄 ' + t('finance.recurring') },
+      { key: 'one_time_contracts', label: '💳 ' + t('finance.oneTime') },
+      { key: 'salaries', label: '👤 ' + t('finance.salariesTab') },
+      { key: 'ads', label: '📣 Ads Spend' },
+      { key: 'software', label: '🖥️ Software' },
+      { key: 'office', label: '🏢 Office' },
+      { key: 'freelancer', label: '🧑‍💻 Freelancer' },
+      { key: 'other', label: '📦 Other' }
+    ];
+
+    const toggleCategory = (key: string) => {
+      setReportSelectedCategories(prev =>
+        prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+      );
+    };
+
+    const toggleAllCategories = () => {
+      if (reportSelectedCategories.length === categoriesList.length) {
+        setReportSelectedCategories([]);
+      } else {
+        setReportSelectedCategories(categoriesList.map(c => c.key));
+      }
+    };
+
+    const exportToExcel = () => {
+      let csvContent = '\uFEFF'; // UTF-8 BOM
+      
+      // Title & Date window
+      csvContent += `"${t('finance.reportTitle')}"\n`;
+      csvContent += `"${t('team.startDate')}: ${reportStartDate} | ${t('team.endDate')}: ${reportEndDate}"\n\n`;
+      
+      // KPIs Summaries
+      csvContent += `"${t('finance.income')}","${formatCurrency(reportKPIs.income, locale)}"\n`;
+      csvContent += `"${t('finance.expense')}","${formatCurrency(reportKPIs.expensesSum, locale)}"\n`;
+      csvContent += `"${t('finance.netProfit')}","${formatCurrency(reportKPIs.netProfit, locale)}"\n`;
+      csvContent += `"${t('finance.margin')}","${reportKPIs.margin}%"\n\n`;
+      
+      // Table Headers
+      csvContent += `"${t('finance.date')}","${t('finance.description')}","${t('finance.category')}","${t('finance.type')}","${t('finance.status')}","${t('finance.amount')}"\n`;
+      
+      // Table Rows
+      filteredLineItems.forEach(item => {
+        const dateStr = formatDate(item.date, locale);
+        const nameStr = item.name.replace(/"/g, '""');
+        const notesStr = item.notes ? ` - ${item.notes.replace(/"/g, '""')}` : '';
+        const descStr = `${nameStr}${notesStr}`;
+        const catLabel = getCategoryLabel(item.category);
+        const typeStr = item.type === 'income' ? t('finance.income') : t('finance.expense');
+        const statusStr = item.status === 'paid' ? t('finance.paid') : item.status === 'active' ? t('clients.active') : t('finance.unpaid');
+        const amtStr = `${item.type === 'income' ? '+' : '-'}${item.amount}`;
+        
+        csvContent += `"${dateStr}","${descStr}","${catLabel}","${typeStr}","${statusStr}","${amtStr}"\n`;
+      });
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `financial_report_${reportStartDate}_to_${reportEndDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Print Layout Override Styles */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #print-report-area, #print-report-area * {
+              visibility: visible;
+            }
+            #print-report-area {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              padding: 20px;
+              box-shadow: none !important;
+              border: none !important;
+              background: white !important;
+              color: black !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        `}} />
+
+        {/* Filters Toolbar */}
+        <div className="no-print" style={{
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: 20,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
+          {/* Left: Date ranges */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                {t('team.startDate')}
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={reportStartDate}
+                onChange={e => setReportStartDate(e.target.value)}
+                style={{ marginBottom: 0, padding: '6px 12px', fontSize: '0.875rem' }}
+              />
+            </div>
+            <span style={{ alignSelf: 'flex-end', paddingBottom: 10, color: 'var(--color-text-muted)' }}>—</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                {t('team.endDate')}
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={reportEndDate}
+                onChange={e => setReportEndDate(e.target.value)}
+                style={{ marginBottom: 0, padding: '6px 12px', fontSize: '0.875rem' }}
+              />
+            </div>
+          </div>
+
+          {/* Middle: Category Selector Dropdown & Search */}
+          <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 280, flexWrap: 'wrap' }}>
+            {/* Custom Multi-select Dropdown */}
+            <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                {t('finance.includeExcludeCategories')}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                style={{
+                  width: '100%',
+                  textAlign: 'start',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg)',
+                  fontSize: '0.875rem',
+                  color: 'var(--color-text-primary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span>
+                  {reportSelectedCategories.length === categoriesList.length
+                    ? t('finance.allCategoriesSelected')
+                    : t('finance.categoriesSelected', { count: reportSelectedCategories.length })}
+                </span>
+                <span>{showCategoryDropdown ? '▲' : '▼'}</span>
+              </button>
+
+              {showCategoryDropdown && (
+                <>
+                  <div
+                    onClick={() => setShowCategoryDropdown(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    marginTop: 6,
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    boxShadow: 'var(--shadow-md)',
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    padding: 8,
+                  }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 8px',
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 700,
+                      borderBottom: '1px solid var(--color-border)',
+                      marginBottom: 6,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={reportSelectedCategories.length === categoriesList.length}
+                        onChange={toggleAllCategories}
+                      />
+                      {t('finance.allCategories')}
+                    </label>
+                    {categoriesList.map(c => (
+                      <label
+                        key={c.key}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '6px 8px',
+                          cursor: 'pointer',
+                          fontSize: '0.8125rem',
+                          borderRadius: 'var(--radius-sm)',
+                          transition: 'background 0.2s',
+                        }}
+                        className="hover:bg-muted/10"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={reportSelectedCategories.includes(c.key)}
+                          onChange={() => toggleCategory(c.key)}
+                        />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Text Search */}
+            <div style={{ flex: 1.5, minWidth: 220, position: 'relative' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                {t('finance.searchTransactions')}
+              </label>
+              <input
+                type="text"
+                placeholder={t('finance.searchTransactions')}
+                value={reportSearchQuery}
+                onChange={e => setReportSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg)',
+                  fontSize: '0.875rem',
+                  marginBottom: 0
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Right: Export Excel Button */}
+          <button
+            onClick={exportToExcel}
+            style={{
+              alignSelf: 'flex-end',
+              height: 38,
+              padding: '0 16px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-primary)',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: 'var(--shadow-sm)',
+              transition: 'background-color 0.2s',
+            }}
+          >
+            📊 {t('finance.exportExcel')}
+          </button>
+        </div>
+
+        {/* Report Output Area (Targeted by CSS print rule) */}
+        {reportLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div id="print-report-area" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Report Header for printing */}
+            <div style={{ borderBottom: '2px solid var(--color-border)', paddingBottom: 12, marginBottom: 8 }} className="text-start">
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: 0 }}>
+                {t('finance.reportTitle')}
+              </h2>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', margin: '4px 0 0 0' }}>
+                {t('team.startDate')}: <strong>{formatDate(reportStartDate, locale)}</strong> | {t('team.endDate')}: <strong>{formatDate(reportEndDate, locale)}</strong>
+              </p>
+            </div>
+
+            {/* KPI Overview Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 16
+            }}>
+              {/* Income */}
+              <div style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 16,
+                boxShadow: 'var(--shadow-sm)',
+                textAlign: 'start'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                  <span>{t('finance.income')}</span>
+                  <span style={{ fontSize: '1.2rem' }}>💰</span>
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a', marginTop: 8, fontFamily: 'monospace' }}>
+                  {formatCurrency(reportKPIs.income, locale)}
+                </div>
+              </div>
+
+              {/* Expense */}
+              <div style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 16,
+                boxShadow: 'var(--shadow-sm)',
+                textAlign: 'start'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                  <span>{t('finance.expense')}</span>
+                  <span style={{ fontSize: '1.2rem' }}>💸</span>
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#e11d48', marginTop: 8, fontFamily: 'monospace' }}>
+                  {formatCurrency(reportKPIs.expensesSum, locale)}
+                </div>
+              </div>
+
+              {/* Net Profit */}
+              <div style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 16,
+                boxShadow: 'var(--shadow-sm)',
+                textAlign: 'start'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                  <span>{t('finance.netProfit')}</span>
+                  <span style={{ fontSize: '1.2rem' }}>📈</span>
+                </div>
+                <div style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 800,
+                  color: reportKPIs.netProfit >= 0 ? 'var(--color-primary)' : '#e11d48',
+                  marginTop: 8,
+                  fontFamily: 'monospace'
+                }}>
+                  {formatCurrency(reportKPIs.netProfit, locale)}
+                </div>
+              </div>
+
+              {/* Margin */}
+              <div style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 16,
+                boxShadow: 'var(--shadow-sm)',
+                textAlign: 'start'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                  <span>{t('finance.margin')}</span>
+                  <span style={{ fontSize: '1.2rem' }}>📊</span>
+                </div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: reportKPIs.margin >= 0 ? '#16a34a' : '#e11d48', marginTop: 8, fontFamily: 'monospace' }}>
+                  {reportKPIs.margin}%
+                </div>
+              </div>
+            </div>
+
+            {/* Ledger Table */}
+            <div style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 20,
+              boxShadow: 'var(--shadow-sm)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16
+            }}>
+              <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700, textAlign: 'start' }}>
+                📄 {t('finance.transactionLedger')} ({filteredLineItems.length})
+              </h3>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)', textAlign: 'start' }}>
+                      <th style={{ padding: '10px 12px', textAlign: 'start', fontWeight: 600 }}>{t('finance.date')}</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'start', fontWeight: 600 }}>{t('finance.description')}</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'start', fontWeight: 600 }}>{t('finance.category')}</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'start', fontWeight: 600 }}>{t('finance.type')}</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'start', fontWeight: 600 }}>{t('finance.status')}</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'end', fontWeight: 600 }}>{t('finance.amount')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredLineItems.map(item => (
+                      <tr key={item.id} style={{ transition: 'background 0.2s' }} className="hover:bg-muted/5">
+                        <td style={{ padding: '12px 12px', textAlign: 'start', color: 'var(--color-text-secondary)', fontSize: '0.8125rem' }}>
+                          {formatDate(item.date, locale)}
+                        </td>
+                        <td style={{ padding: '12px 12px', textAlign: 'start', fontWeight: 600 }}>
+                          {item.name}
+                          {item.notes && (
+                            <div style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                              ℹ️ {item.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 12px', textAlign: 'start' }}>
+                          <span style={{ fontSize: '0.8125rem' }}>
+                            {getCategoryLabel(item.category)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 12px', textAlign: 'start' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            backgroundColor: item.type === 'income' ? '#f0fdf4' : '#fff1f2',
+                            color: item.type === 'income' ? '#15803d' : '#e11d48'
+                          }}>
+                            {item.type === 'income' ? t('finance.income') : t('finance.expense')}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 12px', textAlign: 'start' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            backgroundColor:
+                              item.status === 'paid' ? '#f0fdf4' :
+                              item.status === 'active' ? '#eff6ff' : '#fff7ed',
+                            color:
+                              item.status === 'paid' ? '#15803d' :
+                              item.status === 'active' ? '#1d4ed8' : '#c2410c',
+                            border: `1px solid ${
+                              item.status === 'paid' ? '#bbf7d0' :
+                              item.status === 'active' ? '#bfdbfe' : '#ffedd5'
+                            }`
+                          }}>
+                            {item.status === 'paid' ? t('finance.paid') :
+                             item.status === 'active' ? t('clients.active') : t('finance.unpaid')}
+                          </span>
+                        </td>
+                        <td style={{
+                          padding: '12px 12px',
+                          textAlign: 'end',
+                          fontWeight: 700,
+                          color: item.type === 'income' ? '#16a34a' : '#e11d48',
+                          fontFamily: 'monospace'
+                        }}>
+                          {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount, locale)}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredLineItems.length === 0 && (
+                      <tr style={{ background: 'transparent' }}>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)' }}>
+                          {t('finance.noTransactions')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   useEffect(() => {
     if (user?.role === 'owner' || user?.role === 'sales') {
@@ -1463,6 +2065,7 @@ export default function FinanceDashboardPage() {
           { id: 'analytics', label: '📊 ' + t('finance.analytics') },
           { id: 'contracts', label: '💼 ' + t('finance.contracts') },
           { id: 'expenses', label: '💸 ' + t('finance.expenses') },
+          { id: 'report', label: '📄 ' + t('finance.customReports') },
         ].map(tab => (
           <button
             key={tab.id}
@@ -1487,6 +2090,9 @@ export default function FinanceDashboardPage() {
 
       {/* 1.5 FINANCIAL ANALYTICS TAB */}
       {activeTab === 'analytics' && renderAnalyticsTab()}
+
+      {/* CUSTOM FINANCIAL REPORT TAB */}
+      {activeTab === 'report' && renderReportTab()}
       
       {/* 1. OVERVIEW TAB */}
       {activeTab === 'overview' && (

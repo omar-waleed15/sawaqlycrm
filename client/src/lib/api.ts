@@ -215,6 +215,8 @@ export const salariesApi = {
 // Finance Analytics
 export const financeAnalyticsApi = {
   getDashboard: () => request<import('@/types').FinanceAnalyticsPayload>('/finance-analytics'),
+  customReport: (startDate: string, endDate: string) =>
+    request<{ lineItems: any[] }>(`/finance-analytics/custom-report?startDate=${startDate}&endDate=${endDate}`),
 };
 
 // Sales API

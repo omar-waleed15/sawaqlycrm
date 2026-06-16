@@ -816,5 +816,24 @@ export const ar: Record<string, string> = {
   'team.closedRevenue': 'الإيرادات المغلقة',
   'team.conversionRate': 'معدل التحويل',
   'team.noPerformanceData': 'لا توجد بيانات أداء للمدة الزمنية المحددة.',
+
+  // Finance Custom Reports
+  'finance.customReports': 'التقارير المخصصة',
+  'finance.reportTitle': 'التقرير المالي المخصص',
+  'finance.reportSubtitle': 'توليد قوائم مالية مخصصة حسب الفترات الزمنية والتصنيفات.',
+  'finance.includeExcludeCategories': 'تصفية التصنيفات',
+  'finance.income': 'إيرادات',
+  'finance.expense': 'مصاريف',
+  'finance.type': 'النوع',
+  'finance.searchTransactions': 'البحث عن المعاملات حسب الوصف...',
+  'finance.noTransactions': 'لم يتم العثور على أي معاملات تطابق معايير التصفية.',
+  'finance.printReport': 'طباعة التقرير',
+  'finance.exportExcel': 'تصدير إلى إكسل',
+  'finance.margin': 'هامش الربح',
+  'finance.transactionLedger': 'دفتر المعاملات',
+  'finance.allCategoriesSelected': 'جميع التصنيفات محددة',
+  'finance.categoriesSelected': 'تم تحديد {count} تصنيفات',
+  'finance.description': 'الوصف',
+  'finance.status': 'الحالة',
 };
 

@@ -816,5 +816,24 @@ export const en: Record<string, string> = {
   'team.closedRevenue': 'Closed Revenue',
   'team.conversionRate': 'Conversion Rate',
   'team.noPerformanceData': 'No performance data found for the selected time window.',
+
+  // Finance Custom Reports
+  'finance.customReports': 'Custom Reports',
+  'finance.reportTitle': 'Custom Financial Report',
+  'finance.reportSubtitle': 'Generate custom financial statements by date ranges and categories.',
+  'finance.includeExcludeCategories': 'Filter Categories',
+  'finance.income': 'Income',
+  'finance.expense': 'Expense',
+  'finance.type': 'Type',
+  'finance.searchTransactions': 'Search transactions by description...',
+  'finance.noTransactions': 'No transactions found matching the selected filters.',
+  'finance.printReport': 'Print Report',
+  'finance.exportExcel': 'Export to Excel',
+  'finance.margin': 'Profit Margin',
+  'finance.transactionLedger': 'Transaction Ledger',
+  'finance.allCategoriesSelected': 'All Categories Selected',
+  'finance.categoriesSelected': '{count} Categories Selected',
+  'finance.description': 'Description',
+  'finance.status': 'Status',
 };
 

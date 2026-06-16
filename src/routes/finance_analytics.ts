@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrSales } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrSales } from '../middleware/roleCheck';
 
 const router = Router();
 
@@ -389,6 +389,167 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
   } catch (err) {
     console.error('Failed to compile finance analytics:', err);
     res.status(500).json({ error: 'Internal server error calculating analytics' });
+  }
+});
+
+const formatLocalYYYYMMDD = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseLocalDate = (dateStr: string): Date => {
+  const [yyyy, mm, dd] = dateStr.split('-').map(Number);
+  return new Date(yyyy, mm - 1, dd);
+};
+
+// GET /api/finance-analytics/custom-report — Get custom financial reports (owner only)
+router.get('/custom-report', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: 'startDate and endDate query parameters are required' });
+    return;
+  }
+
+  try {
+    const sDate = String(startDate);
+    const eDate = String(endDate);
+
+    const startMs = new Date(sDate).getTime();
+    const endMs = new Date(eDate).getTime();
+
+    // Fetch in parallel
+    const [contractsRes, installmentsRes, expensesRes, salariesRes, salaryInstallmentsRes] = await Promise.all([
+      supabaseAdmin.from('contracts').select('*, client:clients(name, company)'),
+      supabaseAdmin.from('contract_installments').select('*, contract:contracts(name, is_recurring, client:clients(name, company))').gte('due_date', sDate).lte('due_date', eDate),
+      supabaseAdmin.from('expenses').select('*').gte('date', sDate).lte('date', eDate),
+      supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(name)').gte('month', sDate).lte('month', eDate),
+      supabaseAdmin.from('salary_installments').select('*, salary:salaries(user:profiles!salaries_user_id_fkey(name))').gte('due_date', sDate).lte('due_date', eDate),
+    ]);
+
+    if (contractsRes.error) throw contractsRes.error;
+    if (installmentsRes.error) throw installmentsRes.error;
+    if (expensesRes.error) throw expensesRes.error;
+    if (salariesRes.error) throw salariesRes.error;
+    if (salaryInstallmentsRes.error) throw salaryInstallmentsRes.error;
+
+    const lineItems: any[] = [];
+
+    // 1. Process Contracts (Recurring) - Occurrence Basis
+    (contractsRes.data || []).forEach((c: any) => {
+      if (!c.is_recurring) return; // One-time contracts are handled via installments
+      if (c.status !== 'active' && c.status !== 'completed') return;
+      if (!c.start_date) return;
+
+      const contractStart = parseLocalDate(c.start_date);
+      
+      // If the contract is no longer active, its last billing date is renewal_date
+      const contractEnd = (c.status === 'expired' || c.status === 'cancelled' || c.status === 'completed') && c.renewal_date
+        ? parseLocalDate(c.renewal_date)
+        : parseLocalDate(eDate);
+
+      let currentBillingDate = new Date(contractStart);
+      let iterations = 0;
+
+      while (currentBillingDate <= contractEnd && iterations < 500) {
+        iterations++;
+        const billingDateStr = formatLocalYYYYMMDD(currentBillingDate);
+
+        // Check if the billing date falls inside the selected range
+        if (billingDateStr >= sDate && billingDateStr <= eDate) {
+          lineItems.push({
+            id: `contract-recurring-${c.id}-${billingDateStr}`,
+            name: `${c.name} (${c.client?.company || c.client?.name || 'Client'})`,
+            category: 'recurring_contracts',
+            type: 'income',
+            amount: Number(c.amount),
+            date: billingDateStr,
+            status: 'active',
+            notes: `Billing cycle payment triggered on ${billingDateStr}`
+          });
+        }
+
+        // Advance to next cycle
+        if (c.billing_cycle === 'monthly') {
+          currentBillingDate.setMonth(currentBillingDate.getMonth() + 1);
+        } else if (c.billing_cycle === 'quarterly') {
+          currentBillingDate.setMonth(currentBillingDate.getMonth() + 3);
+        } else if (c.billing_cycle === 'yearly') {
+          currentBillingDate.setFullYear(currentBillingDate.getFullYear() + 1);
+        } else {
+          break; // Safety fallback
+        }
+      }
+    });
+
+    // 2. Process Contract Installments (One-Time)
+    (installmentsRes.data || []).forEach((inst: any) => {
+      // If the contract is recurring, it's already counted in the recurring section
+      if (inst.contract?.is_recurring) return;
+
+      lineItems.push({
+        id: `contract-one-time-${inst.id}`,
+        name: `${inst.contract?.name || 'Contract'} - Installment (${inst.contract?.client?.company || inst.contract?.client?.name || 'Client'})`,
+        category: 'one_time_contracts',
+        type: 'income',
+        amount: Number(inst.amount),
+        date: inst.due_date,
+        status: inst.paid ? 'paid' : 'unpaid'
+      });
+    });
+
+    // 3. Process Expenses
+    (expensesRes.data || []).forEach((exp: any) => {
+      if (exp.category === 'salary') return; // Handled below
+
+      lineItems.push({
+        id: `expense-${exp.id}`,
+        name: exp.title,
+        category: exp.category || 'other',
+        type: 'expense',
+        amount: Number(exp.amount),
+        date: exp.date,
+        status: 'paid'
+      });
+    });
+
+    // 4. Process Salaries (Recurring)
+    (salariesRes.data || []).forEach((sal: any) => {
+      if (!sal.is_recurring) return; // Handled via installments
+
+      lineItems.push({
+        id: `salary-recurring-${sal.id}`,
+        name: `Salary - ${sal.user?.name || 'Team Member'} (${sal.month.substring(0, 7)})`,
+        category: 'salaries',
+        type: 'expense',
+        amount: Number(sal.amount),
+        date: sal.month,
+        status: sal.paid ? 'paid' : 'unpaid'
+      });
+    });
+
+    // 5. Process Salary Installments (One-Time)
+    (salaryInstallmentsRes.data || []).forEach((inst: any) => {
+      lineItems.push({
+        id: `salary-one-time-${inst.id}`,
+        name: `Salary Installment - ${inst.salary?.user?.name || 'Team Member'}`,
+        category: 'salaries',
+        type: 'expense',
+        amount: Number(inst.amount),
+        date: inst.due_date,
+        status: inst.paid ? 'paid' : 'unpaid'
+      });
+    });
+
+    // Sort by date descending
+    lineItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    res.json({ lineItems });
+  } catch (err: any) {
+    console.error('Failed to compile custom report:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate custom financial report' });
   }
 });
 
