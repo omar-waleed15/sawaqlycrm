@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, projectsApi } from '@/lib/api';
+import { formatCairoDate, isDateOverdue } from '@/lib/dateUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,16 +46,14 @@ interface TaskCardProps {
 }
 
 function formatDate(dateStr?: string, locale: string = 'en'): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatCairoDate(dateStr, locale);
 }
 
 function isOverdue(dateStr?: string, assignees?: TaskAssignee[]): boolean {
   if (!dateStr) return false;
   const allCompleted = assignees?.every(a => a.status === 'completed');
   if (allCompleted) return false;
-  return new Date(dateStr) < new Date(new Date().toDateString());
+  return isDateOverdue(dateStr);
 }
 
 function getInitials(name: string): string {

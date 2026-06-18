@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/lib/i18n';
+import { formatCairoDate, formatCairoTime, formatCairoDateTime, getCairoTodayString, getCairoDateString } from '@/lib/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,7 +41,7 @@ function formatCurrency(amount: number, locale?: string): string {
 
 
 function formatDate(date: Date, locale?: string): string {
-  return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return formatCairoDate(date, locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 const getLocalDateString = (d: Date) => {
@@ -277,7 +278,7 @@ export default function CalendarPage() {
         }
       }
       if (task.publish_date) {
-        const dateStr = task.publish_date.split('T')[0];
+        const dateStr = getCairoDateString(task.publish_date);
         if (map[dateStr]) {
           map[dateStr].publications.push(task);
         }
@@ -303,7 +304,7 @@ export default function CalendarPage() {
 
       clients.forEach(client => {
         if (client.meeting_date && client.pipeline_stage === 'meeting_scheduled') {
-          const dateStr = client.meeting_date.split('T')[0];
+          const dateStr = getCairoDateString(client.meeting_date);
           if (map[dateStr]) {
             map[dateStr].meetings.push(client);
           }
@@ -364,7 +365,7 @@ export default function CalendarPage() {
     setIsModalOpen(true);
   };
 
-  const currentMonthLabel = currentMonth.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
+  const currentMonthLabel = formatCairoDate(currentMonth, locale, { month: 'long', year: 'numeric' });
 
   return (
     <div className="page-container fade-in text-start">
@@ -416,7 +417,7 @@ export default function CalendarPage() {
               <CardContent>
                 <div className="text-2xl font-extrabold text-green-600">{formatCurrency(monthStats.projectedRevenue, locale)}</div>
                 <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                  {t('calendar.dueIn').replace('{month}', currentMonth.toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' }))}
+                  {t('calendar.dueIn').replace('{month}', formatCairoDate(currentMonth, locale, { month: 'short' }))}
                 </p>
               </CardContent>
             </Card>
@@ -497,7 +498,7 @@ export default function CalendarPage() {
             {calendarCells.map((cell) => {
               const dateStr = getLocalDateString(cell.date);
               const dayEvents = eventsByDay[dateStr] || { tasks: [], payments: [], publications: [] };
-              const isToday = getLocalDateString(new Date()) === dateStr;
+              const isToday = getCairoTodayString() === dateStr;
               
               const displayTasks = dayEvents.tasks.slice(0, isOwner ? 2 : 3);
               const displayPayments = isOwner ? dayEvents.payments.slice(0, 1) : [];
@@ -698,7 +699,7 @@ export default function CalendarPage() {
                               <>
                                 <span>•</span>
                                 <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                  {t('calendar.timeLabel')} {new Date(client.meeting_date).toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                  {t('calendar.timeLabel')} {formatCairoTime(client.meeting_date, locale)}
                                 </span>
                               </>
                             )}
@@ -922,7 +923,7 @@ export default function CalendarPage() {
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'تاريخ الاجتماع' : 'Meeting Date'}</div>
                     <span className="text-xs font-semibold text-foreground">
-                      {new Date(leadDetail.meeting_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                      {formatCairoDateTime(leadDetail.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                 </div>
@@ -945,7 +946,7 @@ export default function CalendarPage() {
                           <div className="flex items-center justify-between font-bold text-muted-foreground flex-wrap gap-1 text-[10px]">
                             <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
                             <span>
-                              {new Date(log.call_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {formatCairoDateTime(log.call_date, locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <p className="text-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { getCairoTodayString, formatCairoDate, getCairoDateParts } from '@/lib/dateUtils';
 import {
   Plus,
   ArrowRight,
@@ -107,18 +108,18 @@ export default function DashboardPage() {
     return myAssignee?.status === 'completed';
   }).length;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getCairoTodayString();
   const myOverdueCount = myTasks.filter(task => {
     const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
     return task.due_date && task.due_date < todayStr && myAssignee?.status !== 'completed';
   }).length;
 
-  const today = new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+  const today = formatCairoDate(new Date(), locale, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
   const getGreetingKey = () => {
-    const hr = new Date().getHours();
+    const hr = getCairoDateParts().hour;
     if (hr < 12) return 'dashboard.greeting.morning';
     if (hr < 17) return 'dashboard.greeting.afternoon';
     return 'dashboard.greeting.evening';

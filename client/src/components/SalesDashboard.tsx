@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/lib/i18n';
+import { getCairoTodayString, formatCairoDate, formatCairoTime, formatCairoDateTime, getCairoTodayPlusNDays, getCairoDateString, getCairoDateParts } from '@/lib/dateUtils';
 import { 
   Phone, 
   Plus, 
@@ -127,7 +128,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     amount: '',
     is_recurring: true,
     billing_cycle: 'monthly',
-    start_date: new Date().toISOString().split('T')[0],
+    start_date: getCairoTodayString(),
     renewal_date: '',
     taskTitle: 'Kickoff Content Reel',
     taskDescription: '',
@@ -147,8 +148,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   // Target quota configuration states
   const [salesTarget, setSalesTarget] = useState<number | ''>('');
   const [targetMonth, setTargetMonth] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    const parts = getCairoDateParts();
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}`;
   });
   const [fetchingTarget, setFetchingTarget] = useState(false);
   const [savingTarget, setSavingTarget] = useState(false);
@@ -262,7 +263,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       title: '',
       description: '',
       priority: 'medium',
-      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      due_date: getCairoTodayPlusNDays(7),
       content_type: '',
       content_description: '',
       drive_link: '',
@@ -419,7 +420,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       setCloseWonForm(prev => ({
         ...prev,
         contractName: `${selectedLead.company || selectedLead.name} - Contract`,
-        taskDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        taskDueDate: getCairoTodayPlusNDays(7),
       }));
       setErrorMsg('');
       setCloseWonModalOpen(true);
@@ -726,7 +727,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           {lead.email && <span>• {lead.email}</span>}
                           {lead.meeting_date && (
                             <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/20 px-2 py-0.5 rounded text-[10px]">
-                              {t('sales.meeting')} {new Date(lead.meeting_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                              {t('sales.meeting')} {formatCairoDateTime(lead.meeting_date, locale, { dateStyle: 'short', timeStyle: 'short' })}
                             </span>
                           )}
                         </div>
@@ -774,7 +775,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                                     <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap">
                                       <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
                                       <span>
-                                        {new Date(log.call_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {formatCairoDateTime(log.call_date, locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                       </span>
                                     </div>
                                     <p className="text-xs text-foreground mt-1 whitespace-pre-wrap leading-relaxed">
@@ -845,7 +846,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           </span>
                           {lead.email && <span>• {lead.email}</span>}
                           <span>
-                            • {locale === 'ar' ? 'تم الإغلاق في ' : 'Closed on '}{new Date(lead.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            • {locale === 'ar' ? 'تم الإغلاق في ' : 'Closed on '}{formatCairoDate(lead.created_at, locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                           {leadCallLogs.length > 0 && (
                             <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
@@ -1036,7 +1037,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
               <Input
                 id="call-meeting"
                 type="datetime-local"
-                min={new Date().toISOString().substring(0, 16)}
+                min={getCairoTodayString() + "T00:00"}
                 value={callForm.meeting_date}
                 onChange={e => setCallForm(p => ({ ...p, meeting_date: e.target.value }))}
                 required
@@ -1391,7 +1392,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                 )}
               </div>
               <span className="text-[10px] text-muted-foreground">
-                {locale === 'ar' ? 'تمت الإضافة في ' : 'Added '}{new Date(detailDeal.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                {locale === 'ar' ? 'تمت الإضافة في ' : 'Added '}{formatCairoDate(detailDeal.created_at, locale, { month: 'long', day: 'numeric', year: 'numeric' })}
               </span>
             </div>
 
@@ -1425,7 +1426,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'تاريخ الاجتماع' : 'Meeting Date'}</div>
                     <span className="text-xs font-semibold text-foreground">
-                      {new Date(detailDeal.meeting_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                      {formatCairoDateTime(detailDeal.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                 </div>
@@ -1501,7 +1502,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                             <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
                               <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
                               <span>
-                                {new Date(log.call_date).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {formatCairoDateTime(log.call_date, locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             </div>
                             <p className="text-xs text-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">
@@ -1643,7 +1644,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                         id="push-task-due"
                         type="date"
                         value={pushTaskForm.due_date}
-                        min={new Date().toISOString().split('T')[0]}
+                        min={getCairoTodayString()}
                         onChange={e => setPushTaskForm(p => ({ ...p, due_date: e.target.value }))}
                         required
                       />

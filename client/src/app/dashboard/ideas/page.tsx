@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLanguage } from '@/lib/i18n';
+import { formatCairoDate, getCairoTodayString } from '@/lib/dateUtils';
 import {
   Select,
   SelectContent,
@@ -435,7 +436,7 @@ export default function IdeasPage() {
                   {/* Footer: date + action buttons */}
                   <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">
                     <span>
-                      {new Date(idea.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatCairoDate(idea.created_at, locale, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                     <div className="flex items-center gap-1">
                       <Button
@@ -615,7 +616,7 @@ export default function IdeasPage() {
             <div>
               <h2 className="text-lg font-bold text-foreground leading-snug">{viewIdea.title}</h2>
               <p className="text-[11px] text-muted-foreground mt-1">
-                {t('ideas.createdOn')} {new Date(viewIdea.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {t('ideas.createdOn')} {formatCairoDate(viewIdea.created_at, locale, { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
 
@@ -769,7 +770,7 @@ export default function IdeasPage() {
                     id="push-due-date"
                     type="date"
                     value={pushForm.due_date}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getCairoTodayString()}
                     onChange={e => setPushForm(p => ({ ...p, due_date: e.target.value }))}
                     required
                   />

@@ -8,6 +8,7 @@ import { Client, Project, Contract, FinanceStats, Expense, Salary, User, Expense
 import Modal from '@/components/Modal';
 import { useLanguage } from '@/lib/i18n';
 import { Loader2 } from 'lucide-react';
+import { getCairoTodayString, formatCairoDate, getCairoDateParts } from '@/lib/dateUtils';
 
 function formatCurrency(amount: number, locale?: string): string {
   const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
@@ -21,15 +22,15 @@ function formatCurrency(amount: number, locale?: string): string {
 
 function formatDate(dateStr?: string, locale?: string): string {
   if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatCairoDate(dateStr, locale);
 }
 
 function getRenewalStatus(renewalDateStr?: string, status?: string, t?: any): { label: string; color: string; bg: string; isAlert: boolean } {
   if (!renewalDateStr || status !== 'active') return { label: t('clients.inactive'), color: '#64748b', bg: '#f1f5f9', isAlert: false };
   
-  const today = new Date();
-  const renewalDate = new Date(renewalDateStr);
-  const diffTime = renewalDate.getTime() - today.getTime();
+  const todayStr = getCairoTodayString();
+  const renewalDateFormatted = renewalDateStr.split('T')[0];
+  const diffTime = new Date(renewalDateFormatted).getTime() - new Date(todayStr).getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
@@ -147,8 +148,8 @@ export default function FinanceDashboardPage() {
   const [usersList, setUsersList] = useState<User[]>([]);
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('');
   const [expenseMonthFilter, setExpenseMonthFilter] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    const parts = getCairoDateParts();
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}`;
   });
   const [expensesSubTab, setExpensesSubTab] = useState<'expenses' | 'salaries'>('expenses');
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -158,7 +159,7 @@ export default function FinanceDashboardPage() {
     title: '',
     amount: '',
     category: 'software' as ExpenseCategory,
-    date: new Date().toISOString().split('T')[0],
+    date: getCairoTodayString(),
     note: '',
     is_recurring: false,
     recurrence: 'monthly' as 'monthly' | 'yearly',
@@ -169,8 +170,8 @@ export default function FinanceDashboardPage() {
     amount: '',
     paid: false,
     paid_date: (() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-01`;
+      const parts = getCairoDateParts();
+      return `${parts.year}-${String(parts.month).padStart(2, '0')}-01`;
     })(),
     is_recurring: true,
     recurrence: 'monthly' as 'monthly' | 'yearly',
@@ -293,16 +294,11 @@ export default function FinanceDashboardPage() {
 
   useEffect(() => {
     // Initialize custom report date range on mount (local timezone)
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const formatDateStr = (date: Date) => {
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-    setReportStartDate(formatDateStr(firstDay));
-    setReportEndDate(formatDateStr(now));
+    const parts = getCairoDateParts();
+    const todayStr = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+    const firstDayStr = `${parts.year}-${String(parts.month).padStart(2, '0')}-01`;
+    setReportStartDate(firstDayStr);
+    setReportEndDate(todayStr);
   }, []);
 
   useEffect(() => {
@@ -1111,7 +1107,7 @@ export default function FinanceDashboardPage() {
         title: expense.title,
         amount: expense.amount.toString(),
         category: expense.category,
-        date: expense.date ? expense.date.split('T')[0] : new Date().toISOString().split('T')[0],
+        date: expense.date ? expense.date.split('T')[0] : getCairoTodayString(),
         note: expense.note || '',
         is_recurring: expense.is_recurring,
         recurrence: expense.recurrence || 'monthly',
@@ -1123,7 +1119,7 @@ export default function FinanceDashboardPage() {
         title: '',
         amount: '',
         category: 'software',
-        date: new Date().toISOString().split('T')[0],
+        date: getCairoTodayString(),
         note: '',
         is_recurring: false,
         recurrence: 'monthly',
@@ -1178,7 +1174,7 @@ export default function FinanceDashboardPage() {
         ? salary.paid_date.split('T')[0]
         : salary.month
           ? salary.month.substring(0, 10)
-          : new Date().toISOString().split('T')[0];
+          : getCairoTodayString();
       setSalaryForm({
         user_id: salary.user_id,
         amount: salary.amount.toString(),
@@ -1198,7 +1194,7 @@ export default function FinanceDashboardPage() {
     } else {
       const defaultDate = expenseMonthFilter
         ? `${expenseMonthFilter}-01`
-        : new Date().toISOString().split('T')[0];
+        : getCairoTodayString();
       setSalaryForm({
         user_id: usersList[0]?.id || '',
         amount: '',
@@ -1421,7 +1417,7 @@ export default function FinanceDashboardPage() {
 
     const monthLabelFull = (m: string) => {
       const [y, mo] = m.split('-');
-      return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'long', year: 'numeric' });
+      return formatCairoDate(new Date(Number(y), Number(mo) - 1, 1), locale, { month: 'long', year: 'numeric' });
     };
 
     return (
@@ -1558,7 +1554,7 @@ export default function FinanceDashboardPage() {
                   const label = (() => {
                     const [year, month] = d.month.split('-');
                     const date = new Date(Number(year), Number(month) - 1, 1);
-                    return date.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' });
+                    return formatCairoDate(date, locale, { month: 'short' });
                   })();
 
                   return (

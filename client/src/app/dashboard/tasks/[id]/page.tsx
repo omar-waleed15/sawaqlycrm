@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, commentsApi } from '@/lib/api';
 import { Task, TaskAssignee, Comment, User } from '@/types';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,11 +29,11 @@ import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Cloc
 
 function formatDate(dateStr?: string, t?: any, locale?: string): string {
   if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
-  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatCairoDate(dateStr, locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function formatDateTime(dateStr: string, locale: string): string {
-  return new Date(dateStr).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return formatCairoDateTime(dateStr, locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function getInitials(name: string): string {
@@ -239,7 +240,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   if (!task) return null;
 
   const assignees = task.task_assignees || [];
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && assignees.some(a => a.status !== 'completed');
+  const isOverdue = task.due_date && isDateOverdue(task.due_date) && assignees.some(a => a.status !== 'completed');
 
   // Compute summary
   const totalAssignees = assignees.length;

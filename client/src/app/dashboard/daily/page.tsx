@@ -8,6 +8,8 @@ import TaskCard from '@/components/TaskCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
+import { formatCairoDate } from '@/lib/dateUtils';
+
 export default function DailyTasksPage() {
   const { t, locale } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -24,7 +26,7 @@ export default function DailyTasksPage() {
     loadDailyTasks();
   }, []);
 
-  const today = new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+  const today = formatCairoDate(new Date(), locale, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
