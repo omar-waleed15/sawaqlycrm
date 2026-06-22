@@ -227,29 +227,69 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
 
 // PUT /api/users/:id — Update user (owner only)
 router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { id } = req.params;
-  const { name, role } = req.body;
+  const id = req.params.id as string;
+  const { name, role, email, password } = req.body;
 
   try {
+    // 1. Update Supabase Auth if email or password is provided
+    const authUpdates: any = {};
+    if (email) {
+      authUpdates.email = email;
+      authUpdates.email_confirm = true;
+    }
+    if (password) {
+      if (password.length < 6) {
+        res.status(400).json({ error: 'Password must be at least 6 characters' });
+        return;
+      }
+      authUpdates.password = password;
+    }
+
+    if (Object.keys(authUpdates).length > 0) {
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(id, authUpdates);
+      if (authError) {
+        res.status(400).json({ error: authError.message });
+        return;
+      }
+    }
+
+    // 2. Update profiles table
     const updates: Record<string, string> = {};
     if (name) updates.name = name;
     if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'].includes(role)) updates.role = role;
+    if (email) updates.email = email;
 
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    if (Object.keys(updates).length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error) {
-      res.status(500).json({ error: error.message });
-      return;
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      res.json({ user: data });
+    } else {
+      // Just fetch the profile to return if no profile updates were requested
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      res.json({ user: data });
     }
-
-    res.json({ user: data });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update user' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update user' });
   }
 });
 

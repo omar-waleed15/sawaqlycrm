@@ -81,7 +81,7 @@ export const usersApi = {
   list: () => request<{ users: import('@/types').User[] }>('/users'),
   create: (data: { name: string; email: string; password: string; role: string }) =>
     request<{ user: import('@/types').User }>('/users', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ name: string; role: string }>) =>
+  update: (id: string, data: Partial<{ name: string; role: string; email?: string; password?: string }>) =>
     request<{ user: import('@/types').User }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
   performance: (startDate?: string, endDate?: string) => {

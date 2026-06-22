@@ -205,28 +205,66 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
 });
 // PUT /api/users/:id — Update user (owner only)
 router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
-    const { id } = req.params;
-    const { name, role } = req.body;
+    const id = req.params.id;
+    const { name, role, email, password } = req.body;
     try {
+        // 1. Update Supabase Auth if email or password is provided
+        const authUpdates = {};
+        if (email) {
+            authUpdates.email = email;
+            authUpdates.email_confirm = true;
+        }
+        if (password) {
+            if (password.length < 6) {
+                res.status(400).json({ error: 'Password must be at least 6 characters' });
+                return;
+            }
+            authUpdates.password = password;
+        }
+        if (Object.keys(authUpdates).length > 0) {
+            const { error: authError } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(id, authUpdates);
+            if (authError) {
+                res.status(400).json({ error: authError.message });
+                return;
+            }
+        }
+        // 2. Update profiles table
         const updates = {};
         if (name)
             updates.name = name;
         if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'].includes(role))
             updates.role = role;
-        const { data, error } = await supabase_1.supabaseAdmin
-            .from('profiles')
-            .update(updates)
-            .eq('id', id)
-            .select()
-            .single();
-        if (error) {
-            res.status(500).json({ error: error.message });
-            return;
+        if (email)
+            updates.email = email;
+        if (Object.keys(updates).length > 0) {
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            res.json({ user: data });
         }
-        res.json({ user: data });
+        else {
+            // Just fetch the profile to return if no profile updates were requested
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            res.json({ user: data });
+        }
     }
     catch (err) {
-        res.status(500).json({ error: 'Failed to update user' });
+        res.status(500).json({ error: err.message || 'Failed to update user' });
     }
 });
 // DELETE /api/users/:id — Remove a team member (owner only)
