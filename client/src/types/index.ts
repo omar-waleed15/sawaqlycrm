@@ -24,6 +24,8 @@ export interface TaskAssignee {
   rating?: number;
   assigned_at: string;
   updated_at: string;
+  total_time_spent: number;
+  timer_started_at?: string | null;
 }
 
 export interface Task {
@@ -183,6 +185,14 @@ export interface SalaryInstallment {
   created_at: string;
 }
 
+export interface SalaryPenalty {
+  id: string;
+  salary_id: string;
+  amount: number;
+  notes?: string;
+  created_at: string;
+}
+
 export interface Salary {
   id: string;
   user_id: string;
@@ -194,6 +204,7 @@ export interface Salary {
   is_recurring: boolean;    // true = monthly recurring, false = one-time
   recurrence?: 'monthly' | 'yearly';
   installments?: SalaryInstallment[];
+  penalties?: SalaryPenalty[];
   note?: string;
   created_by: string;
   created_at: string;
@@ -342,6 +353,14 @@ export interface SalesTarget {
   created_at?: string;
 }
 
+export interface TaskTarget {
+  id: string;
+  user_id: string;
+  target_tasks: number;
+  month: string;
+  created_at?: string;
+}
+
 export interface SalesCallLog {
   id: string;
   client_id: string;
@@ -371,6 +390,8 @@ export interface UserTaskPerformanceStats {
   incompleteTasks: number;
   completionRate: number;
   averageRating: number | null;
+  taskTarget: number | null;
+  averageCompletionTime: number | null;
 }
 
 export interface UserSalesPerformanceStats {
@@ -379,6 +400,8 @@ export interface UserSalesPerformanceStats {
   dealsWon: number;
   closedRevenue: number;
   conversionRate: number;
+  salesTarget: number | null;
+  meetingsDone: number;
 }
 
 export interface UserPerformanceRecord {

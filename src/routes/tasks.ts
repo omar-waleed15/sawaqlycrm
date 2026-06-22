@@ -19,6 +19,8 @@ const TASK_SELECT = `
     rating,
     assigned_at,
     updated_at,
+    total_time_spent,
+    timer_started_at,
     user:profiles(id, name, email, avatar_url)
   )
 `;
@@ -447,7 +449,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       // Member: check they're assigned
       const { data: assignment, error: aErr } = await supabaseAdmin
         .from('task_assignees')
-        .select('id')
+        .select('*')
         .eq('task_id', id)
         .eq('user_id', req.user!.id)
         .single();
@@ -465,6 +467,15 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (submission_link !== undefined) assignUpdates.submission_link = submission_link;
       if (completion_note !== undefined) assignUpdates.completion_note = completion_note;
       assignUpdates.updated_at = new Date().toISOString();
+
+      // If status is transitioning out of active working statuses, stop the timer if active
+      const activeStatuses = ['todo', 'in_progress', 'revision'];
+      if (status && !activeStatuses.includes(status) && assignment.timer_started_at) {
+        const startTime = new Date(assignment.timer_started_at).getTime();
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+        assignUpdates.total_time_spent = (assignment.total_time_spent || 0) + elapsedSeconds;
+        assignUpdates.timer_started_at = null;
+      }
 
       const { error: updateError } = await supabaseAdmin
         .from('task_assignees')
@@ -589,6 +600,21 @@ router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (r
     }
     updates.updated_at = new Date().toISOString();
 
+    // Check if assignee has a running timer, stop it if we are updating their record/status
+    const { data: assignment } = await supabaseAdmin
+      .from('task_assignees')
+      .select('*')
+      .eq('task_id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (assignment && assignment.timer_started_at) {
+      const startTime = new Date(assignment.timer_started_at).getTime();
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+      updates.total_time_spent = (assignment.total_time_spent || 0) + elapsedSeconds;
+      updates.timer_started_at = null;
+    }
+
     const { error } = await supabaseAdmin
       .from('task_assignees')
       .update(updates)
@@ -635,6 +661,244 @@ router.delete('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest
     res.json({ message: 'Task deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+// POST /api/tasks/target — Set or update task target (owner only)
+router.post('/target', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { user_id, target_tasks, month } = req.body;
+
+  if (!user_id || target_tasks === undefined || !month) {
+    res.status(400).json({ error: 'user_id, target_tasks, and month (YYYY-MM) are required' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('task_targets')
+      .upsert(
+        { user_id, target_tasks: Number(target_tasks), month },
+        { onConflict: 'user_id,month' }
+      )
+      .select()
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ target: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to set target' });
+  }
+});
+
+// GET /api/tasks/target/:userId/:month — Fetch target for a specific user and month (owner or self)
+router.get('/target/:userId/:month', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { userId, month } = req.params;
+  const userIdStr = userId as string;
+  const monthStr = month as string;
+  const callerId = req.user!.id;
+  const callerRole = req.user!.role;
+
+  if (callerRole !== 'owner' && callerId !== userIdStr) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('task_targets')
+      .select('*')
+      .eq('user_id', userIdStr)
+      .eq('month', monthStr)
+      .maybeSingle();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ target: data || null });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch target' });
+  }
+});
+
+// GET /api/tasks/target/:userId/:month/progress — Fetch progress (owner or self)
+router.get('/target/:userId/:month/progress', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { userId, month } = req.params;
+  const userIdStr = userId as string;
+  const monthStr = month as string;
+  const callerId = req.user!.id;
+  const callerRole = req.user!.role;
+
+  if (callerRole !== 'owner' && callerId !== userIdStr) {
+    res.status(403).json({ error: 'Access denied' });
+    return;
+  }
+
+  try {
+    // 1. Fetch target tasks
+    const { data: targetData, error: targetError } = await supabaseAdmin
+      .from('task_targets')
+      .select('target_tasks')
+      .eq('user_id', userIdStr)
+      .eq('month', monthStr)
+      .maybeSingle();
+
+    if (targetError) {
+      res.status(500).json({ error: targetError.message });
+      return;
+    }
+
+    const target = targetData ? targetData.target_tasks : 0;
+
+    // 2. Fetch completed tasks count for that month using updated_at
+    const [year, monthNum] = monthStr.split('-').map(Number);
+    const startDate = new Date(Date.UTC(year, monthNum - 1, 1)).toISOString();
+    const endDate = new Date(Date.UTC(year, monthNum, 1)).toISOString();
+
+    // Count of completed tasks for this user in this date range
+    const { count, error: countError } = await supabaseAdmin
+      .from('task_assignees')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userIdStr)
+      .eq('status', 'completed')
+      .gte('updated_at', startDate)
+      .lt('updated_at', endDate);
+
+    if (countError) {
+      res.status(500).json({ error: countError.message });
+      return;
+    }
+
+    const completedTasks = count || 0;
+    const progressPercent = target > 0 ? Math.round((completedTasks / target) * 100) : 0;
+
+    res.json({
+      target,
+      completedTasks,
+      progressPercent
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch task target progress' });
+  }
+});
+
+// POST /api/tasks/:id/timer/start — Start timer for an assignee
+router.post('/:id/timer/start', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const callerId = req.user!.id;
+
+  try {
+    const { data: assignment, error: aErr } = await supabaseAdmin
+      .from('task_assignees')
+      .select('*')
+      .eq('task_id', id)
+      .eq('user_id', callerId)
+      .single();
+
+    if (aErr || !assignment) {
+      res.status(403).json({ error: 'Access denied. You are not assigned to this task.' });
+      return;
+    }
+
+    if (assignment.status !== 'in_progress') {
+      res.status(400).json({ error: 'You must start the task before you can start the timer.' });
+      return;
+    }
+
+    if (assignment.timer_started_at) {
+      const { data: fullTask, error: fetchError } = await supabaseAdmin
+        .from('tasks')
+        .select(TASK_SELECT)
+        .eq('id', id)
+        .single();
+      if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+      res.json({ task: fullTask });
+      return;
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('task_assignees')
+      .update({
+        timer_started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', assignment.id);
+
+    if (updateError) { res.status(500).json({ error: updateError.message }); return; }
+
+    const { data: fullTask, error: fetchError } = await supabaseAdmin
+      .from('tasks')
+      .select(TASK_SELECT)
+      .eq('id', id)
+      .single();
+
+    if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+    res.json({ task: fullTask });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to start timer' });
+  }
+});
+
+// POST /api/tasks/:id/timer/stop — Stop/Pause timer for an assignee
+router.post('/:id/timer/stop', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const callerId = req.user!.id;
+
+  try {
+    const { data: assignment, error: aErr } = await supabaseAdmin
+      .from('task_assignees')
+      .select('*')
+      .eq('task_id', id)
+      .eq('user_id', callerId)
+      .single();
+
+    if (aErr || !assignment) {
+      res.status(403).json({ error: 'Access denied. You are not assigned to this task.' });
+      return;
+    }
+
+    if (!assignment.timer_started_at) {
+      const { data: fullTask, error: fetchError } = await supabaseAdmin
+        .from('tasks')
+        .select(TASK_SELECT)
+        .eq('id', id)
+        .single();
+      if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+      res.json({ task: fullTask });
+      return;
+    }
+
+    const startTime = new Date(assignment.timer_started_at).getTime();
+    const nowTime = Date.now();
+    const elapsedSeconds = Math.max(0, Math.floor((nowTime - startTime) / 1000));
+    const newTotalTime = (assignment.total_time_spent || 0) + elapsedSeconds;
+
+    const { error: updateError } = await supabaseAdmin
+      .from('task_assignees')
+      .update({
+        timer_started_at: null,
+        total_time_spent: newTotalTime,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', assignment.id);
+
+    if (updateError) { res.status(500).json({ error: updateError.message }); return; }
+
+    const { data: fullTask, error: fetchError } = await supabaseAdmin
+      .from('tasks')
+      .select(TASK_SELECT)
+      .eq('id', id)
+      .single();
+
+    if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+    res.json({ task: fullTask });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to stop timer' });
   }
 });
 

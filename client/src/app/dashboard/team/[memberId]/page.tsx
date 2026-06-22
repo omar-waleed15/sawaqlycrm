@@ -9,7 +9,7 @@ import { tasksApi, usersApi } from '@/lib/api';
 import { Task, TaskAssignee, TaskStatus, User } from '@/types';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import SalesDashboard from '@/components/SalesDashboard';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -79,6 +79,14 @@ const PRIORITY_BORDER_CLASSES: Record<string, string> = {
   low: 'border-l-green-500',
 };
 
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 export default function MemberTasksPage({ params }: { params: Promise<{ memberId: string }> }) {
   const { memberId } = use(params);
   const { user } = useAuth();
@@ -93,6 +101,75 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'title'>('dueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [nowTime, setNowTime] = useState<number>(Date.now());
+
+  // Ticking clock for active timers of this member
+  useEffect(() => {
+    const hasActive = tasks.some(t => {
+      const ma = getMemberAssignment(t, memberId);
+      return ma && ma.timer_started_at;
+    });
+    if (!hasActive) return;
+
+    const interval = setInterval(() => {
+      setNowTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [tasks, memberId]);
+
+  const getMemberTime = (task: Task): number => {
+    const ma = getMemberAssignment(task, memberId);
+    if (!ma) return 0;
+    let elapsed = ma.total_time_spent || 0;
+    if (ma.timer_started_at) {
+      const started = new Date(ma.timer_started_at).getTime();
+      const diffSeconds = Math.max(0, Math.floor((nowTime - started) / 1000));
+      elapsed += diffSeconds;
+    }
+    return elapsed;
+  };
+
+  // Task Target States
+  const [targetMonth, setTargetMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [targetTasks, setTargetTasks] = useState<number | ''>('');
+  const [completedTasks, setCompletedTasks] = useState<number>(0);
+  const [fetchingTarget, setFetchingTarget] = useState<boolean>(false);
+  const [savingTarget, setSavingTarget] = useState<boolean>(false);
+  const [targetMessage, setTargetMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const loadTargetAndProgress = async (monthStr: string) => {
+    setFetchingTarget(true);
+    setTargetMessage(null);
+    try {
+      const [targetData, progressData] = await Promise.all([
+        tasksApi.getTarget(memberId, monthStr),
+        tasksApi.getProgress(memberId, monthStr)
+      ]);
+      setTargetTasks(targetData.target ? targetData.target.target_tasks : '');
+      setCompletedTasks(progressData.completedTasks || 0);
+    } catch (err) {
+      console.error('Failed to load task target:', err);
+    } finally {
+      setFetchingTarget(false);
+    }
+  };
+
+  const handleSaveTarget = async () => {
+    setSavingTarget(true);
+    setTargetMessage(null);
+    try {
+      await tasksApi.setTarget(memberId, targetMonth, targetTasks === '' ? 0 : Number(targetTasks));
+      setTargetMessage({ text: t('taskTarget.updated') || 'Target updated successfully!', type: 'success' });
+      // Reload progress
+      const progressData = await tasksApi.getProgress(memberId, targetMonth);
+      setCompletedTasks(progressData.completedTasks || 0);
+    } catch (err: any) {
+      setTargetMessage({ text: err.message || 'Failed to update target', type: 'error' });
+    } finally {
+      setSavingTarget(false);
+    }
+  };
 
   useEffect(() => {
     if (user && user.role !== 'owner') {
@@ -121,7 +198,16 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     load();
   }, [memberId, user, router]);
 
+  useEffect(() => {
+    if (member && member.role !== 'sales') {
+      loadTargetAndProgress(targetMonth);
+    }
+  }, [targetMonth, memberId, member]);
+
   if (user?.role !== 'owner') return null;
+
+  const targetVal = targetTasks === '' ? 0 : Number(targetTasks);
+  const achievementRate = targetVal > 0 ? Math.round((completedTasks / targetVal) * 100) : 0;
 
   const stats = {
     total: tasks.length,
@@ -220,6 +306,85 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
           <h2 className="text-base font-bold text-foreground tracking-tight">{t('memberDetail.repIntelligence')}</h2>
           <SalesDashboard salesRepId={memberId} />
         </div>
+      )}
+
+      {/* Task Target Setup Card for non-sales employee */}
+      {member.role !== 'sales' && (
+        <Card className="mb-6 border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
+            <div>
+              <h3 className="text-sm font-bold tracking-tight">{t('taskTarget.title')}</h3>
+              <p className="text-[11px] text-muted-foreground">{t('taskTarget.subtitle')}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 pb-5 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 max-w-4xl">
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{t('taskTarget.targetMonth')}</label>
+                <Input
+                  type="month"
+                  value={targetMonth}
+                  onChange={e => setTargetMonth(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="flex-1 w-full space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{t('taskTarget.targetTasks')}</label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 10"
+                  value={targetTasks}
+                  onChange={e => setTargetTasks(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="shrink-0 w-full sm:w-auto">
+                <Button
+                  onClick={handleSaveTarget}
+                  disabled={savingTarget || fetchingTarget}
+                  className="w-full sm:w-auto h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                >
+                  {savingTarget ? t('common.loading') : t('taskTarget.updateTarget')}
+                </Button>
+              </div>
+
+              {/* Progress Display Card / Section */}
+              <div className="flex-1 min-w-[200px] border rounded-lg p-3 bg-muted/20 flex flex-col justify-center">
+                <div className="flex items-center justify-between text-xs font-bold mb-1">
+                  <span>{t('taskTarget.progress')}</span>
+                  <span>{achievementRate}%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 mb-1.5">
+                  <div 
+                    className="h-full rounded-full bg-indigo-600 transition-all duration-300" 
+                    style={{ width: `${Math.min(achievementRate, 100)}%` }} 
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  {completedTasks} / {targetVal > 0 ? targetVal : '0'} {t('common.tasks')}
+                </p>
+              </div>
+            </div>
+
+            {fetchingTarget && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 animate-pulse">
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-indigo-500" />
+                {t('common.loading')}
+              </div>
+            )}
+
+            {targetMessage && (
+              <div className={`mt-3 text-xs p-2.5 rounded-lg border ${
+                targetMessage.type === 'success' 
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400' 
+                  : 'bg-rose-50 border-rose-100 text-rose-800 dark:bg-rose-950/20 dark:border-rose-900/30 dark:text-rose-400'
+              }`}>
+                {targetMessage.text}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Search, Filter & Switch View Panel */}
@@ -354,8 +519,29 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                 </Badge>
                               )}
                             </div>
-                            <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                              <Calendar className="size-3.5" /> {formatDate(task.due_date, locale, t)}
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              {/* Logged Time (except for sales) */}
+                              {(() => {
+                                if (member?.role === 'sales') return null;
+                                const ma = getMemberAssignment(task, memberId);
+                                if (!ma) return null;
+                                const time = getMemberTime(task);
+                                if (time === 0 && !ma.timer_started_at) return null;
+                                return (
+                                  <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold select-none">
+                                    ⏱️ {formatDuration(time)}
+                                    {ma.timer_started_at && (
+                                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 px-1.5 py-0.5 rounded-full select-none animate-pulse ml-1">
+                                        {locale === 'ar' ? 'نشط' : 'active'}
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })()}
+                              {member?.role !== 'sales' && ((ma) => ma && (ma.total_time_spent > 0 || ma.timer_started_at))(getMemberAssignment(task, memberId)) && <span>·</span>}
+                              <div className={`flex items-center gap-1 ${overdue ? 'text-rose-600 font-bold' : ''}`}>
+                                <Calendar className="size-3.5" /> {formatDate(task.due_date, locale, t)}
+                              </div>
                             </div>
                           </div>
 
@@ -466,10 +652,30 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                                       {task.title}
                                     </div>
 
-                                    {/* Due Date */}
-                                    <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                                      <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date, locale, t)}</span>
-                                      {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
+                                    {/* Due Date & Timer */}
+                                    <div className="flex flex-col gap-1">
+                                      <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
+                                        <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date, locale, t)}</span>
+                                        {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
+                                      </div>
+                                      {/* Logged Time (except for sales) */}
+                                      {(() => {
+                                        if (member?.role === 'sales') return null;
+                                        const ma = getMemberAssignment(task, memberId);
+                                        if (!ma) return null;
+                                        const time = getMemberTime(task);
+                                        if (time === 0 && !ma.timer_started_at) return null;
+                                        return (
+                                          <div className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold select-none">
+                                            ⏱️ {formatDuration(time)}
+                                            {ma.timer_started_at && (
+                                              <span className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 px-1 py-0.2 rounded-full select-none animate-pulse ml-0.5">
+                                                {locale === 'ar' ? 'نشط' : 'active'}
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
 
                                     {/* Small Indicators for updates */}

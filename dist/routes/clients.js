@@ -5,6 +5,37 @@ const supabase_1 = require("../lib/supabase");
 const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const router = (0, express_1.Router)();
+// GET /api/clients/reports/custom — Get custom client report (owner only)
+router.get('/reports/custom', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+    const { startDate, endDate } = req.query;
+    if (!startDate || !endDate) {
+        res.status(400).json({ error: 'startDate and endDate query parameters are required' });
+        return;
+    }
+    try {
+        const sDate = String(startDate);
+        const eDate = String(endDate);
+        const { data: clients, error } = await supabase_1.supabaseAdmin
+            .from('clients')
+            .select('*, sales_rep:profiles(name), contracts(*)');
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        // Filter by created_at or start_date within the window in Cairo local timezone
+        const filtered = (clients || []).filter((c) => {
+            const cDate = c.created_at ? c.created_at.substring(0, 10) : null;
+            const sDateVal = c.start_date ? c.start_date.substring(0, 10) : null;
+            const createdInRange = cDate && cDate >= sDate && cDate <= eDate;
+            const startedInRange = sDateVal && sDateVal >= sDate && sDateVal <= eDate;
+            return createdInRange || startedInRange;
+        });
+        res.json({ clients: filtered });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to fetch custom report' });
+    }
+});
 // GET /api/clients — List all clients
 router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (_req, res) => {
     try {

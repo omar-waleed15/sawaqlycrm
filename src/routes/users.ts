@@ -35,6 +35,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
   try {
     const sDate = startDate ? String(startDate) : undefined;
     const eDate = endDate ? String(endDate) : undefined;
+    const currentMonthStr = new Date().toISOString().substring(0, 7);
 
     // 1. Fetch profiles
     const profilesPromise = supabaseAdmin
@@ -45,7 +46,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     // 2. Fetch task assignees within the date window
     let assigneesQuery = supabaseAdmin
       .from('task_assignees')
-      .select('user_id, status, rating, assigned_at');
+      .select('user_id, status, rating, assigned_at, total_time_spent');
     if (sDate) assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
     if (eDate) assigneesQuery = assigneesQuery.lte('assigned_at', eDate);
 
@@ -70,18 +71,34 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     if (sDate) contractsQuery = contractsQuery.gte('created_at', sDate);
     if (eDate) contractsQuery = contractsQuery.lte('created_at', eDate);
 
+    // 6. Fetch task targets for the current month
+    const targetsPromise = supabaseAdmin
+      .from('task_targets')
+      .select('user_id, target_tasks')
+      .eq('month', currentMonthStr);
+
+    // 7. Fetch sales targets for the current month
+    const salesTargetsPromise = supabaseAdmin
+      .from('sales_targets')
+      .select('user_id, target_amount')
+      .eq('month', currentMonthStr);
+
     const [
       { data: profiles, error: profilesErr },
       { data: assignees, error: assigneesErr },
       { data: clients, error: clientsErr },
       { data: calls, error: callsErr },
-      { data: contracts, error: contractsErr }
+      { data: contracts, error: contractsErr },
+      { data: targets, error: targetsErr },
+      { data: salesTargets, error: salesTargetsErr }
     ] = await Promise.all([
       profilesPromise,
       assigneesQuery,
       clientsQuery,
       callsQuery,
-      contractsQuery
+      contractsQuery,
+      targetsPromise,
+      salesTargetsPromise
     ]);
 
     if (profilesErr) throw profilesErr;
@@ -89,6 +106,11 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     if (clientsErr) throw clientsErr;
     if (callsErr) throw callsErr;
     if (contractsErr) throw contractsErr;
+    if (targetsErr) throw targetsErr;
+    if (salesTargetsErr) throw salesTargetsErr;
+
+    const targetMap = new Map<string, number>((targets || []).map(t => [t.user_id, t.target_tasks]));
+    const salesTargetMap = new Map<string, number>((salesTargets || []).map(t => [t.user_id, Number(t.target_amount)]));
 
     // Map profiles to performance stats
     const performanceData = (profiles || []).map(user => {
@@ -104,6 +126,11 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
         ? Math.round((ratedAssignments.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedAssignments.length) * 10) / 10
         : null;
 
+      const completedAssignments = userAssignments.filter(a => a.status === 'completed');
+      const averageCompletionTime = completedAssignments.length > 0
+        ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
+        : null;
+
       // Aggregate sales stats
       const userLeads = (clients || []).filter(c => c.sales_rep_id === user.id);
       const leadsManaged = userLeads.length;
@@ -116,6 +143,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
       const closedRevenue = userContracts.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
       const conversionRate = leadsManaged > 0 ? Math.round((dealsWon / leadsManaged) * 100) : 0;
+      const meetingsDone = userLeads.filter(c => c.pipeline_stage === 'meeting_done').length;
 
       return {
         user,
@@ -124,14 +152,18 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
           completedTasks,
           incompleteTasks,
           completionRate,
-          averageRating
+          averageRating,
+          averageCompletionTime,
+          taskTarget: targetMap.get(user.id) || null
         },
         salesStats: {
           leadsManaged,
           callsLogged,
           dealsWon,
           closedRevenue,
-          conversionRate
+          conversionRate,
+          salesTarget: salesTargetMap.get(user.id) || null,
+          meetingsDone
         }
       };
     });

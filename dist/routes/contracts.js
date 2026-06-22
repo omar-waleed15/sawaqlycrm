@@ -84,10 +84,13 @@ router.get('/finance-stats', auth_1.authMiddleware, roleCheck_1.ownerOrSales, as
                 .lt('date', end);
             const { data: salaries, error: salError } = await supabase_1.supabaseAdmin
                 .from('salaries')
-                .select('amount')
+                .select('amount, penalties:salary_penalties(amount)')
                 .eq('month', start);
             if (!expError && !salError) {
-                const totalSalaries = (salaries || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+                const totalSalaries = (salaries || []).reduce((sum, s) => {
+                    const penaltySum = s.penalties ? s.penalties.reduce((pSum, p) => pSum + (Number(p.amount) || 0), 0) : 0;
+                    return sum + Math.max(0, (Number(s.amount) || 0) - penaltySum);
+                }, 0);
                 const totalOther = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
                 totalExpensesThisMonth = totalSalaries + totalOther;
             }

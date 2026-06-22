@@ -8,7 +8,8 @@ const router = (0, express_1.Router)();
 const SALARY_SELECT = `
   *,
   user:profiles!salaries_user_id_fkey(id, name, email, role, avatar_url),
-  installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at)
+  installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at),
+  penalties:salary_penalties(id, salary_id, amount, notes, created_at)
 `;
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
 router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
@@ -226,6 +227,52 @@ router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (re
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to delete salary record' });
+    }
+});
+// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner only)
+router.post('/:id/penalties', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+    const { id } = req.params;
+    const { amount, notes } = req.body;
+    if (amount === undefined || isNaN(Number(amount))) {
+        res.status(400).json({ error: 'Amount is required and must be a number' });
+        return;
+    }
+    try {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('salary_penalties')
+            .insert({
+            salary_id: id,
+            amount: Number(amount),
+            notes: notes || null
+        })
+            .select('*')
+            .single();
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        res.status(201).json({ penalty: data });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to create penalty' });
+    }
+});
+// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner only)
+router.delete('/:id/penalties/:penaltyId', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+    const { penaltyId } = req.params;
+    try {
+        const { error } = await supabase_1.supabaseAdmin
+            .from('salary_penalties')
+            .delete()
+            .eq('id', penaltyId);
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        res.json({ message: 'Penalty deleted successfully' });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to delete penalty' });
     }
 });
 exports.default = router;

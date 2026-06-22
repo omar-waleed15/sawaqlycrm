@@ -250,6 +250,14 @@ export default function TeamPage() {
     }).format(val);
   };
 
+  const formatDuration = (totalSeconds: number): string => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const pad = (num: number) => String(num).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  };
+
   const renderPerformanceView = () => {
     const taskPerformers = performanceData.filter(p => p.user.role !== 'sales');
     const salesPerformers = performanceData.filter(p => p.user.role === 'sales');
@@ -343,7 +351,10 @@ export default function TeamPage() {
                           <th className="py-3 px-4 text-start font-semibold">{t('team.totalTasks')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.completedTasks')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.incompleteTasks')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.targetColumn')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.progressColumn')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.completionRate')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.avgCompletionTime')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.avgRating')}</th>
                         </tr>
                       </thead>
@@ -389,6 +400,32 @@ export default function TeamPage() {
                               <td className="py-3 px-4 text-start text-muted-foreground font-semibold tabular-nums">
                                 {p.taskStats.incompleteTasks}
                               </td>
+                              <td className="py-3 px-4 text-start font-semibold text-foreground tabular-nums">
+                                {p.taskStats.taskTarget !== null ? p.taskStats.taskTarget : (
+                                  <span className="text-xs text-muted-foreground italic">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-start">
+                                {p.taskStats.taskTarget !== null && p.taskStats.taskTarget > 0 ? (() => {
+                                  const targetProgressRate = Math.round((p.taskStats.completedTasks / p.taskStats.taskTarget) * 100);
+                                  const barColor =
+                                    targetProgressRate >= 100 ? 'bg-emerald-500' :
+                                    targetProgressRate >= 75 ? 'bg-indigo-500' :
+                                    targetProgressRate >= 40 ? 'bg-amber-500' : 'bg-rose-500';
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(targetProgressRate, 100)}%` }} />
+                                      </div>
+                                      <span className="text-xs font-bold text-foreground tabular-nums whitespace-nowrap">
+                                        {p.taskStats.completedTasks}/{p.taskStats.taskTarget}
+                                      </span>
+                                    </div>
+                                  );
+                                })() : (
+                                  <span className="text-xs text-muted-foreground italic">{t('taskTarget.noTarget')}</span>
+                                )}
+                              </td>
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-2">
                                   <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
@@ -396,6 +433,15 @@ export default function TeamPage() {
                                   </div>
                                   <span className="text-xs font-bold text-foreground tabular-nums">{rate}%</span>
                                 </div>
+                              </td>
+                              <td className="py-3 px-4 text-start">
+                                {p.taskStats.averageCompletionTime !== null ? (
+                                  <span className="text-xs font-semibold text-foreground tabular-nums">
+                                    ⏱️ {formatDuration(p.taskStats.averageCompletionTime)}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">—</span>
+                                )}
                               </td>
                               <td className="py-3 px-4 text-start">
                                 {p.taskStats.averageRating !== null ? (
@@ -435,6 +481,8 @@ export default function TeamPage() {
                           <th className="py-3 px-4 text-start font-semibold">{t('team.callsLogged')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.dealsWon')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.closedRevenue')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.targetColumn')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.progressColumn')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.conversionRate')}</th>
                         </tr>
                       </thead>
@@ -478,6 +526,34 @@ export default function TeamPage() {
                               </td>
                               <td className="py-3 px-4 text-start font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
                                 {formatCurrency(p.salesStats.closedRevenue)}
+                              </td>
+                              <td className="py-3 px-4 text-start font-semibold text-foreground tabular-nums">
+                                {p.salesStats.salesTarget !== null ? (
+                                  `${p.salesStats.salesTarget} ${t('sales.meetings')}`
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-start">
+                                {p.salesStats.salesTarget !== null && p.salesStats.salesTarget > 0 ? (() => {
+                                  const targetProgressRate = Math.round((p.salesStats.meetingsDone / p.salesStats.salesTarget) * 100);
+                                  const progressColor =
+                                    targetProgressRate >= 100 ? 'bg-emerald-500' :
+                                    targetProgressRate >= 75 ? 'bg-indigo-500' :
+                                    targetProgressRate >= 40 ? 'bg-amber-500' : 'bg-rose-500';
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${progressColor}`} style={{ width: `${Math.min(targetProgressRate, 100)}%` }} />
+                                      </div>
+                                      <span className="text-xs font-bold text-foreground tabular-nums whitespace-nowrap">
+                                        {p.salesStats.meetingsDone}/{p.salesStats.salesTarget}
+                                      </span>
+                                    </div>
+                                  );
+                                })() : (
+                                  <span className="text-xs text-muted-foreground italic">{t('sales.noTarget')}</span>
+                                )}
                               </td>
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-2">

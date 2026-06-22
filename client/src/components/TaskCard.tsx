@@ -60,6 +60,14 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskDeleted }: TaskCardProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -73,6 +81,23 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
     (user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') &&
     !myAssignment
   );
+
+  // Determine logged time text
+  let loggedTimeText = '';
+  const totalLoggedSeconds = task.task_assignees?.reduce((sum, a) => sum + (a.total_time_spent || 0), 0) || 0;
+  if (isOwner) {
+    if (totalLoggedSeconds > 0) {
+      loggedTimeText = `${formatDuration(totalLoggedSeconds)} (${locale === 'ar' ? 'الإجمالي' : 'total'})`;
+    }
+  } else if (myAssignment) {
+    const mySeconds = myAssignment.total_time_spent || 0;
+    if (mySeconds > 0 || myAssignment.timer_started_at) {
+      loggedTimeText = formatDuration(mySeconds);
+      if (myAssignment.timer_started_at) {
+        loggedTimeText += ` (${locale === 'ar' ? 'نشط' : 'active'})`;
+      }
+    }
+  }
 
   // moderation roles cannot archive/restore tasks
   const canArchive = isOwner && user?.role !== 'moderation';
@@ -331,11 +356,19 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
           {/* Bottom/Footer Section */}
           <div className="flex items-center justify-between pt-3 border-t border-border mt-1">
             {/* Creator Profile */}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">{t('tasks.from')}</span>
-              <span className="text-xs text-muted-foreground font-medium truncate" title={task.creator?.name || 'Unknown'}>
-                {task.creator?.name || 'Unknown'}
-              </span>
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">{t('tasks.from')}</span>
+                <span className="text-xs text-muted-foreground font-medium truncate" title={task.creator?.name || 'Unknown'}>
+                  {task.creator?.name || 'Unknown'}
+                </span>
+              </div>
+              {loggedTimeText && (
+                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 mt-0.5 select-none">
+                  <span>⏱️</span>
+                  <span>{loggedTimeText}</span>
+                </div>
+              )}
             </div>
 
             {/* Assignees stacked avatar group */}

@@ -26,6 +26,140 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch users' });
     }
 });
+// GET /api/users/performance — Get performance stats for team members (owner only)
+router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+    const { startDate, endDate } = req.query;
+    try {
+        const sDate = startDate ? String(startDate) : undefined;
+        const eDate = endDate ? String(endDate) : undefined;
+        const currentMonthStr = new Date().toISOString().substring(0, 7);
+        // 1. Fetch profiles
+        const profilesPromise = supabase_1.supabaseAdmin
+            .from('profiles')
+            .select('id, name, email, role, avatar_url, created_at')
+            .order('created_at', { ascending: false });
+        // 2. Fetch task assignees within the date window
+        let assigneesQuery = supabase_1.supabaseAdmin
+            .from('task_assignees')
+            .select('user_id, status, rating, assigned_at, total_time_spent');
+        if (sDate)
+            assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
+        if (eDate)
+            assigneesQuery = assigneesQuery.lte('assigned_at', eDate);
+        // 3. Fetch clients (leads) within the date window
+        let clientsQuery = supabase_1.supabaseAdmin
+            .from('clients')
+            .select('sales_rep_id, created_at, pipeline_stage');
+        if (sDate)
+            clientsQuery = clientsQuery.gte('created_at', sDate);
+        if (eDate)
+            clientsQuery = clientsQuery.lte('created_at', eDate);
+        // 4. Fetch call logs within the date window
+        let callsQuery = supabase_1.supabaseAdmin
+            .from('sales_call_logs')
+            .select('sales_rep_id, call_date');
+        if (sDate)
+            callsQuery = callsQuery.gte('call_date', sDate);
+        if (eDate)
+            callsQuery = callsQuery.lte('call_date', eDate);
+        // 5. Fetch contracts within the date window
+        let contractsQuery = supabase_1.supabaseAdmin
+            .from('contracts')
+            .select('sales_rep_id, amount, created_at');
+        if (sDate)
+            contractsQuery = contractsQuery.gte('created_at', sDate);
+        if (eDate)
+            contractsQuery = contractsQuery.lte('created_at', eDate);
+        // 6. Fetch task targets for the current month
+        const targetsPromise = supabase_1.supabaseAdmin
+            .from('task_targets')
+            .select('user_id, target_tasks')
+            .eq('month', currentMonthStr);
+        // 7. Fetch sales targets for the current month
+        const salesTargetsPromise = supabase_1.supabaseAdmin
+            .from('sales_targets')
+            .select('user_id, target_amount')
+            .eq('month', currentMonthStr);
+        const [{ data: profiles, error: profilesErr }, { data: assignees, error: assigneesErr }, { data: clients, error: clientsErr }, { data: calls, error: callsErr }, { data: contracts, error: contractsErr }, { data: targets, error: targetsErr }, { data: salesTargets, error: salesTargetsErr }] = await Promise.all([
+            profilesPromise,
+            assigneesQuery,
+            clientsQuery,
+            callsQuery,
+            contractsQuery,
+            targetsPromise,
+            salesTargetsPromise
+        ]);
+        if (profilesErr)
+            throw profilesErr;
+        if (assigneesErr)
+            throw assigneesErr;
+        if (clientsErr)
+            throw clientsErr;
+        if (callsErr)
+            throw callsErr;
+        if (contractsErr)
+            throw contractsErr;
+        if (targetsErr)
+            throw targetsErr;
+        if (salesTargetsErr)
+            throw salesTargetsErr;
+        const targetMap = new Map((targets || []).map(t => [t.user_id, t.target_tasks]));
+        const salesTargetMap = new Map((salesTargets || []).map(t => [t.user_id, Number(t.target_amount)]));
+        // Map profiles to performance stats
+        const performanceData = (profiles || []).map(user => {
+            // Aggregate task stats
+            const userAssignments = (assignees || []).filter(a => a.user_id === user.id);
+            const totalTasks = userAssignments.length;
+            const completedTasks = userAssignments.filter(a => a.status === 'completed').length;
+            const incompleteTasks = totalTasks - completedTasks;
+            const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            const ratedAssignments = userAssignments.filter(a => a.rating !== null && a.rating !== undefined);
+            const averageRating = ratedAssignments.length > 0
+                ? Math.round((ratedAssignments.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedAssignments.length) * 10) / 10
+                : null;
+            const completedAssignments = userAssignments.filter(a => a.status === 'completed');
+            const averageCompletionTime = completedAssignments.length > 0
+                ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
+                : null;
+            // Aggregate sales stats
+            const userLeads = (clients || []).filter(c => c.sales_rep_id === user.id);
+            const leadsManaged = userLeads.length;
+            const userCalls = (calls || []).filter(c => c.sales_rep_id === user.id);
+            const callsLogged = userCalls.length;
+            const userContracts = (contracts || []).filter(c => c.sales_rep_id === user.id);
+            const dealsWon = userContracts.length;
+            const closedRevenue = userContracts.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+            const conversionRate = leadsManaged > 0 ? Math.round((dealsWon / leadsManaged) * 100) : 0;
+            const meetingsDone = userLeads.filter(c => c.pipeline_stage === 'meeting_done').length;
+            return {
+                user,
+                taskStats: {
+                    totalTasks,
+                    completedTasks,
+                    incompleteTasks,
+                    completionRate,
+                    averageRating,
+                    averageCompletionTime,
+                    taskTarget: targetMap.get(user.id) || null
+                },
+                salesStats: {
+                    leadsManaged,
+                    callsLogged,
+                    dealsWon,
+                    closedRevenue,
+                    conversionRate,
+                    salesTarget: salesTargetMap.get(user.id) || null,
+                    meetingsDone
+                }
+            };
+        });
+        res.json({ performance: performanceData });
+    }
+    catch (err) {
+        console.error('Failed to compile performance stats:', err);
+        res.status(500).json({ error: err.message || 'Failed to fetch performance data' });
+    }
+});
 // POST /api/users — Create a new team member (owner only)
 router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
     const { name, email, password, role } = req.body;

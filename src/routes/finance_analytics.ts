@@ -15,7 +15,7 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
     const [contractsRes, expensesRes, salariesRes, clientsRes] = await Promise.all([
       supabaseAdmin.from('contracts').select('*, installments:contract_installments(*), client:clients(*)'),
       supabaseAdmin.from('expenses').select('*'),
-      supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role)'),
+      supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount)'),
       supabaseAdmin.from('clients').select('*').eq('pipeline_stage', 'won'),
     ]);
 
@@ -184,16 +184,19 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
       const salMonth = sal.month ? sal.month.substring(0, 7) : null;
       if (!salMonth) return;
 
+      const penaltyTotal = sal.penalties ? sal.penalties.reduce((sum: number, p: any) => sum + Number(p.amount), 0) : 0;
+
       if (sal.is_recurring) {
+        const netAmt = Math.max(0, amt - penaltyTotal);
         if (monthlyData[salMonth]) {
-          monthlyData[salMonth].expenses += amt;
-          monthlyData[salMonth].salaries += amt;
-          allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) + amt;
+          monthlyData[salMonth].expenses += netAmt;
+          monthlyData[salMonth].salaries += netAmt;
+          allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) + netAmt;
         }
 
         // Count toward current month salary if this is a recurring record for current month
         if (salMonth === currentMonth) {
-          currentMonthSalaryTotal += amt;
+          currentMonthSalaryTotal += netAmt;
         }
 
         // Project salaries into future (recurring)
@@ -203,6 +206,16 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
         });
       } else {
         // One-time salary: installments
+        // Subtract penalties from the month the one-time salary applies to
+        if (monthlyData[salMonth]) {
+          monthlyData[salMonth].expenses -= penaltyTotal;
+          monthlyData[salMonth].salaries -= penaltyTotal;
+          allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) - penaltyTotal;
+        }
+        if (salMonth === currentMonth) {
+          currentMonthSalaryTotal -= penaltyTotal;
+        }
+
         const installments = salaryInstallmentsMap[sal.id] || [];
         installments.forEach((inst: any) => {
           if (!inst.due_date) return;
@@ -421,12 +434,13 @@ router.get('/custom-report', authMiddleware, ownerOnly, async (req: AuthRequest,
     const endMs = new Date(eDate).getTime();
 
     // Fetch in parallel
-    const [contractsRes, installmentsRes, expensesRes, salariesRes, salaryInstallmentsRes] = await Promise.all([
+    const [contractsRes, installmentsRes, expensesRes, salariesRes, salaryInstallmentsRes, penaltiesRes] = await Promise.all([
       supabaseAdmin.from('contracts').select('*, client:clients(name, company)'),
       supabaseAdmin.from('contract_installments').select('*, contract:contracts(name, is_recurring, client:clients(name, company))').gte('due_date', sDate).lte('due_date', eDate),
       supabaseAdmin.from('expenses').select('*').gte('date', sDate).lte('date', eDate),
       supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(name)').gte('month', sDate).lte('month', eDate),
       supabaseAdmin.from('salary_installments').select('*, salary:salaries(user:profiles!salaries_user_id_fkey(name))').gte('due_date', sDate).lte('due_date', eDate),
+      supabaseAdmin.from('salary_penalties').select('*, salary:salaries(user:profiles!salaries_user_id_fkey(name))').gte('created_at', sDate).lte('created_at', eDate + 'T23:59:59'),
     ]);
 
     if (contractsRes.error) throw contractsRes.error;
@@ -434,6 +448,7 @@ router.get('/custom-report', authMiddleware, ownerOnly, async (req: AuthRequest,
     if (expensesRes.error) throw expensesRes.error;
     if (salariesRes.error) throw salariesRes.error;
     if (salaryInstallmentsRes.error) throw salaryInstallmentsRes.error;
+    if (penaltiesRes.error) throw penaltiesRes.error;
 
     const lineItems: any[] = [];
 
@@ -540,6 +555,22 @@ router.get('/custom-report', authMiddleware, ownerOnly, async (req: AuthRequest,
         amount: Number(inst.amount),
         date: inst.due_date,
         status: inst.paid ? 'paid' : 'unpaid'
+      });
+    });
+
+    // 6. Process Salary Penalties
+    (penaltiesRes.data || []).forEach((p: any) => {
+      const penaltyDate = p.created_at ? p.created_at.substring(0, 10) : sDate;
+      const employeeName = p.salary?.user?.name || 'Team Member';
+      lineItems.push({
+        id: `salary-penalty-${p.id}`,
+        name: `Salary Penalty - ${employeeName}`,
+        category: 'penalty',
+        type: 'expense',
+        amount: -Number(p.amount), // negative expense to reduce total expenses
+        date: penaltyDate,
+        status: 'deducted',
+        notes: p.notes || ''
       });
     });
 

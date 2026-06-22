@@ -113,6 +113,19 @@ export const tasksApi = {
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'DELETE' }),
   updateAssignee: (taskId: string, userId: string, data: { status?: string; feedback?: string; rating?: number }) =>
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees/${userId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  startTimer: (id: string) =>
+    request<{ task: import('@/types').Task }>(`/tasks/${id}/timer/start`, { method: 'POST' }),
+  stopTimer: (id: string) =>
+    request<{ task: import('@/types').Task }>(`/tasks/${id}/timer/stop`, { method: 'POST' }),
+  getTarget: (userId: string, month: string) =>
+    request<{ target: import('@/types').TaskTarget | null }>(`/tasks/target/${userId}/${month}`),
+  setTarget: (userId: string, month: string, targetTasks: number) =>
+    request<{ target: import('@/types').TaskTarget }>('/tasks/target', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, month, target_tasks: targetTasks }),
+    }),
+  getProgress: (userId: string, month: string) =>
+    request<{ target: number; completedTasks: number; progressPercent: number }>(`/tasks/target/${userId}/${month}/progress`),
 };
 
 // Comments
@@ -145,6 +158,8 @@ export const clientsApi = {
   update: (id: string, data: Partial<import('@/types').Client>) =>
     request<{ client: import('@/types').Client }>(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/clients/${id}`, { method: 'DELETE' }),
+  customReport: (startDate: string, endDate: string) =>
+    request<{ clients: any[] }>(`/clients/reports/custom?startDate=${startDate}&endDate=${endDate}`),
 };
 
 // Projects
@@ -210,6 +225,10 @@ export const salariesApi = {
   delete: (id: string) => request(`/salaries/${id}`, { method: 'DELETE' }),
   markInstallmentPaid: (salaryId: string, instId: string, paid: boolean) =>
     request(`/salaries/${salaryId}/installments/${instId}/paid`, { method: 'PATCH', body: JSON.stringify({ paid }) }),
+  createPenalty: (salaryId: string, data: { amount: number; notes?: string }) =>
+    request<{ penalty: import('@/types').SalaryPenalty }>(`/salaries/${salaryId}/penalties`, { method: 'POST', body: JSON.stringify(data) }),
+  deletePenalty: (salaryId: string, id: string) =>
+    request(`/salaries/${salaryId}/penalties/${id}`, { method: 'DELETE' }),
 };
 
 // Finance Analytics

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState, useMemo, Fragment } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { clientsApi, projectsApi, contractsApi, expensesApi, salariesApi, usersApi, financeAnalyticsApi } from '@/lib/api';
 import { Client, Project, Contract, FinanceStats, Expense, Salary, User, ExpenseCategory, FinanceAnalyticsPayload } from '@/types';
 import Modal from '@/components/Modal';
 import { useLanguage } from '@/lib/i18n';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MoreVertical } from 'lucide-react';
 import { getCairoTodayString, formatCairoDate, getCairoDateParts } from '@/lib/dateUtils';
 
 function formatCurrency(amount: number, locale?: string): string {
@@ -89,6 +90,7 @@ export default function FinanceDashboardPage() {
     'recurring_contracts',
     'one_time_contracts',
     'salaries',
+    'penalty',
     'ads',
     'software',
     'office',
@@ -182,6 +184,78 @@ export default function FinanceDashboardPage() {
 
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
+  
+  // Penalties State variables
+  const [activeSalaryActionId, setActiveSalaryActionId] = useState<string | null>(null);
+  const [activeSalaryForMenu, setActiveSalaryForMenu] = useState<Salary | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [penaltyModalOpen, setPenaltyModalOpen] = useState(false);
+  const [selectedSalaryForPenalties, setSelectedSalaryForPenalties] = useState<Salary | null>(null);
+  const [submittingPenalty, setSubmittingPenalty] = useState(false);
+  const [penaltyErrorMsg, setPenaltyErrorMsg] = useState('');
+
+  const handleDropdownClick = (e: React.MouseEvent<HTMLButtonElement>, salary: Salary) => {
+    e.stopPropagation();
+    if (activeSalaryActionId === salary.id) {
+      setActiveSalaryActionId(null);
+      setActiveSalaryForMenu(null);
+      setMenuPosition(null);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const menuWidth = 145;
+      const menuHeight = 120; // approximate height of our 3-item dropdown menu
+      
+      // Calculate horizontal position (align right of button, or left if overflows left)
+      let left = rect.right - menuWidth + window.scrollX;
+      if (left < 0) {
+        left = rect.left + window.scrollX;
+      }
+      
+      // Calculate vertical position (open downwards by default, upwards if overflows bottom)
+      const spaceBelow = window.innerHeight - rect.bottom;
+      let top = rect.bottom + window.scrollY + 4;
+      if (spaceBelow < menuHeight + 10 && rect.top > menuHeight + 10) {
+        // Open upwards instead
+        top = rect.top - menuHeight + window.scrollY - 4;
+      }
+      
+      setMenuPosition({ top, left });
+      setActiveSalaryActionId(salary.id);
+      setActiveSalaryForMenu(salary);
+    }
+  };
+
+  useEffect(() => {
+    const handleClose = (e: Event) => {
+      // Close on scroll or resize only if it's at the window/document level
+      if (e.type === 'scroll' && e.target !== window && e.target !== document) {
+        return;
+      }
+      setActiveSalaryActionId(null);
+      setActiveSalaryForMenu(null);
+      setMenuPosition(null);
+    };
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Close if clicked outside both the menu and the trigger button
+      if (activeSalaryActionId && !target.closest('.dropdown-portal-menu') && !target.closest('.dropdown-trigger-btn')) {
+        handleClose(e);
+      }
+    };
+
+    if (activeSalaryActionId) {
+      document.addEventListener('click', handleOutsideClick, true);
+      window.addEventListener('scroll', handleClose, true);
+      window.addEventListener('resize', handleClose);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleOutsideClick, true);
+      window.removeEventListener('scroll', handleClose, true);
+      window.removeEventListener('resize', handleClose);
+    };
+  }, [activeSalaryActionId]);
   
   // Search states
   const [projectSearch, setProjectSearch] = useState('');
@@ -330,6 +404,7 @@ export default function FinanceDashboardPage() {
       case 'recurring_contracts': return '🔄 ' + t('finance.recurring');
       case 'one_time_contracts': return '💳 ' + t('finance.oneTime');
       case 'salaries': return '👤 ' + t('finance.salariesTab');
+      case 'penalty': return '⚠️ Penalty';
       case 'ads': return '📣 Ads';
       case 'software': return '🖥️ Software';
       case 'office': return '🏢 Office';
@@ -378,6 +453,7 @@ export default function FinanceDashboardPage() {
       { key: 'recurring_contracts', label: '🔄 ' + t('finance.recurring') },
       { key: 'one_time_contracts', label: '💳 ' + t('finance.oneTime') },
       { key: 'salaries', label: '👤 ' + t('finance.salariesTab') },
+      { key: 'penalty', label: '⚠️ Penalty' },
       { key: 'ads', label: '📣 Ads Spend' },
       { key: 'software', label: '🖥️ Software' },
       { key: 'office', label: '🏢 Office' },
@@ -423,8 +499,11 @@ export default function FinanceDashboardPage() {
         const descStr = `${nameStr}${notesStr}`;
         const catLabel = getCategoryLabel(item.category);
         const typeStr = item.type === 'income' ? t('finance.income') : t('finance.expense');
-        const statusStr = item.status === 'paid' ? t('finance.paid') : item.status === 'active' ? t('clients.active') : t('finance.unpaid');
-        const amtStr = `${item.type === 'income' ? '+' : '-'}${item.amount}`;
+        const statusStr = item.status === 'paid' ? t('finance.paid') :
+                          item.status === 'active' ? t('clients.active') :
+                          item.status === 'deducted' ? 'Deducted' :
+                          t('finance.unpaid');
+        const amtStr = `${item.type === 'income' ? '+' : '-'}${Math.abs(item.amount)}`;
         
         csvContent += `"${dateStr}","${descStr}","${catLabel}","${typeStr}","${statusStr}","${amtStr}"\n`;
       });
@@ -829,17 +908,21 @@ export default function FinanceDashboardPage() {
                             fontWeight: 600,
                             backgroundColor:
                               item.status === 'paid' ? '#f0fdf4' :
-                              item.status === 'active' ? '#eff6ff' : '#fff7ed',
+                              item.status === 'active' ? '#eff6ff' :
+                              item.status === 'deducted' ? '#fff1f2' : '#fff7ed',
                             color:
                               item.status === 'paid' ? '#15803d' :
-                              item.status === 'active' ? '#1d4ed8' : '#c2410c',
+                              item.status === 'active' ? '#1d4ed8' :
+                              item.status === 'deducted' ? '#e11d48' : '#c2410c',
                             border: `1px solid ${
                               item.status === 'paid' ? '#bbf7d0' :
-                              item.status === 'active' ? '#bfdbfe' : '#ffedd5'
+                              item.status === 'active' ? '#bfdbfe' :
+                              item.status === 'deducted' ? '#fda4af' : '#ffedd5'
                             }`
                           }}>
                             {item.status === 'paid' ? t('finance.paid') :
-                             item.status === 'active' ? t('clients.active') : t('finance.unpaid')}
+                             item.status === 'active' ? t('clients.active') :
+                             item.status === 'deducted' ? 'Deducted' : t('finance.unpaid')}
                           </span>
                         </td>
                         <td style={{
@@ -849,7 +932,7 @@ export default function FinanceDashboardPage() {
                           color: item.type === 'income' ? '#16a34a' : '#e11d48',
                           fontFamily: 'monospace'
                         }}>
-                          {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount, locale)}
+                          {item.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(item.amount), locale)}
                         </td>
                       </tr>
                     ))}
@@ -1295,6 +1378,68 @@ export default function FinanceDashboardPage() {
       loadData(true);
     } catch (err) {
       alert('Failed to delete salary record');
+    }
+  };
+
+  const handleAddPenalty = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedSalaryForPenalties) return;
+    const form = e.currentTarget;
+    const amountVal = (form.elements.namedItem('amount') as HTMLInputElement).value;
+    const notesVal = (form.elements.namedItem('notes') as HTMLInputElement).value;
+
+    if (!amountVal || isNaN(Number(amountVal))) {
+      setPenaltyErrorMsg('Please enter a valid amount.');
+      return;
+    }
+
+    try {
+      setSubmittingPenalty(true);
+      setPenaltyErrorMsg('');
+      const res = await salariesApi.createPenalty(selectedSalaryForPenalties.id, {
+        amount: Number(amountVal),
+        notes: notesVal || undefined,
+      });
+
+      // Update local state reactively
+      const updatedPenalties = [...(selectedSalaryForPenalties.penalties || []), res.penalty];
+      const updatedSalary = { ...selectedSalaryForPenalties, penalties: updatedPenalties };
+      
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForPenalties.id ? updatedSalary : s));
+      setSelectedSalaryForPenalties(updatedSalary);
+      form.reset();
+      
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setPenaltyErrorMsg(err.message || 'Failed to add penalty');
+    } finally {
+      setSubmittingPenalty(false);
+    }
+  };
+
+  const handleDeletePenalty = async (penaltyId: string) => {
+    if (!selectedSalaryForPenalties) return;
+    if (!window.confirm('Are you sure you want to delete this penalty?')) return;
+
+    try {
+      setSubmittingPenalty(true);
+      setPenaltyErrorMsg('');
+      await salariesApi.deletePenalty(selectedSalaryForPenalties.id, penaltyId);
+
+      // Update local state reactively
+      const updatedPenalties = (selectedSalaryForPenalties.penalties || []).filter(p => p.id !== penaltyId);
+      const updatedSalary = { ...selectedSalaryForPenalties, penalties: updatedPenalties };
+
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForPenalties.id ? updatedSalary : s));
+      setSelectedSalaryForPenalties(updatedSalary);
+      
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setPenaltyErrorMsg(err.message || 'Failed to delete penalty');
+    } finally {
+      setSubmittingPenalty(false);
     }
   };
 
@@ -2642,11 +2787,11 @@ export default function FinanceDashboardPage() {
                   fontWeight: 600,
                   color: 'var(--color-text-secondary)'
                 }}>
-                  <div>Total Salary Cost: <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(salaries.reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
+                  <div>Total Salary Cost: <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(salaries.reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
                   <div>•</div>
-                  <div>Paid: <span style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
+                  <div>Paid: <span style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
                   <div>•</div>
-                  <div>Unpaid: <span style={{ fontWeight: 700, color: '#ea580c' }}>{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount, 0), locale)}</span></div>
+                  <div>Unpaid: <span style={{ fontWeight: 700, color: '#ea580c' }}>{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
                 </div>
                 <div style={{ flex: 1 }} />
                 <button
@@ -2693,7 +2838,12 @@ export default function FinanceDashboardPage() {
                             </div>
                           </td>
                           <td style={{ padding: '16px 16px', fontWeight: 700, textAlign: 'start' }}>
-                            {formatCurrency(s.amount, locale)}
+                            <div>{formatCurrency(s.amount, locale)}</div>
+                            {user?.role === 'owner' && s.penalties && s.penalties.length > 0 && (
+                              <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#e11d48', marginTop: 2 }}>
+                                Net: {formatCurrency(s.amount - s.penalties.reduce((sum, p) => sum + Number(p.amount), 0), locale)}
+                              </div>
+                            )}
                           </td>
                           <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2731,9 +2881,15 @@ export default function FinanceDashboardPage() {
                             {s.note || '—'}
                           </td>
                           <td style={{ padding: '16px 16px', textAlign: 'end' }}>
-                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                              <button className="btn btn-secondary btn-sm" onClick={() => { resetSalaryForm(s); setSalaryModalOpen(true); }}>{t('common.edit')}</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSalary(s.id, s.user?.name || 'this member')}>{t('common.delete')}</button>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm dropdown-trigger-btn"
+                                style={{ padding: '6px 8px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                onClick={(e) => handleDropdownClick(e, s)}
+                              >
+                                <MoreVertical className="size-4" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -3273,6 +3429,219 @@ export default function FinanceDashboardPage() {
           </div>
         </form>
       </Modal>
+
+      {/* ── PENALTIES MODAL ── */}
+      <Modal
+        isOpen={penaltyModalOpen}
+        onClose={() => { setPenaltyModalOpen(false); setSelectedSalaryForPenalties(null); }}
+        title={`Penalties Log - ${selectedSalaryForPenalties?.user?.name || ''}`}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
+          {penaltyErrorMsg && (
+            <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>
+              {penaltyErrorMsg}
+            </div>
+          )}
+
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.875rem', fontWeight: 700 }}>Deductions List</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              {selectedSalaryForPenalties?.penalties && selectedSalaryForPenalties.penalties.map(p => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    background: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ textAlign: 'start' }}>
+                    <span style={{ fontWeight: 700, color: '#e11d48', marginRight: 8 }}>
+                      -{formatCurrency(p.amount, locale)}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginRight: 8 }}>
+                      ({p.created_at ? formatDate(p.created_at.substring(0, 10), locale) : ''})
+                    </span>
+                    {p.notes && (
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        {p.notes}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      color: '#e11d48',
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      padding: '4px 8px'
+                    }}
+                    disabled={submittingPenalty}
+                    onClick={() => handleDeletePenalty(p.id)}
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              ))}
+              {(!selectedSalaryForPenalties?.penalties || selectedSalaryForPenalties.penalties.length === 0) && (
+                <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                  No penalties logged for this month.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+
+          <form onSubmit={handleAddPenalty} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>Add Penalty</h4>
+            
+            <div className="form-group text-start">
+              <label className="form-label">Penalty Amount ($) *</label>
+              <input
+                type="number"
+                name="amount"
+                className="form-input"
+                placeholder="e.g. 50"
+                required
+                min="1"
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div className="form-group text-start">
+              <label className="form-label">Notes / Cause (Optional)</label>
+              <input
+                type="text"
+                name="notes"
+                className="form-input"
+                placeholder="e.g. Late to weekly sync"
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={submittingPenalty}
+                onClick={() => { setPenaltyModalOpen(false); setSelectedSalaryForPenalties(null); }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="btn btn-danger"
+                disabled={submittingPenalty}
+              >
+                {submittingPenalty ? t('clients.savingProgress') : 'Add Penalty'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {activeSalaryActionId && menuPosition && activeSalaryForMenu && createPortal(
+        <div className="dropdown-portal-menu" style={{
+          position: 'absolute',
+          top: menuPosition.top,
+          left: menuPosition.left,
+          zIndex: 9999,
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-md)',
+          padding: 4,
+          minWidth: 145,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
+        }}>
+          <button
+            type="button"
+            style={{
+              textAlign: 'start',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'none',
+              border: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: 'var(--color-text-primary)',
+              cursor: 'pointer',
+              width: '100%',
+              transition: 'background-color 0.2s',
+            }}
+            className="hover:bg-muted/10"
+            onClick={() => {
+              setActiveSalaryActionId(null);
+              resetSalaryForm(activeSalaryForMenu);
+              setSalaryModalOpen(true);
+            }}
+          >
+            ✏️ {t('common.edit')}
+          </button>
+          {user?.role === 'owner' && (
+            <button
+              type="button"
+              style={{
+                textAlign: 'start',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'none',
+                border: 'none',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                color: '#e11d48',
+                cursor: 'pointer',
+                width: '100%',
+                transition: 'background-color 0.2s',
+              }}
+              className="hover:bg-red-50 dark:hover:bg-red-950/20"
+              onClick={() => {
+                setActiveSalaryActionId(null);
+                setSelectedSalaryForPenalties(activeSalaryForMenu);
+                setPenaltyModalOpen(true);
+              }}
+            >
+              ⚠️ Penalties ({activeSalaryForMenu.penalties?.length || 0})
+            </button>
+          )}
+          <button
+            type="button"
+            style={{
+              textAlign: 'start',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'none',
+              border: 'none',
+              fontSize: '0.8125rem',
+              fontWeight: 500,
+              color: '#be123c',
+              cursor: 'pointer',
+              width: '100%',
+              transition: 'background-color 0.2s',
+            }}
+            className="hover:bg-red-50 dark:hover:bg-red-950/20"
+            onClick={() => {
+              setActiveSalaryActionId(null);
+              handleDeleteSalary(activeSalaryForMenu.id, activeSalaryForMenu.user?.name || 'this member');
+            }}
+          >
+            🗑️ {t('common.delete')}
+          </button>
+        </div>,
+        document.body
+      )}
+
+
     </div>
   );
 }

@@ -1,14 +1,15 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrSales } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrSales } from '../middleware/roleCheck';
 
 const router = Router();
 
 const SALARY_SELECT = `
   *,
   user:profiles!salaries_user_id_fkey(id, name, email, role, avatar_url),
-  installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at)
+  installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at),
+  penalties:salary_penalties(id, salary_id, amount, notes, created_at)
 `;
 
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
@@ -222,6 +223,59 @@ router.delete('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res
     res.json({ message: 'Salary record deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete salary record' });
+  }
+});
+
+// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner only)
+router.post('/:id/penalties', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { amount, notes } = req.body;
+
+  if (amount === undefined || isNaN(Number(amount))) {
+    res.status(400).json({ error: 'Amount is required and must be a number' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('salary_penalties')
+      .insert({
+        salary_id: id,
+        amount: Number(amount),
+        notes: notes || null
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.status(201).json({ penalty: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create penalty' });
+  }
+});
+
+// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner only)
+router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { penaltyId } = req.params;
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('salary_penalties')
+      .delete()
+      .eq('id', penaltyId);
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ message: 'Penalty deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete penalty' });
   }
 });
 

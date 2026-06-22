@@ -1,9 +1,48 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
 
 const router = Router();
+
+// GET /api/clients/reports/custom — Get custom client report (owner only)
+router.get('/reports/custom', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { startDate, endDate } = req.query;
+
+  if (!startDate || !endDate) {
+    res.status(400).json({ error: 'startDate and endDate query parameters are required' });
+    return;
+  }
+
+  try {
+    const sDate = String(startDate);
+    const eDate = String(endDate);
+
+    const { data: clients, error } = await supabaseAdmin
+      .from('clients')
+      .select('*, sales_rep:profiles(name), contracts(*)');
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    // Filter by created_at or start_date within the window in Cairo local timezone
+    const filtered = (clients || []).filter((c: any) => {
+      const cDate = c.created_at ? c.created_at.substring(0, 10) : null;
+      const sDateVal = c.start_date ? c.start_date.substring(0, 10) : null;
+
+      const createdInRange = cDate && cDate >= sDate && cDate <= eDate;
+      const startedInRange = sDateVal && sDateVal >= sDate && sDateVal <= eDate;
+
+      return createdInRange || startedInRange;
+    });
+
+    res.json({ clients: filtered });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch custom report' });
+  }
+});
 
 // GET /api/clients — List all clients
 router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (_req: AuthRequest, res: Response): Promise<void> => {

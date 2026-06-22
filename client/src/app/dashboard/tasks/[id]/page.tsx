@@ -51,6 +51,14 @@ function timeUntilExpiry(createdAt: string, t: any): string {
   return t('taskDetail.minsLeft', { mins });
 }
 
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -77,6 +85,30 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [approvalFeedback, setApprovalFeedback] = useState<Record<string, string>>({});
 
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [nowTime, setNowTime] = useState<number>(Date.now());
+  const [timerLoading, setTimerLoading] = useState(false);
+
+  // Ticking clock for active timers
+  useEffect(() => {
+    const hasActiveTimers = task?.task_assignees?.some(a => !!a.timer_started_at);
+    if (!hasActiveTimers) return;
+
+    const interval = setInterval(() => {
+      setNowTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [task?.task_assignees]);
+
+  const getAssigneeTime = (a: TaskAssignee): number => {
+    let elapsed = a.total_time_spent || 0;
+    if (a.timer_started_at) {
+      const started = new Date(a.timer_started_at).getTime();
+      const diffSeconds = Math.max(0, Math.floor((nowTime - started) / 1000));
+      elapsed += diffSeconds;
+    }
+    return elapsed;
+  };
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
@@ -162,6 +194,32 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       setTask(data.task);
     } catch (err) { console.error(err); }
     finally { setStatusUpdating(false); }
+  };
+
+  // Timer: start timer
+  const handleStartTimer = async () => {
+    setTimerLoading(true);
+    try {
+      const data = await tasksApi.startTimer(id);
+      setTask(data.task);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTimerLoading(false);
+    }
+  };
+
+  // Timer: stop/pause timer
+  const handleStopTimer = async () => {
+    setTimerLoading(true);
+    try {
+      const data = await tasksApi.stopTimer(id);
+      setTask(data.task);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTimerLoading(false);
+    }
   };
 
   // Admin: review actions
@@ -374,6 +432,60 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 </Card>
               )}
 
+              {/* Task Timer Card */}
+              {myAssignment.status === 'in_progress' && (
+                <Card className="border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-background to-indigo-50/10">
+                  {myAssignment.timer_started_at && (
+                    <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 animate-pulse" />
+                  )}
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">⏱️ {t('taskDetail.timer')}</span>
+                      {myAssignment.timer_started_at ? (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider select-none animate-pulse">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                          {t('taskDetail.timerRunning')}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-2 py-0.5 rounded-full uppercase tracking-wider select-none">
+                          {t('taskDetail.timerPaused')}
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase">{t('taskDetail.totalLoggedTime')}</span>
+                        <span className="text-3xl font-bold font-mono tracking-tight text-foreground mt-0.5 select-all">
+                          {formatDuration(getAssigneeTime(myAssignment))}
+                        </span>
+                      </div>
+                      
+                      {myAssignment.timer_started_at ? (
+                        <Button 
+                          onClick={handleStopTimer} 
+                          disabled={timerLoading}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 gap-1.5 shadow-sm transition-all"
+                        >
+                          {timerLoading ? <Loader2 className="size-4 animate-spin" /> : <span>⏸️</span>}
+                          {t('taskDetail.pauseTimer')}
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={handleStartTimer} 
+                          disabled={timerLoading}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 gap-1.5 shadow-sm transition-all"
+                        >
+                          {timerLoading ? <Loader2 className="size-4 animate-spin" /> : <span>▶️</span>}
+                          {t('taskDetail.startTimer')}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {myAssignment.status === 'todo' && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm">⚡ {t('taskDetail.resumeWorking')}</CardTitle></CardHeader>
@@ -450,6 +562,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     <p className="text-sm text-violet-800 mb-2">
                       {t('taskDetail.submittedPendingDesc')}
                     </p>
+                    <div className="text-xs font-bold text-violet-700 bg-white/60 border border-violet-200 rounded px-2.5 py-1 w-fit mb-3 flex items-center gap-1.5">
+                      ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
+                    </div>
                     {myAssignment.submission_link && (
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground font-medium">{t('taskDetail.yourSubmission')}</span>
@@ -473,15 +588,20 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-green-800">{t('taskDetail.approvedDesc')}</p>
-                    {myAssignment.rating !== undefined && myAssignment.rating !== null && (
-                      <div className="text-xs font-bold text-green-700 bg-white/60 border border-green-200 rounded px-2.5 py-1 w-fit mt-2 flex items-center gap-1">
-                        ⭐ {t('taskDetail.rating')}: {myAssignment.rating}/10
+                    <div className="flex gap-2 flex-wrap items-center mt-2 mb-1">
+                      {myAssignment.rating !== undefined && myAssignment.rating !== null && (
+                        <div className="text-xs font-bold text-green-700 bg-white/60 border border-green-200 rounded px-2.5 py-1 w-fit flex items-center gap-1">
+                          ⭐ {t('taskDetail.rating')}: {myAssignment.rating}/10
+                        </div>
+                      )}
+                      <div className="text-xs font-bold text-green-700 bg-white/60 border border-green-200 rounded px-2.5 py-1 w-fit flex items-center gap-1.5">
+                        ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                       </div>
-                    )}
+                    </div>
                     {myAssignment.completion_note && (
                       <div className="mt-3 border-t border-green-200 pt-3">
                         <span className="text-sm font-semibold text-green-700 block mb-1">💭 {t('taskDetail.finalThoughts')}</span>
-                        <p className="text-sm text-green-950 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{myAssignment.completion_note}</p>
+                        <p className="text-sm text-green-955 whitespace-pre-wrap bg-white/60 px-3 py-2 rounded-md">{myAssignment.completion_note}</p>
                       </div>
                     )}
                   </CardContent>
@@ -513,8 +633,22 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="text-sm font-bold">{a.user?.name}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase font-semibold">{a.user?.role}</div>
+                              <div className="text-sm font-bold flex items-center gap-2">
+                                {a.user?.name}
+                                {a.timer_started_at && (
+                                  <span className="flex items-center gap-0.5 text-[9px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-full select-none animate-pulse">
+                                    <span className="size-1 rounded-full bg-emerald-500 shrink-0" />
+                                    {t('taskDetail.timerRunning')}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-semibold">
+                                <span className="uppercase">{a.user?.role}</span>
+                                <span>·</span>
+                                <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                                  ⏱️ {formatDuration(getAssigneeTime(a))}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -806,6 +940,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold truncate">{a.user?.name}</div>
+                          {a.total_time_spent > 0 || a.timer_started_at ? (
+                            <div className="text-[10px] text-indigo-600 font-medium flex items-center gap-0.5">
+                              ⏱️ {formatDuration(getAssigneeTime(a))}
+                            </div>
+                          ) : null}
                         </div>
                         <StatusBadge status={a.status} />
                       </div>
