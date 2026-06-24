@@ -885,5 +885,20 @@ export const ar: Record<string, string> = {
   'taskTarget.updated': 'تم تحديث هدف المهام بنجاح!',
   'team.targetColumn': 'الهدف',
   'team.progressColumn': 'تقدم الهدف',
+
+  // مرفقات الملفات
+  'createTask.attachFiles': 'إرفاق ملفات',
+  'createTask.attachFilesDesc': 'رفع صور أو ملفات PDF (حد أقصى 20 ميغابايت لكل ملف)',
+  'createTask.selectedFiles': 'الملفات المختارة',
+  'createTask.browseFiles': 'تصفح الملفات',
+  'createTask.uploadingFiles': 'جاري رفع الملفات...',
+  'createTask.removeFile': 'إزالة',
+  'taskDetail.downloadFile': 'تحميل',
+  'taskDetail.openFile': 'فتح',
+  'taskDetail.deleteAttachmentConfirm': 'هل أنت متأكد من حذف هذا المرفق؟',
+  'taskDetail.fileSize': 'الحجم',
+  'taskDetail.existingAttachments': 'المرفقات الحالية',
+  'taskDetail.newFiles': 'ملفات جديدة للرفع',
+  'editTask.savingFailed': 'فشل في حفظ المهمة',
 };
 

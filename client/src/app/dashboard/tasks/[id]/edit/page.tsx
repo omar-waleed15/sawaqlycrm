@@ -4,8 +4,8 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, projectsApi } from '@/lib/api';
-import { User, Project } from '@/types';
+import { tasksApi, usersApi, projectsApi, attachmentsApi } from '@/lib/api';
+import { User, Project, Attachment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Save, Plus, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Plus, X, Paperclip, FileImage, FileText, Trash2 } from 'lucide-react';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -35,6 +35,9 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const [form, setForm] = useState({
     title: '',
@@ -87,6 +90,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       setAssigneeIds(existingIds);
       setMembers(usersData.users);
       setProjects(projectsData.projects);
+      setExistingAttachments(t.attachments || []);
     }).catch(() => router.replace('/dashboard/tasks'))
       .finally(() => setLoading(false));
   }, [id, user, router]);
@@ -105,6 +109,39 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
   const unassignedMembers = members.filter(m => !assigneeIds.includes(m.id));
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files).filter(f => {
+      if (f.size > 20 * 1024 * 1024) {
+        setError(`File "${f.name}" exceeds 20MB limit`);
+        return false;
+      }
+      return true;
+    });
+    setPendingFiles(prev => [...prev, ...newFiles]);
+    e.target.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!confirm(t('taskDetail.deleteAttachmentConfirm'))) return;
+    try {
+      await attachmentsApi.delete(id, attachmentId);
+      setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId));
+    } catch (err) {
+      console.error('Failed to delete attachment:', err);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -122,11 +159,25 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         project_id: (form.project_id && form.project_id !== 'none') ? form.project_id : undefined,
         assignee_ids: assigneeIds,
       });
+
+      // Upload pending files
+      if (pendingFiles.length > 0) {
+        setUploadProgress(t('createTask.uploadingFiles'));
+        for (const file of pendingFiles) {
+          try {
+            await attachmentsApi.upload(id, file);
+          } catch (uploadErr) {
+            console.error('Failed to upload file:', file.name, uploadErr);
+          }
+        }
+      }
+
       router.push(`/dashboard/tasks/${id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('editTask.savingFailed') || 'Failed to save task');
     } finally {
       setSaving(false);
+      setUploadProgress('');
     }
   };
 
@@ -304,11 +355,85 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                 </div>
               </div>
 
+              {/* File Attachments */}
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-bold mb-3">📎 {t('createTask.attachFiles')}</h4>
+                <p className="text-xs text-muted-foreground mb-3">{t('createTask.attachFilesDesc')}</p>
+
+                {/* Existing Attachments */}
+                {existingAttachments.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-4">
+                    <span className="text-xs font-semibold text-muted-foreground">{t('taskDetail.existingAttachments')}</span>
+                    {existingAttachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                        {att.mimetype?.startsWith('image/') ? (
+                          <FileImage className="size-4 text-indigo-500 shrink-0" />
+                        ) : (
+                          <FileText className="size-4 text-rose-500 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{att.filename}</div>
+                          <div className="text-[10px] text-muted-foreground">{formatFileSize(att.size)}</div>
+                        </div>
+                        {att.public_url && (
+                          <a href={att.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium shrink-0">
+                            {t('taskDetail.openFile')} ↗
+                          </a>
+                        )}
+                        <button type="button" onClick={() => handleDeleteAttachment(att.id)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New File Upload */}
+                <label
+                  htmlFor="file-upload-edit"
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all cursor-pointer px-4 py-6"
+                >
+                  <Paperclip className="size-6 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">{t('createTask.browseFiles')}</span>
+                  <span className="text-[10px] text-muted-foreground">PNG, JPG, PDF — max 20MB</span>
+                  <input
+                    id="file-upload-edit"
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </label>
+
+                {pendingFiles.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-3">
+                    <span className="text-xs font-semibold text-muted-foreground">{t('taskDetail.newFiles')}</span>
+                    {pendingFiles.map((file, i) => (
+                      <div key={`${file.name}-${i}`} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                        {file.type.startsWith('image/') ? (
+                          <FileImage className="size-4 text-indigo-500 shrink-0" />
+                        ) : (
+                          <FileText className="size-4 text-rose-500 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{file.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</div>
+                        </div>
+                        <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 justify-end pt-1 border-t border-border">
                 <Button type="button" variant="outline" onClick={() => router.back()}>{t('common.cancel')}</Button>
                 <Button type="submit" disabled={saving}>
                   {saving ? (
-                    <><Loader2 className="size-4 animate-spin" /> {t('editTask.saving')}</>
+                    <><Loader2 className="size-4 animate-spin" /> {uploadProgress || t('editTask.saving')}</>
                   ) : (
                     <><Save className="size-4" /> {t('editTask.saveChanges')}</>
                   )}

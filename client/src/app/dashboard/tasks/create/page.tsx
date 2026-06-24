@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, projectsApi } from '@/lib/api';
+import { tasksApi, usersApi, projectsApi, attachmentsApi } from '@/lib/api';
 import { User, Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Plus, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, X, Paperclip, FileImage, FileText, Trash2 } from 'lucide-react';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -33,6 +33,8 @@ export default function CreateTaskPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const [form, setForm] = useState({
     title: '',
@@ -68,6 +70,29 @@ export default function CreateTaskPage() {
     setAssigneeIds(prev => prev.filter(id => id !== uid));
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files).filter(f => {
+      if (f.size > 20 * 1024 * 1024) {
+        setError(`File "${f.name}" exceeds 20MB limit`);
+        return false;
+      }
+      return true;
+    });
+    setPendingFiles(prev => [...prev, ...newFiles]);
+    e.target.value = ''; // reset input so same file can be re-selected
+  };
+
+  const removeFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const unassignedMembers = members.filter(m => !assigneeIds.includes(m.id));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,11 +112,25 @@ export default function CreateTaskPage() {
         project_id: (form.project_id && form.project_id !== 'none') ? form.project_id : undefined,
         assignee_ids: assigneeIds.length > 0 ? assigneeIds : undefined,
       });
+
+      // Upload pending files after task creation
+      if (pendingFiles.length > 0) {
+        setUploadProgress(t('createTask.uploadingFiles'));
+        for (const file of pendingFiles) {
+          try {
+            await attachmentsApi.upload(data.task.id, file);
+          } catch (uploadErr) {
+            console.error('Failed to upload file:', file.name, uploadErr);
+          }
+        }
+      }
+
       router.push(`/dashboard/tasks/${data.task.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
     } finally {
       setLoading(false);
+      setUploadProgress('');
     }
   };
 
@@ -187,6 +226,51 @@ export default function CreateTaskPage() {
                     rows={3}
                   />
                 </div>
+              </div>
+
+              {/* File Attachments */}
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-bold mb-3">📎 {t('createTask.attachFiles')}</h4>
+                <p className="text-xs text-muted-foreground mb-3">{t('createTask.attachFilesDesc')}</p>
+                
+                <label
+                  htmlFor="file-upload"
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all cursor-pointer px-4 py-6"
+                >
+                  <Paperclip className="size-6 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">{t('createTask.browseFiles')}</span>
+                  <span className="text-[10px] text-muted-foreground">PNG, JPG, PDF — max 20MB</span>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </label>
+
+                {pendingFiles.length > 0 && (
+                  <div className="flex flex-col gap-2 mt-3">
+                    <span className="text-xs font-semibold text-muted-foreground">{t('createTask.selectedFiles')}</span>
+                    {pendingFiles.map((file, i) => (
+                      <div key={`${file.name}-${i}`} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                        {file.type.startsWith('image/') ? (
+                          <FileImage className="size-4 text-indigo-500 shrink-0" />
+                        ) : (
+                          <FileText className="size-4 text-rose-500 shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{file.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</div>
+                        </div>
+                        <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -303,7 +387,7 @@ export default function CreateTaskPage() {
                   {loading ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      {t('createTask.creating')}
+                      {uploadProgress || t('createTask.creating')}
                     </>
                   ) : (
                     <>

@@ -885,5 +885,20 @@ export const en: Record<string, string> = {
   'taskTarget.updated': 'Task target updated successfully!',
   'team.targetColumn': 'Target',
   'team.progressColumn': 'Target Progress',
+
+  // File Attachments
+  'createTask.attachFiles': 'Attach Files',
+  'createTask.attachFilesDesc': 'Upload photos or PDFs (max 20MB each)',
+  'createTask.selectedFiles': 'Selected Files',
+  'createTask.browseFiles': 'Browse Files',
+  'createTask.uploadingFiles': 'Uploading files...',
+  'createTask.removeFile': 'Remove',
+  'taskDetail.downloadFile': 'Download',
+  'taskDetail.openFile': 'Open',
+  'taskDetail.deleteAttachmentConfirm': 'Are you sure you want to delete this attachment?',
+  'taskDetail.fileSize': 'Size',
+  'taskDetail.existingAttachments': 'Current Attachments',
+  'taskDetail.newFiles': 'New Files to Upload',
+  'editTask.savingFailed': 'Failed to save task',
 };
 

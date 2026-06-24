@@ -977,6 +977,50 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.created')}</span>
                 <span className="text-sm text-muted-foreground">{formatDate(task.created_at, t, locale)}</span>
               </div>
+
+              {/* Attachments */}
+              {task.attachments && task.attachments.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      📎 {t('taskDetail.attachments')} ({task.attachments.length})
+                    </span>
+                    <div className="flex flex-col gap-2">
+                      {task.attachments.map(att => (
+                        <a
+                          key={att.id}
+                          href={att.public_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2 hover:bg-muted/80 transition-colors group"
+                        >
+                          {att.mimetype?.startsWith('image/') ? (
+                            <div className="size-10 rounded-md overflow-hidden bg-muted border border-border shrink-0">
+                              <img
+                                src={att.public_url}
+                                alt={att.filename}
+                                className="size-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="size-10 rounded-md bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                              <span className="text-base">📄</span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold truncate group-hover:text-indigo-600 transition-colors">{att.filename}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {att.size < 1024 ? att.size + ' B' : att.size < 1024 * 1024 ? (att.size / 1024).toFixed(1) + ' KB' : (att.size / (1024 * 1024)).toFixed(1) + ' MB'}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">{t('taskDetail.openFile')} ↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
