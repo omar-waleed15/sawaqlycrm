@@ -865,7 +865,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <span className="text-[11px] text-muted-foreground">{formatDateTime(comment.created_at, locale)}</span>
                         <span className="text-[9px] text-amber-500 font-medium ml-auto">{timeUntilExpiry(comment.created_at, t)}</span>
                       </div>
-                      <div className="text-sm bg-muted rounded-lg px-3 py-2 leading-relaxed">{comment.content}</div>
+                      <div className="text-sm bg-muted rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap">{comment.content}</div>
                     </div>
                   </div>
                 ))}
