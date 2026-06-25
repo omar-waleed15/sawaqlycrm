@@ -45,6 +45,7 @@ export const ar: Record<string, string> = {
   'nav.openMenu': 'فتح القائمة',
   'nav.dailyTasks': 'المهام اليومية',
   'nav.sales': 'المبيعات',
+  'nav.globalChat': 'الشات الجماعي',
 
   // ── اللغة ──────────────────────────────────────────────────────────
   'lang.switch': 'اللغة',
@@ -900,5 +901,17 @@ export const ar: Record<string, string> = {
   'taskDetail.existingAttachments': 'المرفقات الحالية',
   'taskDetail.newFiles': 'ملفات جديدة للرفع',
   'editTask.savingFailed': 'فشل في حفظ المهمة',
+
+  // ── Global Chat ─────────────────────────────────────────────────────
+  'chat.title': 'الشات الجماعي',
+  'chat.subtitle': 'تواصل وتعاون مع جميع أعضاء الفريق',
+  'chat.placeholder': 'اكتب رسالة...',
+  'chat.send': 'إرسال',
+  'chat.noMessages': 'لا توجد رسائل بعد. ابدأ المحادثة!',
+  'chat.loading': 'جاري تحميل الرسائل...',
+  'chat.timeLeft': 'متبقي {hours} ساعة و {mins} دقيقة',
+  'chat.minsLeft': 'متبقي {mins} دقيقة',
+  'chat.expiring': 'ينتهي قريباً',
+  'chat.messagesExpire': 'تختفي الرسائل تلقائيًا بعد 24 ساعة',
 };
 

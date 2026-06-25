@@ -418,7 +418,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           {/* ============================================================ */}
           {/* MEMBER VIEW: Own Assignment Panel */}
           {/* ============================================================ */}
-          {!canAdminister && myAssignment && (
+          {myAssignment && (
             <>
               {/* Feedback from admin */}
               {myAssignment.feedback && myAssignment.status === 'revision' && (
@@ -706,7 +706,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         )}
 
                         {/* Admin Action Buttons */}
-                        {canAdminister && a.status === 'submitted' && (
+                        {canAdminister && a.status === 'submitted' && a.user_id !== user?.id && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
                             {!isWritingFeedback && !activeApprovalUserId ? (
                               <>

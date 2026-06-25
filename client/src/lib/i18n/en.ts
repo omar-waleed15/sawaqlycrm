@@ -45,6 +45,7 @@ export const en: Record<string, string> = {
   'nav.openMenu': 'Open Menu',
   'nav.dailyTasks': 'Daily Tasks',
   'nav.sales': 'Sales',
+  'nav.globalChat': 'Global Chat',
 
   // ── Language ────────────────────────────────────────────────────────
   'lang.switch': 'Language',
@@ -900,5 +901,17 @@ export const en: Record<string, string> = {
   'taskDetail.existingAttachments': 'Current Attachments',
   'taskDetail.newFiles': 'New Files to Upload',
   'editTask.savingFailed': 'Failed to save task',
+
+  // ── Global Chat ─────────────────────────────────────────────────────
+  'chat.title': 'Global Chat',
+  'chat.subtitle': 'Connect and collaborate with all team members',
+  'chat.placeholder': 'Type a message...',
+  'chat.send': 'Send',
+  'chat.noMessages': 'No messages yet. Start the conversation!',
+  'chat.loading': 'Loading messages...',
+  'chat.timeLeft': '{hours}h {mins}m left',
+  'chat.minsLeft': '{mins}m left',
+  'chat.expiring': 'Expiring soon',
+  'chat.messagesExpire': 'Messages disappear automatically after 24 hours',
 };
 

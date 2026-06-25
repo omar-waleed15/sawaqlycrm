@@ -117,7 +117,7 @@ export default function TasksPage() {
   };
 
   const displayedTasks = activeTab === 'active'
-    ? tasks.filter(t => t.status !== 'completed')
+    ? (statusFilter === 'completed' ? tasks : tasks.filter(t => t.status !== 'completed'))
     : tasks;
 
   const filteredDisplayed = statusFilter && activeTab === 'scheduled'
@@ -204,7 +204,7 @@ export default function TasksPage() {
             <SelectItem value="in_progress">⚡ {t('status.in_progress')}</SelectItem>
             <SelectItem value="submitted">📤 {t('status.submitted')}</SelectItem>
             <SelectItem value="revision">🔄 {t('status.revision')}</SelectItem>
-            {activeTab === 'scheduled' && <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>}
+            <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
           </SelectContent>
         </Select>
 

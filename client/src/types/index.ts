@@ -67,6 +67,14 @@ export interface Comment {
   created_at: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  user_id: string;
+  content: string;
+  user?: User;
+  created_at: string;
+}
+
 export interface Attachment {
   id: string;
   task_id: string;

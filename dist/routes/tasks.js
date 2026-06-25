@@ -419,6 +419,39 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
                     await supabase_1.supabaseAdmin.from('task_assignees').insert(rows);
                 }
             }
+            // If the admin is also an assignee and sent member-like fields, update their own assignment
+            const { status, submission_link, completion_note } = req.body;
+            if (status || submission_link !== undefined || completion_note !== undefined) {
+                const { data: ownAssignment } = await supabase_1.supabaseAdmin
+                    .from('task_assignees')
+                    .select('*')
+                    .eq('task_id', id)
+                    .eq('user_id', req.user.id)
+                    .maybeSingle();
+                if (ownAssignment) {
+                    const assignUpdates = {};
+                    const allowedStatuses = ['todo', 'in_progress', 'submitted'];
+                    if (status && allowedStatuses.includes(status))
+                        assignUpdates.status = status;
+                    if (submission_link !== undefined)
+                        assignUpdates.submission_link = submission_link;
+                    if (completion_note !== undefined)
+                        assignUpdates.completion_note = completion_note;
+                    assignUpdates.updated_at = new Date().toISOString();
+                    // Stop timer if transitioning out of active working statuses
+                    const activeStatuses = ['todo', 'in_progress', 'revision'];
+                    if (status && !activeStatuses.includes(status) && ownAssignment.timer_started_at) {
+                        const startTime = new Date(ownAssignment.timer_started_at).getTime();
+                        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+                        assignUpdates.total_time_spent = (ownAssignment.total_time_spent || 0) + elapsedSeconds;
+                        assignUpdates.timer_started_at = null;
+                    }
+                    await supabase_1.supabaseAdmin
+                        .from('task_assignees')
+                        .update(assignUpdates)
+                        .eq('id', ownAssignment.id);
+                }
+            }
         }
         else {
             // Member: check they're assigned

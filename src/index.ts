@@ -15,6 +15,7 @@ import expensesRoutes from './routes/expenses';
 import salariesRoutes from './routes/salaries';
 import analyticsRoutes from './routes/finance_analytics';
 import salesRoutes from './routes/sales';
+import chatRoutes from './routes/chat';
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use('/api/expenses', expensesRoutes);
 app.use('/api/salaries', salariesRoutes);
 app.use('/api/finance-analytics', analyticsRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/chat', chatRoutes);
 
 // 404 handler
 app.use((_req, res) => {

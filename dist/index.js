@@ -19,6 +19,7 @@ const expenses_1 = __importDefault(require("./routes/expenses"));
 const salaries_1 = __importDefault(require("./routes/salaries"));
 const finance_analytics_1 = __importDefault(require("./routes/finance_analytics"));
 const sales_1 = __importDefault(require("./routes/sales"));
+const chat_1 = __importDefault(require("./routes/chat"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
@@ -50,6 +51,7 @@ app.use('/api/expenses', expenses_1.default);
 app.use('/api/salaries', salaries_1.default);
 app.use('/api/finance-analytics', finance_analytics_1.default);
 app.use('/api/sales', sales_1.default);
+app.use('/api/chat', chat_1.default);
 // 404 handler
 app.use((_req, res) => {
     res.status(404).json({ error: 'Route not found' });

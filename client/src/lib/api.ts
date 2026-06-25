@@ -139,6 +139,17 @@ export const commentsApi = {
     }),
 };
 
+// Global Chat
+export const chatApi = {
+  list: () =>
+    request<{ messages: import('@/types').ChatMessage[] }>('/chat'),
+  create: (content: string) =>
+    request<{ message: import('@/types').ChatMessage }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+};
+
 // Attachments
 export const attachmentsApi = {
   upload: (taskId: string, file: File) => {
