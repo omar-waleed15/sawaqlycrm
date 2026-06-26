@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { chatApi } from '@/lib/api';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -45,6 +47,41 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t, locale, setLocale } = useLanguage();
+
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+
+  useEffect(() => {
+    if (pathname === '/dashboard/chat') {
+      localStorage.setItem('last_read_chat_time', new Date().toISOString());
+      setHasNewMessage(false);
+      return;
+    }
+
+    const checkNewMessages = async () => {
+      try {
+        const data = await chatApi.list();
+        const messages = data.messages || [];
+        if (messages.length === 0) return;
+
+        const latestMessage = messages[messages.length - 1];
+        if (latestMessage.user_id === user?.id) {
+          return;
+        }
+
+        const lastRead = localStorage.getItem('last_read_chat_time');
+        if (!lastRead || new Date(latestMessage.created_at) > new Date(lastRead)) {
+          setHasNewMessage(true);
+        }
+      } catch (err) {
+        console.error('Error checking new chat messages in sidebar:', err);
+      }
+    };
+
+    checkNewMessages();
+
+    const interval = setInterval(checkNewMessages, 10000);
+    return () => clearInterval(interval);
+  }, [pathname, user?.id]);
 
   const visibleItems = navItems.filter(item => {
     if (item.allowedRoles && (!user || !item.allowedRoles.includes(user.role))) return false;
@@ -97,14 +134,17 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
               href={item.href}
               onClick={onClose}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors relative',
                 isActive
                   ? 'bg-indigo-50 text-indigo-700 font-semibold'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {t(item.labelKey)}
+              <span className="flex-1">{t(item.labelKey)}</span>
+              {item.href === '/dashboard/chat' && hasNewMessage && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 size-2 rounded-full bg-rose-500 animate-pulse" />
+              )}
             </Link>
           );
         })}

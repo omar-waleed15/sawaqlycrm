@@ -56,6 +56,7 @@ export default function GlobalChatPage() {
       if (isFirstLoad) {
         setTimeout(() => scrollToBottom('auto'), 50);
       }
+      localStorage.setItem('last_read_chat_time', new Date().toISOString());
     } catch (err: any) {
       console.error('Failed to load chat messages:', err);
       setError('Failed to load chat messages');

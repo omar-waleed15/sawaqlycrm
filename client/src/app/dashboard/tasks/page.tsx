@@ -34,7 +34,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'archived'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'completed' | 'scheduled' | 'archived'>('active');
 
   const [schedulingTask, setSchedulingTask] = useState<Task | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -59,6 +59,12 @@ export default function TasksPage() {
     if (priorityFilter) params.priority = priorityFilter;
     if (activeTab === 'archived') {
       params.archived = 'true';
+    }
+    if (activeTab === 'completed' && !statusFilter) {
+      params.status = 'completed';
+    }
+    if (activeTab === 'my_tasks' && user?.id) {
+      params.assignee_id = user.id;
     }
     tasksApi.list(params)
       .then(data => setTasks(data.tasks))
@@ -117,14 +123,20 @@ export default function TasksPage() {
   };
 
   const displayedTasks = activeTab === 'active'
-    ? (statusFilter === 'completed' ? tasks : tasks.filter(t => t.status !== 'completed'))
-    : tasks;
+    ? tasks.filter(t => t.status !== 'completed')
+    : activeTab === 'completed'
+      ? tasks.filter(t => t.status === 'completed')
+      : activeTab === 'my_tasks'
+        ? tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id))
+        : tasks;
 
   const filteredDisplayed = statusFilter && activeTab === 'scheduled'
     ? displayedTasks.filter(t => t.status === statusFilter)
     : displayedTasks;
 
   const scheduledCount = tasks.filter(t => !!t.publish_date).length;
+  const completedCount = tasks.filter(t => t.status === 'completed').length;
+  const myTasksCount = tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
 
   return (
     <div className="page-container fade-in">
@@ -156,6 +168,34 @@ export default function TasksPage() {
           }`}
         >
           📋 {t('tasks.activeTasks')}
+        </button>
+        {isOwner && (
+          <button
+            onClick={() => { setActiveTab('my_tasks'); setStatusFilter(''); }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'my_tasks'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            👤 {t('tasks.myTasksTab')}
+            {myTasksCount > 0 && (
+              <Badge className="text-[11px] h-5 px-1.5 bg-indigo-600 hover:bg-indigo-600">{myTasksCount}</Badge>
+            )}
+          </button>
+        )}
+        <button
+          onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeTab === 'completed'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          ✅ {t('tasks.completedTasks')}
+          {completedCount > 0 && (
+            <Badge className="text-[11px] h-5 px-1.5 bg-green-600 hover:bg-green-600">{completedCount}</Badge>
+          )}
         </button>
         <button
           onClick={() => { setActiveTab('scheduled'); setStatusFilter(''); }}
@@ -194,19 +234,23 @@ export default function TasksPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || '')}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder={t('tasks.allStatuses')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">{activeTab === 'active' ? t('tasks.allActiveStatuses') : t('tasks.allStatuses')}</SelectItem>
-            <SelectItem value="todo">📝 {t('status.todo')}</SelectItem>
-            <SelectItem value="in_progress">⚡ {t('status.in_progress')}</SelectItem>
-            <SelectItem value="submitted">📤 {t('status.submitted')}</SelectItem>
-            <SelectItem value="revision">🔄 {t('status.revision')}</SelectItem>
-            <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
-          </SelectContent>
-        </Select>
+        {activeTab !== 'completed' && (
+          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || '')}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder={t('tasks.allStatuses')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">{(activeTab === 'active' || activeTab === 'my_tasks') ? t('tasks.allActiveStatuses') : t('tasks.allStatuses')}</SelectItem>
+              <SelectItem value="todo">📝 {t('status.todo')}</SelectItem>
+              <SelectItem value="in_progress">⚡ {t('status.in_progress')}</SelectItem>
+              <SelectItem value="submitted">📤 {t('status.submitted')}</SelectItem>
+              <SelectItem value="revision">🔄 {t('status.revision')}</SelectItem>
+              {activeTab !== 'active' && activeTab !== 'my_tasks' && (
+                <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val || '')}>
           <SelectTrigger className="w-44">
@@ -258,18 +302,22 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">{activeTab === 'scheduled' ? '📅' : activeTab === 'archived' ? '🗄️' : '🔍'}</div>
-          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : t('tasks.noTasks')}</div>
+          <div className="empty-state-icon">{activeTab === 'scheduled' ? '📅' : activeTab === 'archived' ? '🗄️' : activeTab === 'completed' ? '✅' : activeTab === 'my_tasks' ? '👤' : '🔍'}</div>
+          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : activeTab === 'completed' ? t('tasks.noCompletedTasks') : activeTab === 'my_tasks' ? t('tasks.noMyTasks') : t('tasks.noTasks')}</div>
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
               ? t('tasks.adjustFilters')
-              : isOwner
-                ? activeTab === 'scheduled'
-                  ? t('tasks.noScheduledOwner')
-                  : activeTab === 'archived'
-                    ? t('tasks.noArchivedTasks')
-                    : t('tasks.noActiveOwner')
-                : t('tasks.noActiveMember')}
+              : activeTab === 'completed'
+                ? t('tasks.noCompletedDesc')
+                : activeTab === 'my_tasks'
+                  ? t('tasks.noMyTasksDesc')
+                  : isOwner
+                    ? activeTab === 'scheduled'
+                      ? t('tasks.noScheduledOwner')
+                      : activeTab === 'archived'
+                        ? t('tasks.noArchivedTasks')
+                        : t('tasks.noActiveOwner')
+                    : t('tasks.noActiveMember')}
           </div>
           {isOwner && !statusFilter && !priorityFilter && activeTab === 'active' && (
             <Link href="/dashboard/tasks/create">
