@@ -32,6 +32,11 @@ function formatDate(dateStr?: string, t?: any, locale?: string): string {
   return formatCairoDate(dateStr, locale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function formatDetailDateTime(dateStr?: string, t?: any, locale?: string): string {
+  if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
+  return formatCairoDateTime(dateStr, locale, { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function formatDateTime(dateStr: string, locale: string): string {
   return formatCairoDateTime(dateStr, locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -910,7 +915,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.dueDate')}</span>
                 <span className={`text-sm font-medium ${isOverdue ? 'text-rose-600' : 'text-foreground'}`}>
-                  {formatDate(task.due_date, t, locale)}
+                  {formatDetailDateTime(task.due_date, t, locale)}
                 </span>
               </div>
               {task.content_type && (
@@ -975,7 +980,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('taskDetail.created')}</span>
-                <span className="text-sm text-muted-foreground">{formatDate(task.created_at, t, locale)}</span>
+                <span className="text-sm text-muted-foreground">{formatDetailDateTime(task.created_at, t, locale)}</span>
               </div>
 
               {/* Attachments */}

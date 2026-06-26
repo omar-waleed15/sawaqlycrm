@@ -424,7 +424,7 @@ export default function DashboardPage() {
                 
                 <CardContent className="pt-5">
                   {recentTasks.filter(t => t.status !== 'completed' && (t.priority === 'urgent' || t.priority === 'high')).length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="tasks-grid">
                       {recentTasks
                         .filter(t => t.status !== 'completed' && (t.priority === 'urgent' || t.priority === 'high'))
                         .slice(0, 3)
@@ -461,7 +461,7 @@ export default function DashboardPage() {
               </Badge>
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="tasks-grid">
             {myActiveTasks.slice(0, 6).map(task => (
               <TaskCard 
                 key={task.id} 
@@ -487,7 +487,7 @@ export default function DashboardPage() {
           </div>
 
           {recentTasks.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="tasks-grid">
               {recentTasks.map(task => (
                 <TaskCard 
                   key={task.id} 

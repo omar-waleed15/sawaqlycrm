@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Loader2, CheckCircle2, Search, Key } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
@@ -17,15 +18,9 @@ import { User } from '@/types';
 import Modal from '@/components/Modal';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
-
-  useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
-      router.replace('/dashboard');
-    }
-  }, [user, router]);
 
   const [agencyName, setAgencyName] = useState('Sawaqly Marketing Agency');
   const [supportEmail, setSupportEmail] = useState('support@sawaqly.com');
@@ -34,6 +29,22 @@ export default function SettingsPage() {
   const [latency, setLatency] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Profile editing state
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState(user?.avatar_url || '');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+  const [profileError, setProfileError] = useState('');
+
+  // Sync profile state when user is loaded or modified
+  useEffect(() => {
+    if (user) {
+      setProfileName(user.name);
+      setProfileAvatarUrl(user.avatar_url || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -54,6 +65,57 @@ export default function SettingsPage() {
     checkHealth();
   }, []);
 
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('File size exceeds 5MB limit.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setProfileError('');
+    try {
+      const response = await usersApi.uploadAvatar(file);
+      setProfileAvatarUrl(response.publicUrl);
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to upload photo');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setProfileAvatarUrl('');
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileError(t('team.nameRequired') || 'Name is required');
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError('');
+    setProfileSuccess(false);
+
+    try {
+      const response = await usersApi.updateProfile({
+        name: profileName.trim(),
+        avatar_url: profileAvatarUrl || null,
+      });
+      setUser(response.user);
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 3000);
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to save profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -64,8 +126,8 @@ export default function SettingsPage() {
     }, 800);
   };
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'agency' | 'users'>('agency');
+  // Tab state (default to profile)
+  const [activeTab, setActiveTab] = useState<'profile' | 'agency' | 'users'>('profile');
 
   // User management state
   const [users, setUsers] = useState<User[]>([]);
@@ -247,7 +309,152 @@ export default function SettingsPage() {
     );
   };
 
-  if (user?.role !== 'owner' && user?.role !== 'team_leader') return null;
+  const renderProfileView = () => {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 animate-fade-in">
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle className="text-base text-start">{t('settings.myProfile')}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
+              {profileSuccess && (
+                <div className="flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium">
+                  <CheckCircle2 className="size-4" />
+                  {t('settings.profileUpdated')}
+                </div>
+              )}
+              {profileError && (
+                <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md font-medium">
+                  {profileError}
+                </div>
+              )}
+
+              {/* Profile Photo Upload Section */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl border border-dashed bg-muted/20">
+                <Avatar className="size-20 shrink-0 border shadow-sm">
+                  {profileAvatarUrl && (
+                    <AvatarImage src={profileAvatarUrl} alt={profileName} className="object-cover" />
+                  )}
+                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
+                    {profileName ? getInitials(profileName) : '?'}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex flex-col gap-2 text-center sm:text-start">
+                  <Label className="text-sm font-semibold">{t('settings.profilePhoto')}</Label>
+                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingAvatar || profileSaving}
+                      className="relative h-9 text-xs font-medium"
+                      onClick={() => document.getElementById('avatar-upload-input')?.click()}
+                    >
+                      {uploadingAvatar ? (
+                        <><Loader2 className="size-3 animate-spin mr-1.5" /> {t('settings.uploading')}</>
+                      ) : (
+                        t('settings.uploadNew')
+                      )}
+                    </Button>
+                    <input
+                      id="avatar-upload-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                    {profileAvatarUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={uploadingAvatar || profileSaving}
+                        onClick={handleRemoveAvatar}
+                        className="h-9 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      >
+                        {t('settings.removePhoto')}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    PNG, JPG or JPEG. Max size 5MB.
+                  </p>
+                </div>
+              </div>
+
+              {/* Name Field */}
+              <div className="flex flex-col gap-1.5 text-start">
+                <Label htmlFor="profile-name">{t('settings.profileName')}</Label>
+                <Input
+                  id="profile-name"
+                  type="text"
+                  value={profileName}
+                  onChange={e => setProfileName(e.target.value)}
+                  required
+                  disabled={profileSaving}
+                />
+              </div>
+
+              {/* Email Field (ReadOnly) */}
+              <div className="flex flex-col gap-1.5 text-start">
+                <Label htmlFor="profile-email" className="text-muted-foreground">{t('settings.emailAddress')}</Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  value={user?.email || ''}
+                  disabled
+                  className="bg-muted/50 cursor-not-allowed border-dashed"
+                />
+              </div>
+
+              <div className="flex justify-end mt-2">
+                <Button type="submit" disabled={profileSaving || uploadingAvatar}>
+                  {profileSaving ? (
+                    <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('settings.saving')}</>
+                  ) : t('settings.saveProfile')}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* User Info / Role Info Sidebar */}
+        <div className="text-start">
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle className="text-base">{t('settings.profile')}</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">{t('settings.role')}</span>
+                <Badge
+                  variant={
+                    user?.role === 'owner' ? 'destructive' :
+                    user?.role === 'team_leader' ? 'default' :
+                    'secondary'
+                  }
+                  className="capitalize"
+                >
+                  {user?.role ? t(`role.${user.role}`) : ''}
+                </Badge>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">{t('settings.status')}</span>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  <span className="size-1.5 rounded-full bg-green-500 mr-1 rtl:ml-1" /> Active Account
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="page-container fade-in text-start">
@@ -259,8 +466,18 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs switcher */}
-      {user?.role === 'owner' && (
-        <div className="flex border-b border-border mb-3 gap-6">
+      {(user?.role === 'owner' || user?.role === 'team_leader') && (
+        <div className="flex border-b border-border mb-4 gap-6">
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'profile'
+                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            👤 {t('settings.myProfile')}
+          </button>
           <button
             onClick={() => setActiveTab('agency')}
             className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
@@ -271,20 +488,24 @@ export default function SettingsPage() {
           >
             🏢 {t('settings.agencySettings')}
           </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'users'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            👥 {t('settings.userAccounts')}
-          </button>
+          {user?.role === 'owner' && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'users'
+                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              👥 {t('settings.userAccounts')}
+            </button>
+          )}
         </div>
       )}
 
-      {activeTab === 'agency' ? (
+      {activeTab === 'profile' ? (
+        renderProfileView()
+      ) : activeTab === 'agency' ? (
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
           {/* Main Settings Panel */}
           <div className="flex flex-col gap-6">

@@ -2,8 +2,14 @@ import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { ownerOnly } from '../middleware/roleCheck';
+import multer from 'multer';
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars is plenty
+});
 
 // GET /api/users — List all team members (owner, team leader, sales)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -172,6 +178,83 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
   } catch (err: any) {
     console.error('Failed to compile performance stats:', err);
     res.status(500).json({ error: err.message || 'Failed to fetch performance data' });
+  }
+});
+
+// PUT /api/users/profile — Update currently authenticated user's profile
+router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  
+  const { name, avatar_url } = req.body;
+  
+  try {
+    const updates: Record<string, any> = {};
+    if (name !== undefined) updates.name = name;
+    if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: 'No fields to update' });
+      return;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .update(updates)
+      .eq('id', req.user.id)
+      .select()
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ user: data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update profile' });
+  }
+});
+
+// POST /api/users/profile/avatar — Upload avatar photo to Supabase storage
+router.post('/profile/avatar', authMiddleware, upload.single('avatar'), async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: 'No file provided' });
+    return;
+  }
+
+  try {
+    const file = req.file;
+    const cleanFilename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+    const storagePath = `avatars/${req.user.id}/${Date.now()}_${cleanFilename}`;
+
+    // Upload to Supabase Storage in attachments bucket
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('attachments')
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      res.status(500).json({ error: uploadError.message });
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from('attachments')
+      .getPublicUrl(storagePath);
+
+    res.json({ publicUrl: urlData.publicUrl });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to upload avatar' });
   }
 });
 

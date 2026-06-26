@@ -919,5 +919,16 @@ export const ar: Record<string, string> = {
   'chat.minsLeft': 'متبقي {mins} دقيقة',
   'chat.expiring': 'ينتهي قريباً',
   'chat.messagesExpire': 'تختفي الرسائل تلقائيًا بعد 24 ساعة',
+
+  // My Profile Settings
+  'settings.myProfile': 'الملف الشخصي',
+  'settings.profilePhoto': 'الصورة الشخصية',
+  'settings.profileName': 'الاسم الكامل',
+  'settings.emailAddress': 'البريد الإلكتروني',
+  'settings.emailEditNote': 'لا يمكن تغيير البريد الإلكتروني',
+  'settings.uploadNew': 'رفع صورة',
+  'settings.removePhoto': 'إزالة الصورة',
+  'settings.profileUpdated': 'تم تحديث الملف الشخصي بنجاح!',
+  'settings.uploading': 'جاري الرفع...',
 };
 

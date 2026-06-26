@@ -1,10 +1,18 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const supabase_1 = require("../lib/supabase");
 const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
+const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars is plenty
+});
 // GET /api/users — List all team members (owner, team leader, sales)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager'].includes(req.user.role)) {
@@ -158,6 +166,74 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
     catch (err) {
         console.error('Failed to compile performance stats:', err);
         res.status(500).json({ error: err.message || 'Failed to fetch performance data' });
+    }
+});
+// PUT /api/users/profile — Update currently authenticated user's profile
+router.put('/profile', auth_1.authMiddleware, async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    const { name, avatar_url } = req.body;
+    try {
+        const updates = {};
+        if (name !== undefined)
+            updates.name = name;
+        if (avatar_url !== undefined)
+            updates.avatar_url = avatar_url;
+        if (Object.keys(updates).length === 0) {
+            res.status(400).json({ error: 'No fields to update' });
+            return;
+        }
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('profiles')
+            .update(updates)
+            .eq('id', req.user.id)
+            .select()
+            .single();
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        res.json({ user: data });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to update profile' });
+    }
+});
+// POST /api/users/profile/avatar — Upload avatar photo to Supabase storage
+router.post('/profile/avatar', auth_1.authMiddleware, upload.single('avatar'), async (req, res) => {
+    if (!req.user) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+    }
+    if (!req.file) {
+        res.status(400).json({ error: 'No file provided' });
+        return;
+    }
+    try {
+        const file = req.file;
+        const cleanFilename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+        const storagePath = `avatars/${req.user.id}/${Date.now()}_${cleanFilename}`;
+        // Upload to Supabase Storage in attachments bucket
+        const { error: uploadError } = await supabase_1.supabaseAdmin.storage
+            .from('attachments')
+            .upload(storagePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+        });
+        if (uploadError) {
+            res.status(500).json({ error: uploadError.message });
+            return;
+        }
+        // Get public URL
+        const { data: urlData } = supabase_1.supabaseAdmin.storage
+            .from('attachments')
+            .getPublicUrl(storagePath);
+        res.json({ publicUrl: urlData.publicUrl });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to upload avatar' });
     }
 });
 // POST /api/users — Create a new team member (owner only)

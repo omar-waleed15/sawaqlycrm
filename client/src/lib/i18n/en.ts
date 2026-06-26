@@ -919,5 +919,16 @@ export const en: Record<string, string> = {
   'chat.minsLeft': '{mins}m left',
   'chat.expiring': 'Expiring soon',
   'chat.messagesExpire': 'Messages disappear automatically after 24 hours',
+  
+  // My Profile Settings
+  'settings.myProfile': 'My Profile',
+  'settings.profilePhoto': 'Profile Photo',
+  'settings.profileName': 'Full Name',
+  'settings.emailAddress': 'Email Address',
+  'settings.emailEditNote': 'Email cannot be changed',
+  'settings.uploadNew': 'Upload Photo',
+  'settings.removePhoto': 'Remove Photo',
+  'settings.profileUpdated': 'Profile updated successfully!',
+  'settings.uploading': 'Uploading...',
 };
 

@@ -22,7 +22,9 @@ const TASK_SELECT = `
     total_time_spent,
     timer_started_at,
     user:profiles(id, name, email, avatar_url)
-  )
+  ),
+  attachments(id),
+  comments(id)
 `;
 
 // Helper: check if user is admin/TL
@@ -321,7 +323,22 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
     const { data, error } = await supabaseAdmin
       .from('tasks')
       .select(`
-        ${TASK_SELECT},
+        *,
+        creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url),
+        task_assignees(
+          id,
+          user_id,
+          status,
+          submission_link,
+          completion_note,
+          feedback,
+          rating,
+          assigned_at,
+          updated_at,
+          total_time_spent,
+          timer_started_at,
+          user:profiles(id, name, email, avatar_url)
+        ),
         attachments(*),
         comments(*, user:profiles(id, name, email, avatar_url))
       `)

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, projectsApi } from '@/lib/api';
-import { formatCairoDate, isDateOverdue } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { MoreVertical, Pencil, Trash2, Loader2, Save, X } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, Loader2, Save, X, ArrowRight, MessageSquare, Paperclip } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -246,171 +246,237 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
   return (
     <>
       <Card
-        className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 slide-up"
+        className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 slide-up h-full flex flex-col"
         onClick={handleClick}
       >
-        <CardContent className="p-4 flex flex-col gap-4">
-          {/* Top/Content Section */}
+        <CardContent className="p-4 flex flex-col gap-3 flex-1">
+          {/* Header: Type, Priority & Actions */}
           <div className="flex items-start justify-between gap-4">
-            {/* Left: Title & Description */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-1 justify-between">
-                <h3 className="text-sm font-semibold text-foreground leading-snug break-words flex-1">
-                  {task.title}
-                </h3>
-                {isOwner && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 p-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted rounded-full shrink-0 -mt-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreVertical className="size-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditDialogOpen(true); }}>
-                        <Pencil className="size-3.5 mr-2" />
-                        {t('common.edit')}
-                      </DropdownMenuItem>
-                      {canArchive && (
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleArchive(); }}>
-                          <span className="mr-2 select-none">🗄️</span>
-                          {task.is_archived ? t('taskDetail.unarchiveTask') : t('taskDetail.archiveTask')}
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                      >
-                        <Trash2 className="size-3.5 mr-2" />
-                        {t('common.delete')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-              {task.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mt-1.5 break-words">
-                  {task.description}
-                </p>
+            {/* Top Left: content type & priority badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {task.is_archived && (
+                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-semibold py-0 px-1.5 h-5 flex items-center justify-center">
+                  🗄️ {t('taskDetail.archivedBadge')}
+                </Badge>
+              )}
+              {task.content_type && (
+                <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
+                  📦 {t(`contentType.${task.content_type}`)}
+                </Badge>
+              )}
+              <PriorityBadge priority={task.priority} />
+              {overdue && (
+                <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
+                  ⚠️ {t('common.overdue')}
+                </Badge>
               )}
             </div>
 
-            {/* Right: Priority & Due Date */}
-            <div className="flex flex-col items-end gap-1.5 shrink-0 select-none">
-              <div className="flex items-center gap-1.5">
-                {task.is_archived && (
-                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-semibold py-0 px-1.5 h-5 flex items-center justify-center">
-                    🗄️ {t('taskDetail.archivedBadge')}
-                  </Badge>
-                )}
-                {task.content_type && (
-                  <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
-                    📦 {t(`contentType.${task.content_type}`)}
-                  </Badge>
-                )}
-                <PriorityBadge priority={task.priority} />
-              </div>
-              {task.due_date && (
-                <div className={cn('flex items-center gap-1 text-[11px] select-none shrink-0', overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground')}>
-                  <span>📅</span>
-                  <span>{overdue ? `${t('common.overdue')} · ` : ''}{formatDate(task.due_date, locale)}</span>
-                </div>
-              )}
-            </div>
+            {/* Top Right: options menu */}
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 p-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted rounded-full shrink-0 -mt-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="size-4" />
+                      <span className="sr-only">Actions</span>
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditDialogOpen(true); }}>
+                    <Pencil className="size-3.5 mr-2" />
+                    {t('common.edit')}
+                  </DropdownMenuItem>
+                  {canArchive && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleToggleArchive(); }}>
+                      <span className="mr-2 select-none">🗄️</span>
+                      {task.is_archived ? t('taskDetail.unarchiveTask') : t('taskDetail.archiveTask')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                  >
+                    <Trash2 className="size-3.5 mr-2" />
+                    {t('common.delete')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          {/* Body Section: Title & Description */}
+          <div className="flex flex-col text-start">
+            <h3 className="text-sm font-semibold text-foreground leading-snug break-words">
+              {task.title}
+            </h3>
+            {task.description && (
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mt-1.5 break-words">
+                {task.description}
+              </p>
+            )}
           </div>
 
           {/* Secondary Widgets Section */}
-          {(isOwner && submittedCount > 0) || task.publish_date ? (
-            <div className="flex flex-col gap-2 empty:hidden">
+          {(isOwner && submittedCount > 0) || task.publish_date || loggedTimeText ? (
+            <div className="flex flex-col gap-2 mt-1">
               {/* Submission progress for admin */}
               {isOwner && submittedCount > 0 && (
-                <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-3 py-1.5 text-xs text-violet-800 dark:text-violet-300 font-semibold">
+                <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
                   📤 {t('tasks.submissionsPending', { count: submittedCount })}
                 </div>
               )}
 
               {/* Publish Date Badge */}
               {task.publish_date && (
-                <div className="flex flex-col gap-1 border-t border-dashed border-border pt-2">
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded px-2 py-0.5 w-fit">
+                <div className="flex flex-col gap-1">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded px-1.5 py-0.5 w-fit">
                     📢 {t('tasks.publish')} {formatDate(task.publish_date, locale)}
                   </span>
                   {task.publish_notes && (
-                    <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed mt-0.5 ps-1">
+                    <p className="text-[11px] text-muted-foreground italic line-clamp-1 leading-relaxed ps-1 text-start">
                       📝 {task.publish_notes}
                     </p>
                   )}
                 </div>
               )}
-            </div>
-          ) : null}
 
-          {/* Bottom/Footer Section */}
-          <div className="flex items-center justify-between pt-3 border-t border-border mt-1">
-            {/* Creator Profile */}
-            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider shrink-0 select-none">{t('tasks.from')}</span>
-                <span className="text-xs text-muted-foreground font-medium truncate" title={task.creator?.name || 'Unknown'}>
-                  {task.creator?.name || 'Unknown'}
-                </span>
-              </div>
+              {/* Logged Time */}
               {loggedTimeText && (
-                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 mt-0.5 select-none">
+                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
                   <span>⏱️</span>
                   <span>{loggedTimeText}</span>
                 </div>
               )}
             </div>
+          ) : null}
 
-            {/* Assignees stacked avatar group */}
-            <div className="flex items-center shrink-0">
-              {totalAssignees > 0 ? (
-                <div className="flex items-center">
-                  <div className="flex -space-x-1.5">
-                    {assignees.slice(0, 3).map(a => (
-                      a.user?.avatar_url ? (
-                        <img
-                          key={a.id}
-                          src={a.user.avatar_url}
-                          alt={a.user.name}
-                          className="size-6 rounded-full object-cover shrink-0 border-2 border-white dark:border-slate-900"
-                          title={a.user.name}
-                        />
-                      ) : (
-                        <div
-                          key={a.id}
-                          className="size-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] font-bold text-white shrink-0 border-2 border-white dark:border-slate-900 uppercase"
-                          title={a.user?.name || 'Assigned Member'}
-                        >
-                          {a.user ? getInitials(a.user.name) : '?'}
-                        </div>
-                      )
-                    ))}
-                  </div>
-                  {totalAssignees > 3 && (
-                    <span className="text-[10px] text-muted-foreground font-semibold ml-1 select-none">
-                      +{totalAssignees - 3}
-                    </span>
+          {/* Bottom section (pinned to bottom) */}
+          <div className="mt-auto flex flex-col gap-2">
+            {/* Line separator */}
+            <div className="h-px bg-border my-1" />
+
+            {/* Row 1: Dates (Created at & Due date) */}
+            <div className="flex items-center text-[10px] text-muted-foreground select-none gap-2 flex-wrap text-start px-0.5">
+              <span className="inline-flex items-center gap-1 shrink-0 font-medium">
+                <span>📅</span>
+                <span className="text-muted-foreground/80">{t('taskDetail.created') || 'Created'}:</span>
+                <span className="font-semibold text-foreground">{formatCairoDateTime(task.created_at, locale)}</span>
+              </span>
+              {task.due_date && (
+                <>
+                  <span className="text-muted-foreground/30">|</span>
+                  <span className="inline-flex items-center gap-1 shrink-0 font-medium">
+                    <span>🏁</span>
+                    <span className="text-muted-foreground/80">{t('taskDetail.dueDate') || 'Due'}:</span>
+                    <span className="font-semibold text-foreground">{formatCairoDateTime(task.due_date, locale)}</span>
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Row 2: Creator, Assignees, Metrics & Open Button */}
+            <div className="flex items-center justify-between text-muted-foreground text-xs pt-0.5 select-none gap-3 flex-wrap">
+              {/* Left side: Creator & Assignees */}
+              <div className="flex items-center gap-2">
+                {/* Creator Profile */}
+                <div className="flex items-center" title={`${t('tasks.from')}: ${task.creator?.name || 'Unknown'}`}>
+                  {task.creator?.avatar_url ? (
+                    <img
+                      src={task.creator.avatar_url}
+                      alt={task.creator.name}
+                      className="size-8 rounded-full object-cover shrink-0 border border-border"
+                    />
+                  ) : (
+                    <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0 border border-border uppercase">
+                      {task.creator ? getInitials(task.creator.name) : '?'}
+                    </div>
                   )}
                 </div>
-              ) : (
-                <span className="text-xs text-muted-foreground select-none">{t('common.unassigned')}</span>
-              )}
+
+                <span className="text-muted-foreground/50 text-xs font-semibold mr-0.5 select-none">:</span>
+
+                {/* Assignees stacked avatar group */}
+                <div className="flex items-center shrink-0">
+                  {totalAssignees > 0 ? (
+                    <div className="flex items-center">
+                      <div className="flex -space-x-2">
+                        {assignees.slice(0, 3).map(a => (
+                          a.user?.avatar_url ? (
+                            <img
+                              key={a.id}
+                              src={a.user.avatar_url}
+                              alt={a.user.name}
+                              className="size-8 rounded-full object-cover shrink-0 border-2 border-white dark:border-slate-900"
+                              title={a.user.name}
+                            />
+                          ) : (
+                            <div
+                              key={a.id}
+                              className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0 border-2 border-white dark:border-slate-900 uppercase"
+                              title={a.user?.name || 'Assigned Member'}
+                            >
+                              {a.user ? getInitials(a.user.name) : '?'}
+                            </div>
+                          )
+                        ))}
+                      </div>
+                      {totalAssignees > 3 && (
+                        <span className="text-[10px] text-muted-foreground font-semibold ml-1">
+                          +{totalAssignees - 3}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t('common.unassigned')}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right side: Attachments, Comments & Open Arrow Button */}
+              <div className="flex items-center gap-3.5 flex-wrap">
+                {/* Attachments count */}
+                <div className="flex items-center gap-1" title={t('taskDetail.attachments')}>
+                  <Paperclip className="size-3.5 text-muted-foreground/75" />
+                  <span className="text-[11px] font-semibold">
+                    {task.attachments?.length || 0}
+                  </span>
+                </div>
+
+                {/* Comments count */}
+                <div className="flex items-center gap-1" title={t('taskDetail.comments')}>
+                  <MessageSquare className="size-3.5 text-muted-foreground/75" />
+                  <span className="text-[11px] font-semibold">
+                    {task.comments?.length || 0}
+                  </span>
+                </div>
+
+                {/* Arrow button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClick();
+                  }}
+                  className="size-7 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm flex items-center justify-center transition-all shrink-0"
+                  title={t('common.open') || 'Open'}
+                >
+                  <ArrowRight className="size-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Schedule Action Button */}
           {onScheduleClick && isOwner && !task.publish_date && (
-            <div className="mt-3 pt-3 border-t border-dashed border-border">
+            <div className="mt-2 pt-2 border-t border-dashed border-border">
               <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-md py-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors">
                 🗓️ {t('tasks.clickToSchedule')}
               </span>

@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { chatApi } from '@/lib/api';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/clients',  labelKey: 'nav.clients',       icon: Users,           allowedRoles: ['owner', 'team_leader', 'account_manager'] },
   { href: '/dashboard/ideas',    labelKey: 'nav.contentIdeas',  icon: Lightbulb,       allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager'] },
   { href: '/dashboard/calendar', labelKey: 'nav.calendar',      icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
-  { href: '/dashboard/settings', labelKey: 'nav.settings',      icon: Settings,        allowedRoles: ['owner', 'team_leader'] },
+  { href: '/dashboard/settings', labelKey: 'nav.settings',      icon: Settings,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
 ];
 
 export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
@@ -170,6 +170,9 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
       <div className="px-3 py-4">
         <div className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted transition-colors">
           <Avatar className="size-8 shrink-0">
+            {user?.avatar_url && (
+              <AvatarImage src={user.avatar_url} alt={user.name} className="object-cover animate-fade-in" />
+            )}
             <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[11px] font-bold">
               {user?.name ? getInitials(user.name) : '?'}
             </AvatarFallback>
