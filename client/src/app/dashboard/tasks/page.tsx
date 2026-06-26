@@ -158,7 +158,7 @@ export default function TasksPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0 border-b border-border mb-5">
+      <div className="flex gap-0 border-b border-border mb-3">
         <button
           onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${

@@ -596,7 +596,7 @@ export default function TeamPage() {
       </div>
 
       {/* Tabs switcher */}
-      <div className="flex border-b border-border mb-6 gap-6">
+      <div className="flex border-b border-border mb-3 gap-6">
         <button
           onClick={() => setActiveTab('directory')}
           className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
