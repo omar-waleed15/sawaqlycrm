@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi } from '@/lib/api';
 import { Task, TaskAssignee, TaskStatus, User } from '@/types';
-import { PriorityBadge, StatusBadge } from '@/components/Badges';
+import TaskCard from '@/components/TaskCard';
 import SalesDashboard from '@/components/SalesDashboard';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,21 +27,11 @@ import {
   Search,
   LayoutGrid,
   List,
-  Calendar,
-  AlertTriangle,
   ArrowUpDown,
-  Zap,
-  Upload,
-  RefreshCw,
 } from 'lucide-react';
 
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function formatDate(dateStr?: string, locale?: string, t?: any): string {
-  if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
-  return new Date(dateStr).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function isOverdue(dateStr?: string, status?: string): boolean {
@@ -72,20 +62,6 @@ const PRIORITY_WEIGHTS: Record<string, number> = {
   low: 1,
 };
 
-const PRIORITY_BORDER_CLASSES: Record<string, string> = {
-  urgent: 'border-l-rose-500',
-  high: 'border-l-orange-500',
-  medium: 'border-l-yellow-400',
-  low: 'border-l-green-500',
-};
-
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const pad = (num: number) => String(num).padStart(2, '0');
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
-}
 
 export default function MemberTasksPage({ params }: { params: Promise<{ memberId: string }> }) {
   const { memberId } = use(params);
@@ -101,34 +77,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'title'>('dueDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [nowTime, setNowTime] = useState<number>(Date.now());
 
-  // Ticking clock for active timers of this member
-  useEffect(() => {
-    const hasActive = tasks.some(t => {
-      const ma = getMemberAssignment(t, memberId);
-      return ma && ma.timer_started_at;
-    });
-    if (!hasActive) return;
-
-    const interval = setInterval(() => {
-      setNowTime(Date.now());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [tasks, memberId]);
-
-  const getMemberTime = (task: Task): number => {
-    const ma = getMemberAssignment(task, memberId);
-    if (!ma) return 0;
-    let elapsed = ma.total_time_spent || 0;
-    if (ma.timer_started_at) {
-      const started = new Date(ma.timer_started_at).getTime();
-      const diffSeconds = Math.max(0, Math.floor((nowTime - started) / 1000));
-      elapsed += diffSeconds;
-    }
-    return elapsed;
-  };
 
   // Task Target States
   const [targetMonth, setTargetMonth] = useState<string>(new Date().toISOString().substring(0, 7));
@@ -495,118 +444,19 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
               </div>
             ) : viewMode === 'list' ? (
               /* LIST VIEW */
-              <div className="flex flex-col gap-3">
-                {filteredTasks.map(task => {
-                  const mStatus = getMemberStatus(task, memberId);
-                  const overdue = isOverdue(task.due_date, mStatus);
-
-                  return (
-                    <div
-                      key={task.id}
-                      onClick={() => router.push(`/dashboard/tasks/${task.id}`)}
-                      className="block cursor-pointer"
-                    >
-                      <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} hover:-translate-y-0.5`}>
-                        <CardContent className="p-5 flex flex-col gap-4">
-                          {/* Badges & Date Header */}
-                          <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <StatusBadge status={mStatus} />
-                              <PriorityBadge priority={task.priority} />
-                              {overdue && (
-                                <Badge variant="destructive" className="text-[10px] gap-1 font-semibold">
-                                  <AlertTriangle className="size-2.5" /> {t('common.overdue')}
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              {/* Logged Time (except for sales) */}
-                              {(() => {
-                                if (member?.role === 'sales') return null;
-                                const ma = getMemberAssignment(task, memberId);
-                                if (!ma) return null;
-                                const time = getMemberTime(task);
-                                if (time === 0 && !ma.timer_started_at) return null;
-                                return (
-                                  <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold select-none">
-                                    ⏱️ {formatDuration(time)}
-                                    {ma.timer_started_at && (
-                                      <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 px-1.5 py-0.5 rounded-full select-none animate-pulse ml-1">
-                                        {locale === 'ar' ? 'نشط' : 'active'}
-                                      </span>
-                                    )}
-                                  </span>
-                                );
-                              })()}
-                              {member?.role !== 'sales' && ((ma) => ma && (ma.total_time_spent > 0 || ma.timer_started_at))(getMemberAssignment(task, memberId)) && <span>·</span>}
-                              <div className={`flex items-center gap-1 ${overdue ? 'text-rose-600 font-bold' : ''}`}>
-                                <Calendar className="size-3.5" /> {formatDate(task.due_date, locale, t)}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Task Title & Desc */}
-                          <div>
-                            <h3 className="font-bold text-base hover:text-indigo-600 transition-colors leading-snug">
-                              {task.title}
-                            </h3>
-                            {task.description && (
-                              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
-                                {task.description}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Meta Updates (Submissions, revisions, progress) */}
-                          {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback); })() && (
-                            <div className="border-t border-dashed pt-3 mt-1 flex flex-col gap-2.5">
-                              {/* Member Completion Note */}
-                              {getMemberAssignment(task, memberId)?.completion_note && (
-                                <div className="flex items-start gap-2.5 bg-blue-50/50 border border-blue-100 rounded-lg p-3 text-blue-900">
-                                  <Zap className="size-4 text-blue-500 shrink-0 mt-0.5" />
-                                  <div>
-                                    <div className="text-[9px] font-bold text-blue-700 uppercase tracking-wide">{t('taskDetail.finalThoughts')}</div>
-                                    <p className="text-xs italic mt-0.5 leading-relaxed">&ldquo;{getMemberAssignment(task, memberId)?.completion_note}&rdquo;</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Work Submission */}
-                              {getMemberAssignment(task, memberId)?.submission_link && (
-                                <div className="flex items-center justify-between gap-3 bg-green-50/50 border border-green-100 rounded-lg p-3 text-green-900 flex-wrap">
-                                  <div className="flex items-center gap-2">
-                                    <Upload className="size-4 text-green-500 shrink-0" />
-                                    <span className="text-xs font-semibold">{t('taskDetail.workSubmitted')}</span>
-                                  </div>
-                                  <a
-                                    href={getMemberAssignment(task, memberId)?.submission_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={e => e.stopPropagation()}
-                                    className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 py-1.5 px-3 rounded-md transition-colors"
-                                  >
-                                    {t('taskDetail.viewSubmission')} ↗
-                                  </a>
-                                </div>
-                              )}
-
-                              {/* Admin Revision Feedback */}
-                              {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
-                                <div className="flex items-start gap-2.5 bg-orange-50/50 border border-orange-100 rounded-lg p-3 text-orange-950">
-                                  <RefreshCw className="size-4 text-orange-500 shrink-0 mt-0.5" />
-                                  <div>
-                                    <div className="text-[9px] font-bold text-orange-700 uppercase tracking-wide">{t('taskDetail.revisionRequired')}</div>
-                                    <p className="text-xs mt-0.5 leading-relaxed">{getMemberAssignment(task, memberId)?.feedback}</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  );
-                })}
+              <div className="tasks-grid">
+                {filteredTasks.map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onTaskUpdated={(updatedTask) => {
+                      setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+                    }}
+                    onTaskDeleted={(deletedTaskId) => {
+                      setTasks(prev => prev.filter(t => t.id !== deletedTaskId));
+                    }}
+                  />
+                ))}
               </div>
             ) : (
               /* KANBAN BOARD VIEW */
@@ -640,69 +490,18 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                             {t('memberDetail.noTasksColumn')}
                           </div>
                         ) : (
-                          columnTasks.map(task => {
-                            const overdue = isOverdue(task.due_date, task.status);
-
-                            return (
-                              <Link key={task.id} href={`/dashboard/tasks/${task.id}`} className="block">
-                                <Card className={`hover:shadow-md transition-all duration-200 border-l-4 ${PRIORITY_BORDER_CLASSES[task.priority] || 'border-l-muted'} cursor-pointer hover:-translate-y-0.5 relative`}>
-                                  <CardContent className="p-3.5 flex flex-col gap-3">
-                                    {/* Title */}
-                                    <div className="text-xs font-bold text-foreground line-clamp-2 leading-relaxed">
-                                      {task.title}
-                                    </div>
-
-                                    {/* Due Date & Timer */}
-                                    <div className="flex flex-col gap-1">
-                                      <div className={`flex items-center justify-between text-[10px] ${overdue ? 'text-rose-600 font-bold' : 'text-muted-foreground'}`}>
-                                        <span className="flex items-center gap-1"><Calendar className="size-3" /> {formatDate(task.due_date, locale, t)}</span>
-                                        {overdue && <AlertTriangle className="size-3 text-rose-500 shrink-0" />}
-                                      </div>
-                                      {/* Logged Time (except for sales) */}
-                                      {(() => {
-                                        if (member?.role === 'sales') return null;
-                                        const ma = getMemberAssignment(task, memberId);
-                                        if (!ma) return null;
-                                        const time = getMemberTime(task);
-                                        if (time === 0 && !ma.timer_started_at) return null;
-                                        return (
-                                          <div className="flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold select-none">
-                                            ⏱️ {formatDuration(time)}
-                                            {ma.timer_started_at && (
-                                              <span className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 px-1 py-0.2 rounded-full select-none animate-pulse ml-0.5">
-                                                {locale === 'ar' ? 'نشط' : 'active'}
-                                              </span>
-                                            )}
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-
-                                    {/* Small Indicators for updates */}
-                                    {(() => { const ma = getMemberAssignment(task, memberId); return (ma?.submission_link || ma?.feedback || ma?.completion_note); })() && (
-                                      <div className="flex gap-1.5 border-t border-dashed pt-2 mt-1">
-                                         {getMemberAssignment(task, memberId)?.completion_note && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-blue-50 text-blue-600 hover:bg-blue-50" title={t('taskDetail.finalThoughts')}>
-                                             💭
-                                           </Badge>
-                                         )}
-                                         {getMemberAssignment(task, memberId)?.submission_link && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-green-50 text-green-600 hover:bg-green-50" title={t('taskDetail.workSubmitted')}>
-                                             📤
-                                           </Badge>
-                                         )}
-                                         {getMemberAssignment(task, memberId)?.feedback && getMemberStatus(task, memberId) === 'revision' && (
-                                           <Badge variant="secondary" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[8px] bg-orange-50 text-orange-600 hover:bg-orange-50" title={t('taskDetail.revisionRequired')}>
-                                             🔄
-                                           </Badge>
-                                         )}
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              </Link>
-                            );
-                          })
+                          columnTasks.map(task => (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onTaskUpdated={(updatedTask) => {
+                                setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+                              }}
+                              onTaskDeleted={(deletedTaskId) => {
+                                setTasks(prev => prev.filter(t => t.id !== deletedTaskId));
+                              }}
+                            />
+                          ))
                         )}
                       </div>
                     </div>

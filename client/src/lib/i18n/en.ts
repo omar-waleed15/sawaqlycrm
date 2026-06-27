@@ -16,6 +16,8 @@ export const en: Record<string, string> = {
   'common.add': 'Add',
   'common.view': 'View',
   'common.open': 'Open',
+  'common.download': 'Download',
+  'common.actions': 'Actions',
   'common.manage': 'Manage',
   'common.tasks': 'tasks',
   'common.yes': 'Yes',
@@ -143,6 +145,9 @@ export const en: Record<string, string> = {
   'tasks.publish': 'Publish:',
 
   // ── Task Detail Page ────────────────────────────────────────────────
+  'taskDetail.actionHub': 'Task Actions & Workspace',
+
+
   'taskDetail.backToTasks': 'Back to Tasks',
   'taskDetail.editTask': 'Edit Task',
   'taskDetail.deleteTask': 'Delete Task',

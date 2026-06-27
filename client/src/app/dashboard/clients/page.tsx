@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/auth';
 import { clientsApi, projectsApi, tasksApi } from '@/lib/api';
 import { Client, Project, Task } from '@/types';
 import Modal from '@/components/Modal';
+import ProjectCard from '@/components/ProjectCard';
+import ClientCard from '@/components/ClientCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,9 +37,6 @@ import {
   Briefcase,
   ListTodo,
   Loader2,
-  CheckCircle2,
-  Clock,
-  CircleDot,
   BarChart3,
   Check,
 } from 'lucide-react';
@@ -51,20 +50,6 @@ function formatDate(dateStr?: string, locale?: string): string {
   });
 }
 
-function getTaskOverallStatus(task: Task, t: any): { label: string; className: string; icon: typeof CheckCircle2 } {
-  if (!task.task_assignees || task.task_assignees.length === 0) {
-    return { label: t('status.todo'), className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
-  }
-  const allCompleted = task.task_assignees.every(a => a.status === 'completed');
-  if (allCompleted) {
-    return { label: t('status.completed'), className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', icon: CheckCircle2 };
-  }
-  const anyInProgress = task.task_assignees.some(a => a.status === 'in_progress' || a.status === 'submitted');
-  if (anyInProgress) {
-    return { label: t('status.in_progress'), className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: Clock };
-  }
-  return { label: t('status.todo'), className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: CircleDot };
-}
 
 function getCompletionRate(projectTasks: Task[]): number {
   if (projectTasks.length === 0) return 0;
@@ -104,109 +89,9 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-/* ─── Inline Task Table Component ─── */
-function ProjectTasksTable({ projectTasks }: { projectTasks: Task[] }) {
-  const { t, locale } = useLanguage();
 
-  if (projectTasks.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground italic py-3 ps-2">
-        {t('clients.noTasksLinked')}
-      </p>
-    );
-  }
 
-  return (
-    <div className="border rounded-lg bg-background overflow-hidden">
-      <div className="table-responsive">
-        <table className="table" style={{ margin: 0 }}>
-          <thead>
-            <tr className="text-xs text-muted-foreground bg-muted/20">
-              <th className="py-2.5 px-4 font-bold text-start">{t('clients.taskTitle')}</th>
-              <th className="py-2.5 px-4 font-bold text-start">{t('clients.assignees')}</th>
-              <th className="py-2.5 px-4 font-bold text-start">{t('tasks.dueDate')}</th>
-              <th className="py-2.5 px-4 font-bold text-start">{t('clients.status')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {projectTasks.map(tTask => {
-              const overall = getTaskOverallStatus(tTask, t);
-              const StatusIcon = overall.icon;
-              return (
-                <tr key={tTask.id} className="text-xs hover:bg-muted/5 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-foreground text-start">
-                    <a
-                      href={`/dashboard/tasks/${tTask.id}`}
-                      className="hover:underline hover:text-indigo-600 dark:hover:text-indigo-400"
-                    >
-                      {tTask.title}
-                    </a>
-                  </td>
-                  <td className="py-3 px-4 text-start">
-                    <div className="flex -space-x-1.5 overflow-hidden">
-                      {tTask.task_assignees && tTask.task_assignees.length > 0 ? (
-                        tTask.task_assignees.map(a => {
-                          if (!a.user) return null;
-                          return (
-                            <div
-                              key={a.id}
-                              title={`${a.user.name} (${a.status})`}
-                              className="size-5 rounded-full ring-2 ring-background bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[7px] font-bold text-white shrink-0"
-                            >
-                              {getInitials(a.user.name)}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <span className="text-muted-foreground italic text-[10px]">{t('common.unassigned')}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-muted-foreground text-start">
-                    {tTask.due_date ? formatDate(tTask.due_date, locale) : t('taskDetail.noDueDate')}
-                  </td>
-                  <td className="py-3 px-4 text-start">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${overall.className}`}>
-                      <StatusIcon className="size-3" />
-                      {overall.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
-/* ─── Completion Badge Component ─── */
-function CompletionBadge({ rate, total }: { rate: number; total: number }) {
-  const { t } = useLanguage();
-  const color =
-    rate >= 100 ? 'text-emerald-600 dark:text-emerald-400' :
-    rate >= 50 ? 'text-blue-600 dark:text-blue-400' :
-    rate > 0 ? 'text-amber-600 dark:text-amber-400' :
-    'text-muted-foreground';
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            rate >= 100 ? 'bg-emerald-500' :
-            rate >= 50 ? 'bg-blue-500' :
-            rate > 0 ? 'bg-amber-500' : 'bg-muted-foreground/20'
-          }`}
-          style={{ width: `${rate}%` }}
-        />
-      </div>
-      <span className={`text-xs font-bold tabular-nums ${color}`}>{rate}%</span>
-      <span className="text-[10px] text-muted-foreground">({total} {t('common.tasks')})</span>
-    </div>
-  );
-}
 
 
 export default function ClientsDashboardPage() {
@@ -1133,300 +1018,49 @@ export default function ClientsDashboardPage() {
                 />
               </div>
 
-              {/* Clients Cards/Rows */}
-              <div className="flex flex-col gap-3">
-                {filteredClients.map(c => {
-                  const clientProjects = projects.filter(p => p.client_id === c.id);
-                  const isExpanded = expandedClientId === c.id;
+              {/* Clients Cards Grid */}
+              {filteredClients.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {filteredClients.map(c => {
+                    const clientProjects = projects.filter(p => p.client_id === c.id);
+                    const isExpanded = expandedClientId === c.id;
 
-                  // Aggregate project tasks for this client
-                  const allClientTasks = clientProjects.flatMap(p => getProjectTasks(p.id));
-                  const clientCompletionRate = getCompletionRate(allClientTasks);
-
-                  return (
-                    <Card key={c.id} className="overflow-hidden transition-all duration-200">
-                      <div
-                        onClick={() => setExpandedClientId(isExpanded ? null : c.id)}
-                        className="p-5 flex items-center justify-between cursor-pointer hover:bg-muted/10 transition-colors select-none"
-                      >
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="size-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold shrink-0">
-                            {c.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 flex-1">
-                            <div>
-                              <h3 className="text-sm font-bold text-foreground leading-tight">{c.name}</h3>
-                              <p className="text-xs text-muted-foreground truncate">{c.company || t('clients.privateClient')}</p>
-                            </div>
-                            <div className="text-xs text-muted-foreground self-center text-start">
-                              {c.email && <div>📧 {c.email}</div>}
-                              {c.phone && <div>📞 {c.phone}</div>}
-                            </div>
-                            <div className="self-center">
-                              {allClientTasks.length > 0 && (
-                                <CompletionBadge rate={clientCompletionRate} total={allClientTasks.length} />
-                              )}
-                            </div>
-                            <div className="flex gap-2 items-center md:justify-end">
-                              <Badge variant={c.status === 'active' ? 'default' : 'secondary'}>
-                                {c.status === 'active' ? t('clients.active') : t('clients.inactive')}
-                              </Badge>
-                              <Badge variant="outline">
-                                {clientProjects.length} {t('clients.projects')}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="pl-4 rtl:pl-0 rtl:pr-4">
-                          {isExpanded ? (
-                            <ChevronUp className="size-5 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="size-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </div>
-
-                      {isExpanded && (
-                        <CardContent className="border-t border-border bg-muted/5 p-6 flex flex-col gap-6">
-                          {/* Client Profile details */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                👥 {t('clients.contactDetails')}
-                              </h4>
-                              <div className="text-sm space-y-1 text-start">
-                                <div className="font-semibold">{c.name}</div>
-                                {c.company && <div className="text-muted-foreground">{c.company}</div>}
-                                {c.email && <div className="text-muted-foreground truncate">{c.email}</div>}
-                                {c.phone && <div className="text-muted-foreground">{c.phone}</div>}
-                              </div>
-                              <div className="flex gap-2 justify-end mt-2 pt-2 border-t">
-                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); resetClientForm(c); setClientModalOpen(true); }}>
-                                  <Edit className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('common.edit')}
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClient(c.id, c.name); }}>
-                                  <Trash2 className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('common.delete')}
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                <MapPin className="size-3.5" /> {t('clients.addressTimeline')}
-                              </h4>
-                              <div className="text-sm space-y-2 text-start">
-                                <div className="flex gap-1.5 items-start">
-                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">{t('clients.startDate')}</span>
-                                  <span>{c.start_date ? formatDate(c.start_date, locale) : t('clients.notSpecified')}</span>
-                                </div>
-                                <div className="flex gap-1.5 items-start">
-                                  <span className="text-xs text-muted-foreground font-semibold shrink-0">{t('clients.address')}</span>
-                                  <span className="text-muted-foreground whitespace-pre-line leading-snug">
-                                    {c.address || t('clients.noAddress')}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="bg-background border rounded-lg p-4 flex flex-col gap-2.5">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                  📁 {t('clients.deliverables')}
-                                </h4>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); openProgressModal(c); }}
-                                >
-                                  <BarChart3 className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('clients.updateProgress')}
-                                </Button>
-                              </div>
-                              <div className="text-sm space-y-2.5 flex-1 flex flex-col justify-between">
-                                {/* Content deliverable progress */}
-                                <div className="grid grid-cols-4 gap-2">
-                                  {[
-                                    { label: t('clients.posts'), done: c.done_posts ?? 0, total: c.num_posts ?? 0 },
-                                    { label: t('clients.reels'), done: c.done_reels ?? 0, total: c.num_reels ?? 0 },
-                                    { label: t('clients.stories'), done: c.done_stories ?? 0, total: c.num_stories ?? 0 },
-                                    { label: t('clients.photos'), done: c.done_photos ?? 0, total: c.num_photos ?? 0 },
-                                  ].map(item => {
-                                    const pct = item.total > 0 ? Math.round((item.done / item.total) * 100) : 0;
-                                    const isComplete = item.total > 0 && item.done >= item.total;
-                                    return (
-                                      <div key={item.label} className="text-center bg-muted/30 rounded-md py-2.5 px-1 relative overflow-hidden">
-                                        {item.total > 0 && (
-                                          <div
-                                            className={`absolute bottom-0 left-0 h-1 rounded-full transition-all duration-500 ${
-                                              isComplete ? 'bg-emerald-500' : pct > 0 ? 'bg-indigo-500' : 'bg-transparent'
-                                            }`}
-                                            style={{ width: `${Math.min(pct, 100)}%` }}
-                                          />
-                                        )}
-                                        <div className={`text-base font-bold tabular-nums ${
-                                          isComplete ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'
-                                        }`}>
-                                          {item.done}/{item.total}
-                                        </div>
-                                        <div className="text-[10px] text-muted-foreground font-semibold">{item.label}</div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                {/* Others row */}
-                                {c.other_deliverables && (
-                                  <div className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-2">
-                                    <span className="text-xs text-muted-foreground text-start">
-                                      <span className="font-semibold">{t('clients.others')}</span> {c.other_deliverables}
-                                    </span>
-                                    <span className={`text-xs font-bold ${
-                                      c.done_other ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
-                                    }`}>
-                                      {c.done_other ? '1/1 ✓' : '0/1'}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Content Plan link */}
-                                {c.content_plan_link ? (
-                                  <a
-                                    href={c.content_plan_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-xs transition-colors border border-indigo-200 dark:border-indigo-800/40 w-fit"
-                                  >
-                                    {t('clients.openContentPlan')} <ExternalLink className="size-3" />
-                                  </a>
-                                ) : (
-                                  <div className="text-muted-foreground italic text-xs text-start">
-                                    {t('clients.noContentPlan')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Client Projects with inline expandable tasks */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                <Briefcase className="size-3.5" /> {t('clients.projects')} ({clientProjects.length})
-                              </h4>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  resetProjectForm(undefined, c.id);
-                                  setProjectModalOpen(true);
-                                }}
-                              >
-                                <Plus className="size-3 mr-1 rtl:ml-1 rtl:mr-0" /> {t('clients.newProject')}
-                              </Button>
-                            </div>
-                            {clientProjects.length > 0 ? (
-                              <div className="flex flex-col gap-2">
-                                {clientProjects.map(p => {
-                                  const cfg = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
-                                  const pTasks = getProjectTasks(p.id);
-                                  const rate = getCompletionRate(pTasks);
-                                  const isProjExpanded = expandedProjectId === p.id;
-
-                                  return (
-                                    <div key={p.id} className="border rounded-lg bg-background overflow-hidden">
-                                      {/* Project header row */}
-                                      <div
-                                        onClick={() => setExpandedProjectId(isProjExpanded ? null : p.id)}
-                                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/10 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3 flex-1">
-                                          <div className={`size-2 rounded-full shrink-0 ${
-                                            p.status === 'active' ? 'bg-indigo-500' :
-                                            p.status === 'completed' ? 'bg-emerald-500' :
-                                            p.status === 'on_hold' ? 'bg-amber-500' : 'bg-slate-400'
-                                          }`} />
-                                          <div className="flex-1 min-w-0 text-start">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <span className="font-semibold text-sm text-foreground">{p.name}</span>
-                                              <Badge className={`${cfg.className} text-[10px] px-2 py-0`}>{t(cfg.labelKey)}</Badge>
-                                            </div>
-                                            {p.description && (
-                                              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{p.description}</p>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-4 shrink-0">
-                                            <CompletionBadge rate={rate} total={pTasks.length} />
-                                            <div className="flex gap-1">
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 w-7 p-0"
-                                                onClick={(e) => { e.stopPropagation(); resetProjectForm(p); setProjectModalOpen(true); }}
-                                              >
-                                                <Edit className="size-3" />
-                                              </Button>
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteProject(p.id, p.name); }}
-                                              >
-                                                <Trash2 className="size-3" />
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <div className="pl-3 rtl:pl-0 rtl:pr-3">
-                                          {isProjExpanded ? (
-                                            <ChevronUp className="size-4 text-muted-foreground" />
-                                          ) : (
-                                            <ChevronDown className="size-4 text-muted-foreground" />
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Expanded project tasks */}
-                                      {isProjExpanded && (
-                                        <div className="border-t border-border bg-muted/5 p-4">
-                                          <div className="flex items-center justify-between mb-3">
-                                            <h5 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                              <ListTodo className="size-3.5" /> {t('common.tasks')} ({pTasks.length})
-                                            </h5>
-                                            {pTasks.length > 0 && (
-                                              <div className="flex items-center gap-2 text-xs">
-                                                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                                  {pTasks.filter(tTask => tTask.task_assignees?.every(a => a.status === 'completed')).length} {t('status.completed')}
-                                                </span>
-                                                <span className="text-muted-foreground">·</span>
-                                                <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                                                  {pTasks.filter(tTask => !tTask.task_assignees?.every(a => a.status === 'completed')).length} {t('status.in_progress')}
-                                                </span>
-                                              </div>
-                                            )}
-                                          </div>
-                                          <ProjectTasksTable projectTasks={pTasks} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground italic pl-1 text-start">{t('clients.noProjects')}</p>
-                            )}
-                          </div>
-                        </CardContent>
-                      )}
-                    </Card>
-                  );
-                })}
-                {filteredClients.length === 0 && (
-                  <div className="text-center py-10 border rounded-lg border-dashed text-muted-foreground text-sm">
-                    {t('clients.noClientsFound')}
-                  </div>
-                )}
-              </div>
+                    return (
+                      <ClientCard
+                        key={c.id}
+                        client={c}
+                        clientProjects={clientProjects}
+                        getProjectTasks={getProjectTasks}
+                        locale={locale}
+                        t={t}
+                        isExpanded={isExpanded}
+                        onToggleExpand={() => setExpandedClientId(isExpanded ? null : c.id)}
+                        onEditClick={(client) => {
+                          resetClientForm(client);
+                          setClientModalOpen(true);
+                        }}
+                        onDeleteClick={handleDeleteClient}
+                        onUpdateProgressClick={openProgressModal}
+                        expandedProjectId={expandedProjectId}
+                        onToggleExpandProject={setExpandedProjectId}
+                        onEditProjectClick={(proj) => {
+                          resetProjectForm(proj);
+                          setProjectModalOpen(true);
+                        }}
+                        onDeleteProjectClick={handleDeleteProject}
+                        onNewProjectClick={(clientId) => {
+                          resetProjectForm(undefined, clientId);
+                          setProjectModalOpen(true);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-10 border rounded-lg border-dashed text-muted-foreground text-sm bg-card">
+                  {t('clients.noClientsFound')}
+                </div>
+              )}
             </div>
           )}
 
@@ -1464,77 +1098,26 @@ export default function ClientsDashboardPage() {
                     </div>
 
                     {/* Project cards under this client */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-11 rtl:pl-0 rtl:pr-11">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-11 rtl:pl-0 rtl:pr-11">
                       {clientProjs.map(p => {
-                        const cfg = PROJECT_STATUS_CONFIG[p.status] || PROJECT_STATUS_CONFIG.planning;
                         const pTasks = getProjectTasks(p.id);
-                        const rate = getCompletionRate(pTasks);
                         const isProjExpanded = expandedProjectId === p.id;
 
                         return (
-                          <Card key={p.id} className="relative overflow-hidden group hover:shadow-md transition-all duration-200 border border-border flex flex-col">
-                            {/* Top accent line */}
-                            <div className={`h-1.5 w-full ${
-                              p.status === 'planning' ? 'bg-slate-400' :
-                              p.status === 'active' ? 'bg-indigo-500' :
-                              p.status === 'on_hold' ? 'bg-amber-500' : 'bg-emerald-500'
-                            }`} />
-
-                            <CardContent className="p-5 flex flex-col gap-3 flex-1">
-                              {/* Header */}
-                              <div className="flex justify-between items-start gap-3">
-                                <h3 className="font-bold text-sm text-foreground leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors text-start">
-                                  {p.name}
-                                </h3>
-                                <Badge className={`${cfg.className} shrink-0 text-[10px] px-2 py-0`}>{t(cfg.labelKey)}</Badge>
-                              </div>
-
-                              {/* Description */}
-                              {p.description ? (
-                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed text-start">{p.description}</p>
-                              ) : (
-                                <p className="text-xs text-muted-foreground/40 italic text-start">{t('taskDetail.noDescription')}</p>
-                              )}
-
-                              {/* Completion Rate */}
-                              <div className="pt-2 border-t border-border/60">
-                                <CompletionBadge rate={rate} total={pTasks.length} />
-                              </div>
-
-                              {/* Timeline */}
-                              <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                                <span className="flex items-center gap-1"><Calendar className="size-3 text-indigo-500" /> {p.start_date ? formatDate(p.start_date, locale) : t('common.noData')}</span>
-                                <span>—</span>
-                                <span className="flex items-center gap-1 font-semibold text-foreground"><Calendar className="size-3 text-rose-500" /> {p.end_date ? formatDate(p.end_date, locale) : t('common.noData')}</span>
-                              </div>
-
-                              {/* Expand tasks button */}
-                              <button
-                                onClick={() => setExpandedProjectId(isProjExpanded ? null : p.id)}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors pt-1"
-                              >
-                                {isProjExpanded ? <ChevronUp className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                                {isProjExpanded ? t('common.close') : `${t('common.view')} (${pTasks.length})`}
-                              </button>
-
-                              {/* Actions */}
-                              <div className="flex gap-2 justify-end pt-2 border-t border-border/60">
-                                <Button size="sm" variant="outline" onClick={() => { resetProjectForm(p); setProjectModalOpen(true); }} className="h-8 text-xs">
-                                  <Edit className="size-3 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('common.edit')}
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleDeleteProject(p.id, p.name)} className="h-8 text-xs">
-                                  <Trash2 className="size-3 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('common.delete')}
-                                </Button>
-                              </div>
-                            </CardContent>
-
-                            {/* Expanded task list below card */}
-                            {isProjExpanded && (
-                              <div className="border-t border-border bg-muted/5 p-4">
-                                <ProjectTasksTable projectTasks={pTasks} />
-                              </div>
-                            )}
-                          </Card>
+                          <ProjectCard
+                            key={p.id}
+                            project={p}
+                            projectTasks={pTasks}
+                            locale={locale}
+                            t={t}
+                            isExpanded={isProjExpanded}
+                            onToggleExpand={() => setExpandedProjectId(isProjExpanded ? null : p.id)}
+                            onEditClick={(proj) => {
+                              resetProjectForm(proj);
+                              setProjectModalOpen(true);
+                            }}
+                            onDeleteClick={handleDeleteProject}
+                          />
                         );
                       })}
                     </div>

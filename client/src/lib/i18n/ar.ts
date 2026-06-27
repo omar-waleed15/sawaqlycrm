@@ -16,6 +16,8 @@ export const ar: Record<string, string> = {
   'common.add': 'إضافة',
   'common.view': 'عرض',
   'common.open': 'فتح',
+  'common.download': 'تنزيل',
+  'common.actions': 'الإجراءات',
   'common.manage': 'إدارة',
   'common.tasks': 'مهام',
   'common.yes': 'نعم',
@@ -143,6 +145,9 @@ export const ar: Record<string, string> = {
   'tasks.publish': 'نشر:',
 
   // ── تفاصيل المهمة ──────────────────────────────────────────────────
+  'taskDetail.actionHub': 'إجراءات ومساحة العمل',
+
+
   'taskDetail.backToTasks': 'العودة للمهام',
   'taskDetail.editTask': 'تعديل المهمة',
   'taskDetail.deleteTask': 'حذف المهمة',
