@@ -365,10 +365,10 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
       return;
     }
 
-    // 2. Update client pipeline_stage to 'won'
+    // 2. Update client pipeline_stage to 'won' and sales_rep_id if not set
     await supabaseAdmin
       .from('clients')
-      .update({ pipeline_stage: 'won' })
+      .update({ pipeline_stage: 'won', sales_rep_id: lead.sales_rep_id || salesRepId })
       .eq('id', leadId);
 
     // 3. Create Project

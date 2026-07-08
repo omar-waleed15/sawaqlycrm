@@ -4,8 +4,8 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, projectsApi, attachmentsApi } from '@/lib/api';
-import { User, Project, Attachment } from '@/types';
+import { tasksApi, usersApi, clientsApi, attachmentsApi } from '@/lib/api';
+import { User, Client, Attachment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,7 +31,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const { t, locale } = useLanguage();
   const router = useRouter();
   const [members, setMembers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +47,13 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     drive_link: '',
     content_type: '',
     content_description: '',
-    project_id: '',
+    client_id: '',
+    is_deliverable: false,
+    deliverable_type: 'post' as 'post' | 'reel' | 'story' | 'photo',
+    deliverable_month: (() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    })(),
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -61,10 +67,10 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     Promise.all([
       tasksApi.get(id),
       usersApi.list(),
-      projectsApi.list(),
-    ]).then(([taskData, usersData, projectsData]) => {
-      const t = taskData.task;
-      const myA = t.task_assignees?.find((a: any) => a.user_id === user?.id);
+      clientsApi.list(),
+    ]).then(([taskData, usersData, clientsData]) => {
+      const tData = taskData.task;
+      const myA = tData.task_assignees?.find((a: any) => a.user_id === user?.id);
 
       const isOwnerRole = user?.role === 'owner';
       const isOtherAdminRole = user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
@@ -76,21 +82,27 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       }
 
       setForm({
-        title: t.title,
-        description: t.description || '',
-        priority: t.priority,
-        due_date: t.due_date ? t.due_date.split('T')[0] : '',
-        drive_link: t.drive_link || '',
-        content_type: t.content_type || '',
-        content_description: t.content_description || '',
-        project_id: t.project_id || '',
+        title: tData.title,
+        description: tData.description || '',
+        priority: tData.priority,
+        due_date: tData.due_date ? tData.due_date.split('T')[0] : '',
+        drive_link: tData.drive_link || '',
+        content_type: tData.content_type || '',
+        content_description: tData.content_description || '',
+        client_id: tData.client_id || '',
+        is_deliverable: tData.is_deliverable || false,
+        deliverable_type: tData.deliverable_type || 'post',
+        deliverable_month: tData.deliverable_month ? tData.deliverable_month.substring(0, 7) : (() => {
+          const now = new Date();
+          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        })(),
       });
       // Load existing assignees from task_assignees
-      const existingIds = (t.task_assignees || []).map(a => a.user_id);
+      const existingIds = (tData.task_assignees || []).map(a => a.user_id);
       setAssigneeIds(existingIds);
-      setMembers(usersData.users);
-      setProjects(projectsData.projects);
-      setExistingAttachments(t.attachments || []);
+      setMembers((usersData.users || []).filter((u: any) => u.role !== 'client'));
+      setClients(clientsData.clients);
+      setExistingAttachments(tData.attachments || []);
     }).catch(() => router.replace('/dashboard/tasks'))
       .finally(() => setLoading(false));
   }, [id, user, router]);
@@ -156,7 +168,10 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
-        project_id: (form.project_id && form.project_id !== 'none') ? form.project_id : undefined,
+        client_id: form.client_id || undefined,
+        is_deliverable: form.is_deliverable,
+        deliverable_type: form.is_deliverable ? form.deliverable_type : undefined,
+        deliverable_month: form.is_deliverable ? `${form.deliverable_month}-01` : undefined,
         assignee_ids: assigneeIds,
       });
 
@@ -286,21 +301,77 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="project_id">{t('createTask.linkToProject')}</Label>
-                <Select value={form.project_id || 'none'} onValueChange={v => handleSelectChange('project_id', v || '')}>
-                  <SelectTrigger id="project_id">
-                    <SelectValue placeholder={t('createTask.selectProject')} />
+                <Label htmlFor="client_id">{t('tasks.client')} *</Label>
+                <Select value={form.client_id} onValueChange={v => handleSelectChange('client_id', v || '')}>
+                  <SelectTrigger id="client_id">
+                    <SelectValue placeholder={t('tasks.selectClient')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">{t('createTask.noneProject')}</SelectItem>
-                    {projects.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} {p.client ? `— ${p.client.name}` : ''}
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.company ? `(${c.company})` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Monthly Deliverables Config */}
+              {form.client_id && (
+                <div className="border border-[#1D61E7]/15 bg-[#1D61E7]/5 rounded-lg p-4 flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="is_deliverable"
+                      name="is_deliverable"
+                      type="checkbox"
+                      checked={form.is_deliverable}
+                      onChange={e => setForm(prev => ({ ...prev, is_deliverable: e.target.checked }))}
+                      className="size-4 rounded border-gray-300 text-[#1D61E7] focus:ring-[#1D61E7]"
+                    />
+                    <div className="text-start">
+                      <Label htmlFor="is_deliverable" className="font-bold text-sm cursor-pointer">
+                        🎯 {t('tasks.isDeliverable')}
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground leading-tight">
+                        {t('tasks.isDeliverableDesc')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {form.is_deliverable && (
+                    <div className="grid grid-cols-2 gap-4 pt-1">
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="deliverable_type">{t('tasks.deliverableType')}</Label>
+                        <Select
+                          value={form.deliverable_type}
+                          onValueChange={v => handleSelectChange('deliverable_type', v || 'post')}
+                        >
+                          <SelectTrigger id="deliverable_type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="post">📝 {t('closedClients.plan.post')}</SelectItem>
+                            <SelectItem value="reel">🎬 {t('closedClients.plan.reel')}</SelectItem>
+                            <SelectItem value="story">📸 {t('closedClients.plan.story')}</SelectItem>
+                            <SelectItem value="photo">🖼️ {t('closedClients.plan.photo')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="deliverable_month">{t('tasks.deliverableMonth')}</Label>
+                        <Input
+                          id="deliverable_month"
+                          name="deliverable_month"
+                          type="month"
+                          value={form.deliverable_month}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Multi-Assignee Picker */}
               <div className="border-t border-border pt-4">
@@ -317,7 +388,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                           variant="secondary"
                           className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
                         >
-                          <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+                          <div className="size-5 rounded-full bg-[#1D61E7] flex items-center justify-center text-[8px] font-bold text-white shrink-0">
                             {getInitials(m.name)}
                           </div>
                           {m.name}
@@ -367,7 +438,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     {existingAttachments.map(att => (
                       <div key={att.id} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
                         {att.mimetype?.startsWith('image/') ? (
-                          <FileImage className="size-4 text-indigo-500 shrink-0" />
+                          <FileImage className="size-4 text-[#1D61E7] shrink-0" />
                         ) : (
                           <FileText className="size-4 text-rose-500 shrink-0" />
                         )}
@@ -376,7 +447,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                           <div className="text-[10px] text-muted-foreground">{formatFileSize(att.size)}</div>
                         </div>
                         {att.public_url && (
-                          <a href={att.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium shrink-0">
+                          <a href={att.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[#1D61E7] hover:text-[#1553c7] font-medium shrink-0">
                             {t('taskDetail.openFile')} ↗
                           </a>
                         )}
@@ -391,7 +462,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                 {/* New File Upload */}
                 <label
                   htmlFor="file-upload-edit"
-                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all cursor-pointer px-4 py-6"
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-[#1D61E7] hover:bg-[#1D61E7]/5 transition-all cursor-pointer px-4 py-6"
                 >
                   <Paperclip className="size-6 text-muted-foreground" />
                   <span className="text-sm font-medium text-muted-foreground">{t('createTask.browseFiles')}</span>
@@ -412,7 +483,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     {pendingFiles.map((file, i) => (
                       <div key={`${file.name}-${i}`} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
                         {file.type.startsWith('image/') ? (
-                          <FileImage className="size-4 text-indigo-500 shrink-0" />
+                          <FileImage className="size-4 text-[#1D61E7] shrink-0" />
                         ) : (
                           <FileText className="size-4 text-rose-500 shrink-0" />
                         )}

@@ -11,6 +11,10 @@ export default function HomePage() {
   useEffect(() => {
     if (!loading) {
       if (user) {
+        if (user.role === 'client') {
+          router.replace('/client-portal');
+          return;
+        }
         router.replace('/dashboard');
       } else {
         router.replace('/login');

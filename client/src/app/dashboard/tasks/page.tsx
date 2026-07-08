@@ -163,7 +163,7 @@ export default function TasksPage() {
           onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'active'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#1D61E7] text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -174,13 +174,13 @@ export default function TasksPage() {
             onClick={() => { setActiveTab('my_tasks'); setStatusFilter(''); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'my_tasks'
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-[#1D61E7] text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             👤 {t('tasks.myTasksTab')}
             {myTasksCount > 0 && (
-              <Badge className="text-[11px] h-5 px-1.5 bg-indigo-600 hover:bg-indigo-600">{myTasksCount}</Badge>
+              <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{myTasksCount}</Badge>
             )}
           </button>
         )}
@@ -188,7 +188,7 @@ export default function TasksPage() {
           onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'completed'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#1D61E7] text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -201,13 +201,13 @@ export default function TasksPage() {
           onClick={() => { setActiveTab('scheduled'); setStatusFilter(''); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'scheduled'
-              ? 'border-indigo-600 text-indigo-600'
+              ? 'border-[#1D61E7] text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           📅 {t('tasks.scheduledTasks')}
           {scheduledCount > 0 && (
-            <Badge className="text-[11px] h-5 px-1.5 bg-indigo-600 hover:bg-indigo-600">{scheduledCount}</Badge>
+            <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{scheduledCount}</Badge>
           )}
         </button>
         {isOwner && user?.role !== 'moderation' && (
@@ -215,11 +215,11 @@ export default function TasksPage() {
             onClick={() => { setActiveTab('archived'); setStatusFilter(''); }}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'archived'
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-[#1D61E7] text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            🗄️ {t('tasks.archivedTasks')}
+            📂 {t('tasks.archivedTasks')}
           </button>
         )}
       </div>

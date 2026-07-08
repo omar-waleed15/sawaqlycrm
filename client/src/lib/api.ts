@@ -5,7 +5,7 @@ function getToken(): string | null {
   return localStorage.getItem('access_token');
 }
 
-async function request<T>(
+export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -102,7 +102,7 @@ export const usersApi = {
 
 // Tasks
 export const tasksApi = {
-  list: (params?: { status?: string; priority?: string; assignee_id?: string; archived?: string }) => {
+  list: (params?: { status?: string; priority?: string; assignee_id?: string; archived?: string; client_id?: string }) => {
     const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return request<{ tasks: import('@/types').Task[] }>(`/tasks${query}`);
   },
@@ -303,4 +303,65 @@ export const salesApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+};
+
+// Closed Clients
+export const closedClientsApi = {
+  list: () => request<{ clients: import('@/types').Client[] }>('/closed-clients'),
+  get: (id: string) => request<{ client: import('@/types').Client }>(`/closed-clients/${id}`),
+
+  // FAQ
+  listFaq: (clientId: string) =>
+    request<{ faq: import('@/types').ClientFAQ[] }>(`/closed-clients/${clientId}/faq`),
+  createFaq: (clientId: string, data: { question: string; answer: string; sort_order?: number }) =>
+    request<{ faq: import('@/types').ClientFAQ }>(`/closed-clients/${clientId}/faq`, { method: 'POST', body: JSON.stringify(data) }),
+  updateFaq: (clientId: string, faqId: string, data: Partial<import('@/types').ClientFAQ>) =>
+    request<{ faq: import('@/types').ClientFAQ }>(`/closed-clients/${clientId}/faq/${faqId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFaq: (clientId: string, faqId: string) =>
+    request(`/closed-clients/${clientId}/faq/${faqId}`, { method: 'DELETE' }),
+
+  // Content Plans
+  listPlans: (clientId: string) =>
+    request<{ plans: import('@/types').ClientContentPlan[] }>(`/closed-clients/${clientId}/content-plans`),
+  createPlan: (clientId: string, data: Partial<import('@/types').ClientContentPlan>) =>
+    request<{ plan: import('@/types').ClientContentPlan }>(`/closed-clients/${clientId}/content-plans`, { method: 'POST', body: JSON.stringify(data) }),
+  updatePlan: (clientId: string, planId: string, data: Partial<import('@/types').ClientContentPlan>) =>
+    request<{ plan: import('@/types').ClientContentPlan }>(`/closed-clients/${clientId}/content-plans/${planId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePlan: (clientId: string, planId: string) =>
+    request(`/closed-clients/${clientId}/content-plans/${planId}`, { method: 'DELETE' }),
+
+  // Ideas
+  listIdeas: (clientId: string) =>
+    request<{ ideas: import('@/types').ClientIdea[] }>(`/closed-clients/${clientId}/ideas`),
+  createIdea: (clientId: string, data: Partial<import('@/types').ClientIdea>) =>
+    request<{ idea: import('@/types').ClientIdea }>(`/closed-clients/${clientId}/ideas`, { method: 'POST', body: JSON.stringify(data) }),
+  updateIdea: (clientId: string, ideaId: string, data: Partial<import('@/types').ClientIdea>) =>
+    request<{ idea: import('@/types').ClientIdea }>(`/closed-clients/${clientId}/ideas/${ideaId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteIdea: (clientId: string, ideaId: string) =>
+    request(`/closed-clients/${clientId}/ideas/${ideaId}`, { method: 'DELETE' }),
+  uploadIdeaAttachment: (clientId: string, formData: FormData) =>
+    uploadFile(`/closed-clients/${clientId}/ideas/upload`, formData) as Promise<{ public_url: string; filename: string }>,
+
+  // Reports
+  listReports: (clientId: string) =>
+    request<{ reports: import('@/types').ClientReport[] }>(`/closed-clients/${clientId}/reports`),
+  createReport: (clientId: string, data: Partial<import('@/types').ClientReport>) =>
+    request<{ report: import('@/types').ClientReport }>(`/closed-clients/${clientId}/reports`, { method: 'POST', body: JSON.stringify(data) }),
+  updateReport: (clientId: string, reportId: string, data: Partial<import('@/types').ClientReport>) =>
+    request<{ report: import('@/types').ClientReport }>(`/closed-clients/${clientId}/reports/${reportId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteReport: (clientId: string, reportId: string) =>
+    request(`/closed-clients/${clientId}/reports/${reportId}`, { method: 'DELETE' }),
+};
+
+// Reminders API
+export const remindersApi = {
+  list: () => request<{ reminders: import('@/types').Reminder[] }>('/reminders'),
+  create: (data: { receiver_ids: string[]; content: string }) =>
+    request<{ reminders: import('@/types').Reminder[] }>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
+  markRead: (id: string) =>
+    request<{ reminder: import('@/types').Reminder }>(`/reminders/${id}/read`, { method: 'PUT' }),
+  markDone: (id: string) =>
+    request<{ reminder: import('@/types').Reminder }>(`/reminders/${id}/done`, { method: 'PUT' }),
+  delete: (id: string) =>
+    request(`/reminders/${id}`, { method: 'DELETE' }),
 };

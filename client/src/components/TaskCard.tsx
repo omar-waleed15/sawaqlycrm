@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Task, TaskAssignee, User, Project } from '@/types';
+import { Task, TaskAssignee, User, Client } from '@/types';
 import { PriorityBadge } from './Badges';
 import { useAuth } from '@/lib/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, projectsApi } from '@/lib/api';
+import { tasksApi, usersApi, clientsApi } from '@/lib/api';
 import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
 import {
   DropdownMenu,
@@ -108,7 +108,7 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
   // Edit Modal State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [members, setMembers] = useState<User[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loadingLists, setLoadingLists] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -121,7 +121,13 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
     drive_link: task.drive_link || '',
     content_type: task.content_type || '',
     content_description: task.content_description || '',
-    project_id: task.project_id || '',
+    client_id: task.client_id || '',
+    is_deliverable: task.is_deliverable || false,
+    deliverable_type: task.deliverable_type || 'post',
+    deliverable_month: task.deliverable_month ? task.deliverable_month.substring(0, 7) : (() => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    })(),
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
@@ -139,26 +145,32 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
         drive_link: task.drive_link || '',
         content_type: task.content_type || '',
         content_description: task.content_description || '',
-        project_id: task.project_id || '',
+        client_id: task.client_id || '',
+        is_deliverable: task.is_deliverable || false,
+        deliverable_type: task.deliverable_type || 'post',
+        deliverable_month: task.deliverable_month ? task.deliverable_month.substring(0, 7) : (() => {
+          const now = new Date();
+          return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        })(),
       });
       setAssigneeIds((task.task_assignees || []).map(a => a.user_id));
       setError('');
     }
   }, [task, isEditDialogOpen]);
 
-  // Lazy load members and projects lists
+  // Lazy load members and clients lists
   useEffect(() => {
     if (!isEditDialogOpen) return;
     setLoadingLists(true);
     Promise.all([
       usersApi.list(),
-      projectsApi.list(),
-    ]).then(([usersData, projectsData]) => {
+      clientsApi.list(),
+    ]).then(([usersData, clientsData]) => {
       setMembers(usersData.users);
-      setProjects(projectsData.projects);
+      setClients(clientsData.clients);
     }).catch(err => {
       console.error(err);
-      setError('Failed to load members or projects');
+      setError('Failed to load members or clients');
     }).finally(() => setLoadingLists(false));
   }, [isEditDialogOpen]);
 
@@ -229,7 +241,10 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
-        project_id: (form.project_id && form.project_id !== 'none') ? form.project_id : undefined,
+        client_id: form.client_id || undefined,
+        is_deliverable: form.is_deliverable,
+        deliverable_type: form.is_deliverable ? form.deliverable_type : undefined,
+        deliverable_month: form.is_deliverable ? `${form.deliverable_month}-01` : undefined,
         assignee_ids: assigneeIds,
       });
       setIsEditDialogOpen(false);
@@ -314,6 +329,11 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
 
           {/* Body Section: Title & Description */}
           <div className="flex flex-col text-start">
+            {task.client && (
+              <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1 block">
+                💼 {task.client.name}
+              </span>
+            )}
             <h3 className="text-sm font-semibold text-foreground leading-snug break-words">
               {task.title}
             </h3>
@@ -614,24 +634,81 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="edit-project_id">{t('createTask.linkToProject')}</Label>
+                  <Label htmlFor="edit-client_id">{t('tasks.client')} *</Label>
                   <Select 
-                    value={form.project_id || 'none'} 
-                    onValueChange={v => handleSelectChange('project_id', v || '')}
+                    value={form.client_id || 'none'} 
+                    onValueChange={v => handleSelectChange('client_id', v === 'none' || !v ? '' : v)}
                   >
-                    <SelectTrigger id="edit-project_id">
-                      <SelectValue placeholder={t('createTask.selectProject')} />
+                    <SelectTrigger id="edit-client_id">
+                      <SelectValue placeholder={t('tasks.selectClient')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{t('createTask.noneProject')}</SelectItem>
-                      {projects.map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name} {p.client ? `— ${p.client.name}` : ''}
+                      <SelectItem value="none">— None —</SelectItem>
+                      {clients.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name} {c.company ? `(${c.company})` : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Monthly Deliverables Config */}
+                {form.client_id && form.client_id !== 'none' && (
+                  <div className="border border-indigo-100 bg-indigo-50/20 dark:border-indigo-950/40 dark:bg-indigo-950/5 rounded-lg p-4 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="edit-is_deliverable"
+                        name="is_deliverable"
+                        type="checkbox"
+                        checked={form.is_deliverable}
+                        onChange={e => setForm(prev => ({ ...prev, is_deliverable: e.target.checked }))}
+                        className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="text-start">
+                        <Label htmlFor="edit-is_deliverable" className="font-bold text-sm cursor-pointer">
+                          🎯 {t('tasks.isDeliverable')}
+                        </Label>
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          {t('tasks.isDeliverableDesc')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {form.is_deliverable && (
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="edit-deliverable_type">{t('tasks.deliverableType')}</Label>
+                          <Select
+                            value={form.deliverable_type}
+                            onValueChange={v => handleSelectChange('deliverable_type', v || 'post')}
+                          >
+                            <SelectTrigger id="edit-deliverable_type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="post">📝 {t('closedClients.plan.post')}</SelectItem>
+                              <SelectItem value="reel">🎬 {t('closedClients.plan.reel')}</SelectItem>
+                              <SelectItem value="story">📸 {t('closedClients.plan.story')}</SelectItem>
+                              <SelectItem value="photo">🖼️ {t('closedClients.plan.photo')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <Label htmlFor="edit-deliverable_month">{t('tasks.deliverableMonth')}</Label>
+                          <Input
+                            id="edit-deliverable_month"
+                            name="deliverable_month"
+                            type="month"
+                            value={form.deliverable_month}
+                            onChange={handleChange}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Multi-Assignee Picker */}
                 <div className="border-t border-border pt-3">

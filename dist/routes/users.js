@@ -243,7 +243,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
         res.status(400).json({ error: 'Name, email, and password are required' });
         return;
     }
-    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'];
+    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'];
     const userRole = validRoles.includes(role) ? role : 'member';
     try {
         // Create user in Supabase Auth
@@ -308,7 +308,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         const updates = {};
         if (name)
             updates.name = name;
-        if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'].includes(role))
+        if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'].includes(role))
             updates.role = role;
         if (email)
             updates.email = email;

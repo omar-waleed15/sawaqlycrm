@@ -396,7 +396,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {(task.drive_link || task.content_description || (task.attachments && task.attachments.length > 0)) && (
                 <div className="border-t pt-4 mt-1 flex flex-col gap-4">
-                  <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-[#1D61E7] uppercase tracking-wider flex items-center gap-1.5">
                     🎬 {t('taskDetail.contentDetailsAssets') || 'Content Details & Assets'}
                   </h3>
 
@@ -404,17 +404,17 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {task.drive_link && (
                     <div className="flex flex-col gap-1.5 text-xs text-start">
                       <span className="font-bold text-muted-foreground uppercase tracking-wide">{t('taskDetail.googleDriveAttachments') || 'Google Drive Link'}</span>
-                      <div className="flex items-center gap-3 bg-muted/40 dark:bg-indigo-955/10 border border-border/60 p-3 rounded-lg flex-wrap min-w-0">
+                      <div className="flex items-center gap-3 bg-[#1D61E7]/5 border border-border/60 p-3 rounded-lg flex-wrap min-w-0">
                         <a
                           href={task.drive_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold break-all text-xs flex-1 min-w-0 text-start"
+                          className="text-[#1D61E7] hover:underline font-semibold break-all text-xs flex-1 min-w-0 text-start"
                         >
                           {task.drive_link}
                         </a>
                         <a href={task.drive_link} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                          <Button size="sm" className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1 rounded">
+                          <Button size="sm" className="h-7 px-3 text-xs bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1 rounded">
                             {t('common.open') || 'Open'} ↗
                           </Button>
                         </a>
@@ -532,9 +532,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               )}
 
               {/* Timer & Work Submission Card */}
-              <Card className="border-indigo-100 dark:border-indigo-900/30 overflow-hidden shadow-xs">
-                <div className="bg-indigo-50/30 dark:bg-indigo-955/20 px-5 py-3 border-b flex items-center justify-between gap-4 flex-wrap">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+              <Card className="border-slate-200 overflow-hidden shadow-xs">
+                <div className="bg-[#1D61E7]/5 px-5 py-3 border-b flex items-center justify-between gap-4 flex-wrap">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#1D61E7] flex items-center gap-1.5">
                     ⚡ {t('taskDetail.actionHub') || 'Task Actions & Workspace'}
                   </span>
                   <span className="text-[10px] font-bold text-muted-foreground uppercase bg-muted/60 border rounded-full px-2.5 py-0.5 select-none">
@@ -572,7 +572,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                           <Button
                             onClick={handleStartTimer}
                             disabled={timerLoading}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
+                            className="bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
                           >
                             ▶️ {t('taskDetail.startTimer')}
                           </Button>
@@ -587,7 +587,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       <p className="text-xs text-muted-foreground leading-normal">
                         {t('taskDetail.todoStartDesc') || 'You are assigned to this task. Click start to begin work and log your time.'}
                       </p>
-                      <Button onClick={handleStartTask} disabled={statusUpdating} className="w-fit bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-xs">
+                      <Button onClick={handleStartTask} disabled={statusUpdating} className="w-fit bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 shadow-xs">
                         {statusUpdating ? <Loader2 className="size-4 animate-spin" /> : '⚡'} {t('taskDetail.startWorking')}
                       </Button>
                     </div>
@@ -599,7 +599,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       <p className="text-xs text-muted-foreground leading-normal">
                         {t('taskDetail.revisionResumeDesc') || 'This task requires revisions. Click resume to start logging time again.'}
                       </p>
-                      <Button onClick={handleResumeWork} disabled={statusUpdating} className="w-fit bg-indigo-600 hover:bg-indigo-700 text-white font-bold gap-1.5 shadow-xs">
+                      <Button onClick={handleResumeWork} disabled={statusUpdating} className="w-fit bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 shadow-xs">
                         <RotateCcw className="size-4" /> {t('taskDetail.resumeWorking')}
                       </Button>
                     </div>
@@ -654,15 +654,15 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {/* Submitted Pending Status */}
                   {myAssignment.status === 'submitted' && (
                     <div className="flex flex-col gap-3 py-1">
-                      <p className="text-xs text-violet-800 dark:text-violet-300 bg-violet-50/50 dark:bg-violet-955/10 border border-violet-100 dark:border-violet-900/30 rounded-lg p-3 leading-relaxed">
+                      <p className="text-xs text-[#1D61E7] bg-[#1D61E7]/5 border border-[#1D61E7]/10 rounded-lg p-3 leading-relaxed">
                         {t('taskDetail.submittedPendingDesc') || 'Your work has been submitted. Admins will review it soon.'}
                       </p>
                       <div className="flex gap-2 flex-wrap items-center">
-                        <div className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2.5 py-1">
+                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1">
                           ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                         </div>
                         {myAssignment.submission_link && (
-                          <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline font-semibold flex items-center gap-1">
+                          <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-[#1D61E7] underline font-semibold flex items-center gap-1">
                             📎 {t('taskDetail.yourSubmission') || 'View Submission Link'} ↗
                           </a>
                         )}
@@ -688,7 +688,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             ⭐ {t('taskDetail.rating')}: {myAssignment.rating}/10
                           </div>
                         )}
-                        <div className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-1">
+                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1">
                           ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                         </div>
                       </div>
@@ -726,7 +726,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <Avatar className="size-8 shrink-0">
-                              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-bold">
+                              <AvatarFallback className="bg-[#1D61E7] text-white text-[10px] font-bold">
                                 {a.user ? getInitials(a.user.name) : '?'}
                               </AvatarFallback>
                             </Avatar>
@@ -743,7 +743,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                               <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5 uppercase mt-0.5">
                                 <span>{a.user?.role}</span>
                                 <span>·</span>
-                                <span className="text-indigo-600 dark:text-indigo-400">⏱️ {formatDuration(getAssigneeTime(a))}</span>
+                                <span className="text-[#1D61E7]">⏱️ {formatDuration(getAssigneeTime(a))}</span>
                               </div>
                             </div>
                           </div>
@@ -762,7 +762,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   href={a.submission_link}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-indigo-600 underline font-medium truncate max-w-[280px] hover:text-indigo-700"
+                                  className="text-[#1D61E7] underline font-medium truncate max-w-[280px] hover:text-[#1553c7]"
                                 >
                                   {a.submission_link} ↗
                                 </a>
@@ -957,7 +957,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   return (
                     <div key={comment.id} className={cn("flex gap-2.5 max-w-[85%]", isMe ? "ml-auto flex-row-reverse" : "mr-auto")}>
                       <Avatar className="size-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[9px] font-bold">
+                        <AvatarFallback className="bg-[#1D61E7] text-white text-[9px] font-bold">
                           {comment.user ? getInitials(comment.user.name) : '?'}
                         </AvatarFallback>
                       </Avatar>
@@ -970,7 +970,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <div className={cn(
                           "text-xs px-3 py-2 rounded-xl leading-relaxed whitespace-pre-wrap shadow-2xs border",
                           isMe
-                            ? "bg-indigo-600 text-white border-indigo-700/50 rounded-tr-none"
+                            ? "bg-[#1D61E7] text-white border-[#1D61E7]/50 rounded-tr-none"
                             : "bg-muted text-foreground border-border/60 rounded-tl-none"
                         )}>
                           {comment.content}
@@ -985,7 +985,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               <form onSubmit={handlePostComment} className="flex gap-2.5 items-start">
                 <Avatar className="size-8 shrink-0 mt-1">
-                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[10px] font-bold">
+                  <AvatarFallback className="bg-[#1D61E7] text-white text-[10px] font-bold">
                     {user?.name ? getInitials(user.name) : '?'}
                   </AvatarFallback>
                 </Avatar>
@@ -1072,7 +1072,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {task.creator && (
                     <div className="flex items-center gap-2 mt-0.5">
                       <Avatar className="size-6 shrink-0">
-                        <AvatarFallback className="bg-indigo-100 text-indigo-700 text-[8px] font-black">
+                        <AvatarFallback className="bg-[#1D61E7]/10 text-[#1D61E7] text-[8px] font-black">
                           {getInitials(task.creator.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -1092,14 +1092,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <div key={a.id} className="flex items-center justify-between gap-2.5">
                           <div className="flex items-center gap-2 min-w-0">
                             <Avatar className="size-6 shrink-0">
-                              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-[8px] font-bold">
+                              <AvatarFallback className="bg-[#1D61E7] text-white text-[8px] font-bold">
                                 {a.user ? getInitials(a.user.name) : '?'}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col min-w-0">
                               <span className="text-xs font-bold truncate text-foreground/90">{a.user?.name}</span>
                               {a.total_time_spent > 0 || a.timer_started_at ? (
-                                <span className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-0.5 mt-0.5">
+                                <span className="text-[9px] text-[#1D61E7] font-bold flex items-center gap-0.5 mt-0.5">
                                   ⏱️ {formatDuration(getAssigneeTime(a))}
                                 </span>
                               ) : null}

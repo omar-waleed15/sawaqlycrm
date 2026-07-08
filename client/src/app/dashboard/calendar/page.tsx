@@ -136,7 +136,7 @@ export default function CalendarPage() {
     const fetchContracts = (user.role === 'owner' || user.role === 'sales')
       ? contractsApi.list() 
       : Promise.resolve({ contracts: [] as Contract[] });
-    const fetchClients = (user.role === 'owner' || user.role === 'sales')
+    const fetchClients = (user.role === 'owner' || user.role === 'sales' || user.role === 'team_leader' || user.role === 'account_manager')
       ? clientsApi.list()
       : Promise.resolve({ clients: [] as Client[] });
 
@@ -263,11 +263,11 @@ export default function CalendarPage() {
 
   // Compile all calendar events for the active month view
   const eventsByDay = useMemo(() => {
-    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; publications: Task[]; meetings: Client[] }> = {};
+    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; publications: Task[]; meetings: Client[]; targetSlots: any[] }> = {};
     
     calendarCells.forEach(cell => {
       const dateStr = getLocalDateString(cell.date);
-      map[dateStr] = { tasks: [], payments: [], publications: [], meetings: [] };
+      map[dateStr] = { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
     });
 
     tasks.forEach(task => {
@@ -312,6 +312,91 @@ export default function CalendarPage() {
       });
     }
 
+    // Populate target deliverables schedule slots for any loaded clients
+    clients.forEach(client => {
+      const schedule = client.deliverables_schedule;
+      if (schedule) {
+        let scheduleObj: any = {};
+        if (typeof schedule === 'string') {
+          try {
+            scheduleObj = JSON.parse(schedule);
+          } catch {
+            scheduleObj = {};
+          }
+        } else {
+          scheduleObj = schedule;
+        }
+        
+        const types = ['posts', 'reels', 'stories', 'photos'] as const;
+        const typeLabelMap: Record<string, string> = {
+          posts: 'Post',
+          reels: 'Reel',
+          stories: 'Story',
+          photos: 'Photo',
+        };
+        
+        types.forEach(tKey => {
+          const dates = (scheduleObj && scheduleObj[tKey]) || [];
+          dates.forEach((dateStr: string, idx: number) => {
+            if (!dateStr) return;
+            const targetDateStr = dateStr.substring(0, 10);
+            if (map[targetDateStr]) {
+              const typeKey = tKey === 'posts' ? 'post' : tKey === 'reels' ? 'reel' : tKey === 'stories' ? 'story' : 'photo';
+              const matchingTasks = map[targetDateStr].tasks
+                .filter(t => 
+                  t.client_id === client.id && 
+                  t.is_deliverable === true && 
+                  t.deliverable_type === typeKey
+                )
+                .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
+
+              if (idx < matchingTasks.length) {
+                // The slot is filled by an actual task!
+                const matchedTask = matchingTasks[idx];
+                map[targetDateStr].targetSlots.push({
+                  id: matchedTask.id,
+                  client_id: client.id,
+                  client_name: client.name,
+                  title: `🎯 ${matchedTask.title}`,
+                  content_type: typeKey,
+                  scheduled_date: dateStr,
+                  isFilled: true,
+                  task: matchedTask,
+                });
+              } else {
+                // The slot is empty
+                map[targetDateStr].targetSlots.push({
+                  id: `target-${client.id}-${tKey}-${idx}`,
+                  client_id: client.id,
+                  client_name: client.name,
+                  title: `🎯 ${client.name} Target ${typeLabelMap[tKey]} ${idx + 1}`,
+                  content_type: typeKey,
+                  scheduled_date: dateStr,
+                  isFilled: false,
+                });
+              }
+            }
+          });
+        });
+      }
+    });
+
+    // Filter out matched tasks from general lists so they do not show up twice
+    calendarCells.forEach(cell => {
+      const dateStr = getLocalDateString(cell.date);
+      const dayData = map[dateStr];
+      if (dayData) {
+        const filledTaskIds = dayData.targetSlots
+          .filter(slot => slot.isFilled && slot.task)
+          .map(slot => slot.task.id);
+          
+        if (filledTaskIds.length > 0) {
+          dayData.tasks = dayData.tasks.filter(t => !filledTaskIds.includes(t.id));
+          dayData.publications = dayData.publications.filter(t => !filledTaskIds.includes(t.id));
+        }
+      }
+    });
+
     return map;
   }, [calendarCells, tasks, contracts, clients, isOwner]);
 
@@ -355,9 +440,9 @@ export default function CalendarPage() {
   }, [calendarCells, eventsByDay, isOwner, isTaskAdmin, user]);
 
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDate) return { tasks: [], payments: [], publications: [], meetings: [] };
+    if (!selectedDate) return { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
     const dateStr = getLocalDateString(selectedDate);
-    return eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [] };
+    return eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
   }, [selectedDate, eventsByDay]);
 
   const handleDayClick = (date: Date) => {
@@ -393,74 +478,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="pt-6">
-                <div className="size-10 rounded bg-muted mb-3" />
-                <div className="h-6 bg-muted rounded w-2/3 mb-2" />
-                <div className="h-3 bg-muted rounded w-1/2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          {isOwner ? (
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <span className="text-sm font-medium text-muted-foreground">{t('calendar.projectedRevenue')}</span>
-                <DollarSign className="size-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-extrabold text-green-600">{formatCurrency(monthStats.projectedRevenue, locale)}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                  {t('calendar.dueIn').replace('{month}', formatCairoDate(currentMonth, locale, { month: 'short' }))}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <span className="text-sm font-medium text-muted-foreground">{t('calendar.urgentActions')}</span>
-                <AlertTriangle className="size-4 text-rose-500 animate-bounce" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-extrabold text-rose-600">{monthStats.urgentTasks}</div>
-                <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">{t('calendar.urgentTasksPending')}</p>
-              </CardContent>
-            </Card>
-          )}
-          
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">{t('calendar.monthlyDeadlines')}</span>
-              <ClipboardList className="size-4 text-indigo-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-extrabold">{monthStats.totalTasksDue}</div>
-              <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                {isOwner ? t('calendar.tasksEndingMonth') : t('calendar.tasksAssigned')}
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">{t('calendar.completionRate')}</span>
-              <CheckCircle2 className="size-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-extrabold text-purple-600">{monthStats.completionRate}%</div>
-              <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                {t('calendar.completedOf').replace('{completed}', monthStats.completedTasks.toString()).replace('{total}', monthStats.totalTasksDue.toString())}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md mb-5">
@@ -497,15 +515,16 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 grid-rows-5 bg-border gap-[1px]">
             {calendarCells.map((cell) => {
               const dateStr = getLocalDateString(cell.date);
-              const dayEvents = eventsByDay[dateStr] || { tasks: [], payments: [], publications: [] };
+              const dayEvents = eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
               const isToday = getCairoTodayString() === dateStr;
               
-              const displayTasks = dayEvents.tasks.slice(0, isOwner ? 2 : 3);
+              const displayTasks = dayEvents.tasks.slice(0, isOwner ? 1 : 2);
               const displayPayments = isOwner ? dayEvents.payments.slice(0, 1) : [];
-              const displayPublications = (dayEvents.publications || []).slice(0, 2);
+              const displayPublications = (dayEvents.publications || []).slice(0, 1);
               const displayMeetings = isOwner ? (dayEvents.meetings || []).slice(0, 1) : [];
-              const totalItems = displayTasks.length + displayPayments.length + displayPublications.length + displayMeetings.length;
-              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.publications || []).length + (dayEvents.meetings || []).length;
+              const displayTargetSlots = (dayEvents.targetSlots || []).slice(0, 1);
+              const totalItems = displayTasks.length + displayPayments.length + displayPublications.length + displayMeetings.length + displayTargetSlots.length;
+              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.publications || []).length + (dayEvents.meetings || []).length + (dayEvents.targetSlots || []).length;
               const hasMore = actualTotal > totalItems;
               const extraCount = actualTotal - totalItems;
 
@@ -576,6 +595,33 @@ export default function CalendarPage() {
                         >
                           {pubCompleted ? <CheckCircle2 className="size-2.5 shrink-0" /> : <Megaphone className="size-2 shrink-0" />}
                           <span className={pubCompleted ? 'line-through opacity-70' : ''}>{tTask.title}</span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Target Slots */}
+                    {displayTargetSlots.map(slot => {
+                      const taskCompleted = slot.isFilled ? isTaskCompleted(slot.task) : false;
+                      const isUrgent = slot.isFilled ? slot.task.priority === 'urgent' : false;
+                      const isHigh = slot.isFilled ? slot.task.priority === 'high' : false;
+                      return (
+                        <div
+                          key={slot.id}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
+                            slot.isFilled
+                              ? taskCompleted
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                                : isUrgent
+                                ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
+                                : isHigh
+                                ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                : 'bg-sky-50 border-sky-200 text-sky-700'
+                              : 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300'
+                          }`}
+                          title={slot.title}
+                        >
+                          <span className="shrink-0">🎯</span>
+                          <span>{slot.title}</span>
                         </div>
                       );
                     })}
@@ -719,6 +765,53 @@ export default function CalendarPage() {
                 ) : (
                   <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noMeetings')}</p>
                 )}
+              </div>
+            )}
+
+            {/* Target Slots Section */}
+            {selectedDayEvents.targetSlots && selectedDayEvents.targetSlots.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
+                  <span className="shrink-0">🎯</span> {t('calendar.deliverablesScheduled') || 'Deliverables Targets'} ({selectedDayEvents.targetSlots.length})
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {selectedDayEvents.targetSlots.map(slot => (
+                    <div
+                      key={slot.id}
+                      className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
+                        slot.isFilled ? 'border-l-emerald-500' : 'border-l-indigo-500'
+                      }`}
+                    >
+                      <div className="flex-1 overflow-hidden text-start">
+                        <h4 className="font-bold text-xs">{slot.title}</h4>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
+                          <span>{t('taskDetail.client') || 'Client'}: {slot.client_name}</span>
+                          <span>•</span>
+                          <span className="capitalize">{slot.content_type}</span>
+                          {slot.isFilled && (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-600 font-semibold text-[10px]">Filled</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {slot.isFilled && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsModalOpen(false);
+                            router.push(`/dashboard/tasks/${slot.id}`);
+                          }}
+                          className="h-7 text-xs font-semibold shrink-0"
+                        >
+                          {t('common.view') || 'View'}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

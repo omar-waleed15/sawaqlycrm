@@ -9,6 +9,7 @@ const router = Router();
 const TASK_SELECT = `
   *,
   creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url),
+  client:clients(id, name, company),
   task_assignees(
     id,
     user_id,
@@ -57,7 +58,7 @@ async function canAdministerTask(userId: string, role: string, taskId: string): 
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { status, priority, assignee_id, archived } = req.query;
+    const { status, priority, assignee_id, archived, client_id } = req.query;
     const userRole = req.user!.role;
     const showArchived = archived === 'true' && userRole !== 'moderation';
 
@@ -70,6 +71,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
         .order('created_at', { ascending: false });
 
       if (priority) query = query.eq('priority', priority as string);
+      if (client_id) query = query.eq('client_id', client_id as string);
 
       const { data, error } = await query;
 
@@ -112,6 +114,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
         .order('created_at', { ascending: false });
 
       if (priority) query = query.eq('priority', priority as string);
+      if (client_id) query = query.eq('client_id', client_id as string);
 
       const { data, error } = await query;
 
@@ -251,7 +254,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
 
 // POST /api/tasks — Create a new task (owner, team leader or sales)
 router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date, client_id, project_id } = req.body;
+  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date, client_id, project_id, is_deliverable, deliverable_type, deliverable_month } = req.body;
 
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
@@ -276,6 +279,9 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
         publish_date: publish_date || null,
         client_id: client_id || null,
         project_id: project_id || null,
+        is_deliverable: is_deliverable ?? false,
+        deliverable_type: deliverable_type || null,
+        deliverable_month: deliverable_month || null,
       })
       .select('*')
       .single();
@@ -405,7 +411,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (admin) {
       // Admin: update shared task fields
-      const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id, is_archived } = req.body;
+      const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month } = req.body;
 
       const updates: Record<string, unknown> = {};
       if (title !== undefined) updates.title = title;
@@ -419,6 +425,9 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (publish_notes !== undefined) updates.publish_notes = publish_notes;
       if (client_id !== undefined) updates.client_id = client_id || null;
       if (project_id !== undefined) updates.project_id = project_id || null;
+      if (is_deliverable !== undefined) updates.is_deliverable = is_deliverable;
+      if (deliverable_type !== undefined) updates.deliverable_type = deliverable_type;
+      if (deliverable_month !== undefined) updates.deliverable_month = deliverable_month;
       if (is_archived !== undefined) {
         if (req.user!.role === 'moderation') {
           res.status(403).json({ error: 'Access denied. Moderators cannot archive or unarchive tasks.' });

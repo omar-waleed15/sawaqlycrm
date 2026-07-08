@@ -132,7 +132,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
           tasksApi.list({ assignee_id: memberId }),
         ]);
         const found = usersData.users.find(u => u.id === memberId);
-        if (!found) {
+        if (!found || found.role === 'client') {
           router.replace('/dashboard/team');
           return;
         }
@@ -232,15 +232,15 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
       {/* Profile Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Avatar className="size-14 ring-4 ring-indigo-50 shadow-lg shrink-0">
-          <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-extrabold text-lg">
+        <Avatar className="size-14 ring-4 ring-[#1D61E7]/10 shadow-lg shrink-0">
+          <AvatarFallback className="bg-[#1D61E7] text-white font-extrabold text-lg">
             {getInitials(member.name)}
           </AvatarFallback>
         </Avatar>
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold tracking-tight">{member.name}</h1>
-            <Badge variant={member.role === 'owner' ? 'destructive' : 'default'} className="text-[10px] py-0.5 px-2">
+            <Badge variant="outline" className="text-[10px] py-0.5 px-2">
               {member.role === 'owner' ? t('role.owner') : member.role === 'sales' ? t('role.sales') : t('role.teamMember')}
             </Badge>
           </div>
@@ -292,7 +292,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                 <Button
                   onClick={handleSaveTarget}
                   disabled={savingTarget || fetchingTarget}
-                  className="w-full sm:w-auto h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                  className="w-full sm:w-auto h-9 text-xs bg-[#1D61E7] hover:bg-[#1553c7] text-white font-semibold"
                 >
                   {savingTarget ? t('common.loading') : t('taskTarget.updateTarget')}
                 </Button>
@@ -306,7 +306,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                 </div>
                 <div className="w-full bg-muted rounded-full h-2 mb-1.5">
                   <div 
-                    className="h-full rounded-full bg-indigo-600 transition-all duration-300" 
+                    className="h-full rounded-full bg-[#1D61E7] transition-all duration-300" 
                     style={{ width: `${Math.min(achievementRate, 100)}%` }} 
                   />
                 </div>
@@ -318,7 +318,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
             {fetchingTarget && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3 animate-pulse">
-                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-indigo-500" />
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-[#1D61E7]" />
                 {t('common.loading')}
               </div>
             )}

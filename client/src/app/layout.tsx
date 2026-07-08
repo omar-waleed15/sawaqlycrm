@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 import { LanguageProvider } from '@/lib/i18n';
+import { ThemeProvider } from '@/lib/theme';
 import { Geist, Noto_Sans_Arabic } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +21,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning className={cn("font-sans", geist.variable, notoArabic.variable)}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+          } catch (_) {}
+        ` }} />
+      </head>
       <body>
         <LanguageProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </ThemeProvider>
         </LanguageProvider>
       </body>
     </html>

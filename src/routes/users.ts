@@ -267,7 +267,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
     return;
   }
 
-  const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'];
+  const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'];
   const userRole = validRoles.includes(role) ? role : 'member';
 
   try {
@@ -339,7 +339,7 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
     // 2. Update profiles table
     const updates: Record<string, string> = {};
     if (name) updates.name = name;
-    if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'].includes(role)) updates.role = role;
+    if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'].includes(role)) updates.role = role;
     if (email) updates.email = email;
 
     if (Object.keys(updates).length > 0) {

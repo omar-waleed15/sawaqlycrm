@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'team_leader' | 'sales' | 'member' | 'moderation' | 'account_manager';
+export type UserRole = 'owner' | 'team_leader' | 'sales' | 'member' | 'moderation' | 'account_manager' | 'client';
 
 export interface User {
   id: string;
@@ -48,8 +48,12 @@ export interface Task {
   assignee_id?: string;          // legacy — use task_assignees
   client_id?: string;
   project_id?: string;
+  is_deliverable?: boolean;
+  deliverable_type?: 'post' | 'reel' | 'story' | 'photo';
+  deliverable_month?: string;
   creator?: User;
   assignee?: User;               // legacy
+  client?: { id: string; name: string; company?: string; };
   task_assignees?: TaskAssignee[];
   attachments?: Attachment[];
   comments?: Comment[];
@@ -124,6 +128,17 @@ export interface Client {
   done_stories?: number;
   done_photos?: number;
   done_other?: boolean;
+  deliverables_schedule?: {
+    posts?: string[];
+    reels?: string[];
+    stories?: string[];
+    photos?: string[];
+  };
+  user_id?: string;
+  sales_rep?: {
+    id: string;
+    name: string;
+  };
   created_at: string;
 }
 
@@ -416,4 +431,72 @@ export interface UserPerformanceRecord {
   user: User;
   taskStats: UserTaskPerformanceStats;
   salesStats: UserSalesPerformanceStats;
+}
+
+// ── Closed Clients sub-features ─────────────────────────────────────────
+
+export interface ClientFAQ {
+  id: string;
+  client_id: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientContentPlan {
+  id: string;
+  client_id: string;
+  title: string;
+  description?: string;
+  content_type?: string;
+  status: 'draft' | 'approved' | 'published';
+  scheduled_date?: string;
+  drive_link?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientIdea {
+  id: string;
+  client_id: string;
+  title: string;
+  description?: string;
+  color: string;
+  status: 'idea' | 'scheduled' | 'done';
+  drive_link?: string;
+  attachment_url?: string;
+  attachment_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientReport {
+  id: string;
+  client_id: string;
+  report_month: string;
+  views: number;
+  interactions: number;
+  messages: number;
+  num_posts: number;
+  num_reels: number;
+  num_stories: number;
+  num_photos: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Reminder {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  read_at?: string;
+  completed_at?: string;
+  created_at: string;
+  sender?: { name: string; avatar_url?: string };
+  receiver?: { name: string; avatar_url?: string };
 }

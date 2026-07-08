@@ -8,6 +8,12 @@
    DESIGN TOKENS
    ========================================= */
 :root {
+  /* Sawaqly Marketing Agency Brand Colors */
+  --brand-blue: #1D61E7;
+  --brand-yellow: #FFD200;
+  --brand-blue-rgb: 29, 97, 231;
+  --brand-yellow-rgb: 255, 210, 0;
+
   /* Colors */
   --color-bg: #f8f9fc;
   --color-surface: #ffffff;
@@ -15,10 +21,10 @@
   --color-border: #e4e7f0;
   --color-border-hover: #c5cbe0;
 
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-light: #ede9fe;
-  --color-primary-text: #3730a3;
+  --color-primary: #1D61E7; /* Default primary is now Sawaqly Blue */
+  --color-primary-hover: #1553c7;
+  --color-primary-light: #e8f0fe;
+  --color-primary-text: #1d4ed8;
 
   --color-text-primary: #111827;
   --color-text-secondary: #6b7280;
@@ -83,9 +89,9 @@
   --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --primary: 244 75% 57%;
+  --primary: 220 81% 51%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96%;
+  --secondary: 49 100% 50%;
   --secondary-foreground: 222 47% 11%;
   --muted: 210 40% 96%;
   --muted-foreground: 215 16% 47%;
@@ -95,8 +101,85 @@
   --destructive-foreground: 0 0% 100%;
   --border: 214 32% 91%;
   --input: 214 32% 91%;
-  --ring: 244 75% 57%;
+  --ring: 220 81% 51%;
   --radius: 0.625rem;
+}
+
+.dark {
+  /* Colors override to Light Sawaqly Brand theme */
+  --color-bg: #f8f9fc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f3f9;
+  --color-border: #e4e7f0;
+  --color-border-hover: #c5cbe0;
+
+  --color-primary: #1D61E7;
+  --color-primary-hover: #1553c7;
+  --color-primary-light: #e8f0fe;
+  --color-primary-text: #1d4ed8;
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+
+  /* Priority colors */
+  --priority-urgent-bg: #fff1f2;
+  --priority-urgent-text: #be123c;
+  --priority-urgent-dot: #f43f5e;
+
+  --priority-high-bg: #fff7ed;
+  --priority-high-text: #c2410c;
+  --priority-high-dot: #f97316;
+
+  --priority-medium-bg: #fefce8;
+  --priority-medium-text: #a16207;
+  --priority-medium-dot: #eab308;
+
+  --priority-low-bg: #f0fdf4;
+  --priority-low-text: #15803d;
+  --priority-low-dot: #22c55e;
+
+  /* Status colors */
+  --status-todo-bg: #f1f5f9;
+  --status-todo-text: #475569;
+
+  --status-inprogress-bg: #eff6ff;
+  --status-inprogress-text: #1d4ed8;
+
+  --status-submitted-bg: #f0fdf4;
+  --status-submitted-text: #15803d;
+
+  --status-revision-bg: #fff7ed;
+  --status-revision-text: #c2410c;
+
+  --status-completed-bg: #f5f3ff;
+  --status-completed-text: #6d28d9;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* ---- Shadcn/UI required CSS variables ---- */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 220 81% 51%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 49 100% 50%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 94%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 220 81% 51%;
 }
 
 /* =========================================
@@ -162,6 +245,7 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
+  background-color: #ffffff;
 }
 
 @media (max-width: 768px) {
@@ -3306,8 +3390,15 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
 /* =========================================
    RTL OVERRIDES
    ========================================= */
-html[dir="rtl"] body {
-  font-family: var(--font-arabic, 'Noto Sans Arabic'), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+[dir="rtl"] body,
+[dir="rtl"] .font-sans,
+[dir="rtl"] .font-mono,
+[dir="rtl"] button,
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select,
+[dir="rtl"] {
+  font-family: var(--font-arabic, 'Noto Sans Arabic'), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
 html[dir="rtl"] .sidebar {

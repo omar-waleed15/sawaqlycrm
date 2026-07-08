@@ -182,7 +182,7 @@ export default function TeamPage() {
     setFormError('');
 
     try {
-      await usersApi.update(selectedUser.id, { name, role });
+      await usersApi.update(selectedUser.id, { name, role, email });
       setIsEditOpen(false);
       resetForm();
       loadUsers();
@@ -232,11 +232,13 @@ export default function TeamPage() {
     return nameStr.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const filteredUsers = users.filter(u =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTeamMembers = users.filter(u =>
+    u.role !== 'client' &&
+    (u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     u.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const totalTeamCount = users.filter(u => u.role !== 'client').length;
   const ownerCount = users.filter(u => u.role === 'owner').length;
   const memberCount = users.filter(u => u.role === 'member').length;
   const teamLeaderCount = users.filter(u => u.role === 'team_leader').length;
@@ -259,7 +261,7 @@ export default function TeamPage() {
   };
 
   const renderPerformanceView = () => {
-    const taskPerformers = performanceData.filter(p => p.user.role !== 'sales');
+    const taskPerformers = performanceData.filter(p => p.user.role !== 'sales' && p.user.role !== 'client');
     const salesPerformers = performanceData.filter(p => p.user.role === 'sales');
 
     return (
@@ -339,7 +341,7 @@ export default function TeamPage() {
             {taskPerformers.length > 0 && (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2 px-1 text-start">
-                  <Target className="size-4.5 text-indigo-500" />
+                  <Target className="size-4.5 text-[#1D61E7]" />
                   <h2 className="text-base font-bold text-foreground">{t('team.taskExecutionPerf')}</h2>
                 </div>
                 <div className="border border-border rounded-lg overflow-hidden bg-background shadow-sm">
@@ -363,7 +365,7 @@ export default function TeamPage() {
                           const rate = p.taskStats.completionRate;
                           const progressColor =
                             rate >= 90 ? 'bg-emerald-500' :
-                            rate >= 75 ? 'bg-indigo-500' :
+                            rate >= 75 ? 'bg-[#1D61E7]' :
                             rate >= 50 ? 'bg-blue-500' :
                             rate >= 30 ? 'bg-amber-500' : 'bg-rose-500';
 
@@ -372,14 +374,14 @@ export default function TeamPage() {
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="size-8">
-                                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs">
+                                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
                                       {getInitials(p.user.name)}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div className="text-start">
                                     <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
                                       {p.user.name}
-                                      <Badge variant="outline" className="text-[9px] py-0 px-1 border-indigo-200 text-indigo-700 bg-indigo-50/50 dark:border-indigo-800 dark:text-indigo-300 dark:bg-indigo-950/20">
+                                      <Badge variant="outline" className="text-[9px] py-0 px-1 border-[#1D61E7]/25 text-[#1D61E7] bg-[#1D61E7]/5">
                                         {p.user.role === 'owner' ? t('role.owner') :
                                          p.user.role === 'team_leader' ? t('role.team_leader') :
                                          p.user.role === 'moderation' ? t('role.moderation') :
@@ -410,7 +412,7 @@ export default function TeamPage() {
                                   const targetProgressRate = Math.round((p.taskStats.completedTasks / p.taskStats.taskTarget) * 100);
                                   const barColor =
                                     targetProgressRate >= 100 ? 'bg-emerald-500' :
-                                    targetProgressRate >= 75 ? 'bg-indigo-500' :
+                                    targetProgressRate >= 75 ? 'bg-[#1D61E7]' :
                                     targetProgressRate >= 40 ? 'bg-amber-500' : 'bg-rose-500';
                                   return (
                                     <div className="flex items-center gap-2">
@@ -491,7 +493,7 @@ export default function TeamPage() {
                           const conversion = p.salesStats.conversionRate;
                           const barColor =
                             conversion >= 40 ? 'bg-emerald-500' :
-                            conversion >= 25 ? 'bg-indigo-500' :
+                            conversion >= 25 ? 'bg-[#1D61E7]' :
                             conversion >= 10 ? 'bg-blue-500' :
                             conversion > 0 ? 'bg-amber-500' : 'bg-transparent';
 
@@ -500,7 +502,7 @@ export default function TeamPage() {
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-3">
                                   <Avatar className="size-8">
-                                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs">
+                                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
                                       {getInitials(p.user.name)}
                                     </AvatarFallback>
                                   </Avatar>
@@ -539,7 +541,7 @@ export default function TeamPage() {
                                   const targetProgressRate = Math.round((p.salesStats.meetingsDone / p.salesStats.salesTarget) * 100);
                                   const progressColor =
                                     targetProgressRate >= 100 ? 'bg-emerald-500' :
-                                    targetProgressRate >= 75 ? 'bg-indigo-500' :
+                                    targetProgressRate >= 75 ? 'bg-[#1D61E7]' :
                                     targetProgressRate >= 40 ? 'bg-amber-500' : 'bg-rose-500';
                                   return (
                                     <div className="flex items-center gap-2">
@@ -601,7 +603,7 @@ export default function TeamPage() {
           onClick={() => setActiveTab('directory')}
           className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'directory'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+              ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -611,7 +613,7 @@ export default function TeamPage() {
           onClick={() => setActiveTab('performance')}
           className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'performance'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+              ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -626,10 +628,10 @@ export default function TeamPage() {
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <span className="text-sm font-medium text-muted-foreground">{t('team.totalTeam')}</span>
-            <Users className="size-4 text-indigo-500" />
+            <Users className="size-4 text-[#1D61E7]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
+            <div className="text-2xl font-bold">{totalTeamCount}</div>
             <p className="text-[11px] text-muted-foreground mt-1">{t('team.registeredAccounts')}</p>
           </CardContent>
         </Card>
@@ -692,7 +694,10 @@ export default function TeamPage() {
           />
         </div>
         <div className="text-xs text-muted-foreground self-center">
-          {t('team.showingOf', { shown: filteredUsers.length, total: users.length })}
+          {t('team.showingOf', { 
+            shown: filteredTeamMembers.length, 
+            total: totalTeamCount 
+          })}
         </div>
       </div>
 
@@ -718,14 +723,14 @@ export default function TeamPage() {
             </Card>
           ))}
         </div>
-      ) : filteredUsers.length > 0 ? (
+      ) : filteredTeamMembers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredUsers.map(member => (
+          {filteredTeamMembers.map(member => (
             <Card key={member.id} className="hover:shadow-md transition-all duration-200">
               <CardContent className="pt-6 flex flex-col h-full gap-4">
                 <div className="flex gap-4 items-center">
                   <Avatar className="size-12">
-                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-base">
+                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-base">
                       {getInitials(member.name)}
                     </AvatarFallback>
                   </Avatar>
@@ -733,14 +738,7 @@ export default function TeamPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-sm truncate max-w-[150px]">{member.name}</h3>
                       <Badge
-                        variant={
-                          member.role === 'owner' ? 'destructive' :
-                          member.role === 'team_leader' ? 'default' :
-                          member.role === 'sales' ? 'secondary' :
-                          member.role === 'moderation' ? 'secondary' :
-                          member.role === 'account_manager' ? 'secondary' :
-                          'outline'
-                        }
+                        variant="outline"
                         className="text-[10px] py-0.5 px-1.5"
                       >
                         {member.role === 'owner' ? t('role.owner') :
@@ -748,6 +746,7 @@ export default function TeamPage() {
                          member.role === 'sales' ? t('role.sales') :
                          member.role === 'moderation' ? t('role.moderation') :
                          member.role === 'account_manager' ? t('role.account_manager') :
+                         member.role === 'client' ? t('role.client') :
                          t('role.member')}
                       </Badge>
                     </div>
@@ -762,14 +761,16 @@ export default function TeamPage() {
                     {t('team.joined')} {member.created_at ? new Date(member.created_at).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US') : t('common.noData')}
                   </span>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/dashboard/team/${member.id}`)}
-                      className="h-8 text-xs gap-1"
-                    >
-                      <ExternalLink className="size-3" /> {t('team.tasks')}
-                    </Button>
+                    {member.role !== 'client' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/dashboard/team/${member.id}`)}
+                        className="h-8 text-xs gap-1"
+                      >
+                        <ExternalLink className="size-3" /> {t('team.tasks')}
+                      </Button>
+                    )}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -868,6 +869,7 @@ export default function TeamPage() {
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
+
               </SelectContent>
             </Select>
           </div>
@@ -899,13 +901,13 @@ export default function TeamPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-email">{t('team.emailCannotChange')}</Label>
+            <Label htmlFor="edit-email">{t('team.emailAddress')}</Label>
             <Input
               id="edit-email"
               type="email"
               value={email}
-              disabled
-              className="bg-muted cursor-not-allowed"
+              onChange={e => setEmail(e.target.value)}
+              required
             />
           </div>
 
@@ -937,6 +939,7 @@ export default function TeamPage() {
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
+                <SelectItem value="client">{t('role.client')}</SelectItem>
               </SelectContent>
             </Select>
             {selectedUser?.id === user?.id && (

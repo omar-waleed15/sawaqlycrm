@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { ownerOnly, ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
+import { populateDynamicDeliverables } from '../lib/deliverables';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get('/reports/custom', authMiddleware, ownerOnly, async (req: AuthRequest
 
     const { data: clients, error } = await supabaseAdmin
       .from('clients')
-      .select('*, sales_rep:profiles(name), contracts(*)');
+      .select('*, sales_rep:profiles!clients_sales_rep_id_fkey(name), contracts(*)');
 
     if (error) {
       res.status(500).json({ error: error.message });
@@ -38,9 +39,74 @@ router.get('/reports/custom', authMiddleware, ownerOnly, async (req: AuthRequest
       return createdInRange || startedInRange;
     });
 
-    res.json({ clients: filtered });
+    const populated = await populateDynamicDeliverables(filtered);
+    res.json({ clients: populated });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch custom report' });
+  }
+});
+
+// GET /api/clients/portal/data - Get client portal data (accessible by client role)
+router.get('/portal/data', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const role = req.user!.role;
+
+    if (role !== 'client') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // 1. Get client details linked to this user_id
+    const { data: client, error: clientErr } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (clientErr) {
+      res.status(500).json({ error: clientErr.message });
+      return;
+    }
+
+    if (!client) {
+      res.status(404).json({ error: 'Client profile not found for this user account' });
+      return;
+    }
+
+    // Populate dynamic deliverables for current month progress
+    const [populatedClient] = await populateDynamicDeliverables([client]);
+
+    // 2. Fetch FAQs
+    const { data: faq, error: faqErr } = await supabaseAdmin
+      .from('client_faq')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('sort_order', { ascending: true });
+
+    // 3. Fetch approved or published content plans (only basic fields, exclude drafts)
+    const { data: contentPlans, error: plansErr } = await supabaseAdmin
+      .from('client_content_plans')
+      .select('id, title, content_type, status, scheduled_date, drive_link')
+      .eq('client_id', client.id)
+      .in('status', ['approved', 'published'])
+      .order('scheduled_date', { ascending: true });
+
+    // 4. Fetch performance reports (Views, Engagement, etc.)
+    const { data: reports, error: reportsErr } = await supabaseAdmin
+      .from('client_reports')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('report_month', { ascending: false });
+
+    res.json({
+      client: populatedClient,
+      faq: faq || [],
+      contentPlans: contentPlans || [],
+      reports: reports || [],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to load client portal data' });
   }
 });
 
@@ -49,7 +115,7 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async 
   try {
     const { data, error } = await supabaseAdmin
       .from('clients')
-      .select('*')
+      .select('*, sales_rep:profiles!clients_sales_rep_id_fkey(id, name)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -57,7 +123,8 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async 
       return;
     }
 
-    res.json({ clients: data });
+    const populated = await populateDynamicDeliverables(data || []);
+    res.json({ clients: populated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch clients' });
   }
@@ -65,7 +132,7 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async 
 
 // POST /api/clients — Create a new client
 router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
 
   if (!name) {
     res.status(400).json({ error: 'Client name is required' });
@@ -95,6 +162,9 @@ router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async
         done_stories: done_stories ?? 0,
         done_photos: done_photos ?? 0,
         done_other: done_other ?? false,
+        deliverables_schedule: deliverables_schedule || { posts: [], reels: [], stories: [], photos: [] },
+        user_id: user_id || null,
+        sales_rep_id: sales_rep_id || null,
       })
       .select()
       .single();
@@ -113,7 +183,7 @@ router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async
 // PUT /api/clients/:id — Update a client
 router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other } = req.body;
+  const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
 
   try {
     const updates: Record<string, any> = {};
@@ -136,6 +206,9 @@ router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, asy
     if (done_stories !== undefined) updates.done_stories = done_stories;
     if (done_photos !== undefined) updates.done_photos = done_photos;
     if (done_other !== undefined) updates.done_other = done_other;
+    if (deliverables_schedule !== undefined) updates.deliverables_schedule = deliverables_schedule;
+    if (user_id !== undefined) updates.user_id = user_id || null;
+    if (sales_rep_id !== undefined) updates.sales_rep_id = sales_rep_id || null;
 
     const { data, error } = await supabaseAdmin
       .from('clients')

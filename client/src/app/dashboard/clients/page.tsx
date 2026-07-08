@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo, Fragment } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { clientsApi, projectsApi, tasksApi } from '@/lib/api';
-import { Client, Project, Task } from '@/types';
+import { clientsApi, tasksApi, usersApi } from '@/lib/api';
+import { Client, Task } from '@/types';
 import Modal from '@/components/Modal';
-import ProjectCard from '@/components/ProjectCard';
-import ClientCard from '@/components/ClientCard';
+import PotentialClientCard from '@/components/PotentialClientCard';
+import ClosedDealCard from '@/components/ClosedDealCard';
+import CloseWonModal from '@/components/CloseWonModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,21 +52,8 @@ function formatDate(dateStr?: string, locale?: string): string {
 }
 
 
-function getCompletionRate(projectTasks: Task[]): number {
-  if (projectTasks.length === 0) return 0;
-  const completed = projectTasks.filter(t => {
-    if (!t.task_assignees || t.task_assignees.length === 0) return false;
-    return t.task_assignees.every(a => a.status === 'completed');
-  }).length;
-  return Math.round((completed / projectTasks.length) * 100);
-}
+// Cairo local date helper
 
-const PROJECT_STATUS_CONFIG: Record<string, { labelKey: string; className: string }> = {
-  planning: { labelKey: 'clients.planning', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
-  active: { labelKey: 'clients.active', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  on_hold: { labelKey: 'clients.onHold', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
-  completed: { labelKey: 'status.completed', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
-};
 
 function formatCurrency(amount: number, locale?: string): string {
   const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
@@ -108,7 +96,12 @@ export default function ClientsDashboardPage() {
 
   // General States
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'clients' | 'projects' | 'reports'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'reports'>('clients');
+  const [subTab, setSubTab] = useState<'potential' | 'won'>('potential');
+  const [closeWonOpen, setCloseWonOpen] = useState(false);
+  const [clientToClose, setClientToClose] = useState<Client | null>(null);
+  const [teamMembers, setTeamMembers] = useState<import('@/types').User[]>([]);
+  const [allTeamUsers, setAllTeamUsers] = useState<import('@/types').User[]>([]);
 
   // Custom Reports states
   const [reportStartDate, setReportStartDate] = useState('');
@@ -124,48 +117,40 @@ export default function ClientsDashboardPage() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showSalesRepDropdown, setShowSalesRepDropdown] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   
   // Search Filters
   const [clientSearch, setClientSearch] = useState('');
-  const [projectSearch, setProjectSearch] = useState('');
 
   // Expanded states
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
-  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
 
   // Modals States
   const [clientModalOpen, setClientModalOpen] = useState(false);
-  const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Selected for Edit
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Progress tracking modal
-  const [progressModalOpen, setProgressModalOpen] = useState(false);
-  const [progressClient, setProgressClient] = useState<Client | null>(null);
-  const [progressForm, setProgressForm] = useState({
-    done_posts: 0,
-    done_reels: 0,
-    done_stories: 0,
-    done_photos: 0,
-    done_other: false,
-  });
-  const [savingProgress, setSavingProgress] = useState(false);
+  // Client Users List State
+  const [clientUsers, setClientUsers] = useState<import('@/types').User[]>([]);
+
+  // Inline account creation states
+  const [createAccountInline, setCreateAccountInline] = useState(false);
+  const [newAccountEmail, setNewAccountEmail] = useState('');
+  const [newAccountPassword, setNewAccountPassword] = useState('');
 
   // Client Form State
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [clientForm, setClientForm] = useState({
     name: '',
     company: '',
     email: '',
     phone: '',
     status: 'active' as Client['status'],
-    pipeline_stage: 'won' as Client['pipeline_stage'],
+    pipeline_stage: 'new_lead' as Client['pipeline_stage'],
     start_date: '',
     address: '',
     content_plan_link: '',
@@ -174,32 +159,44 @@ export default function ClientsDashboardPage() {
     num_stories: 0,
     num_photos: 0,
     other_deliverables: '',
+    deliverables_schedule: {
+      posts: [] as string[],
+      reels: [] as string[],
+      stories: [] as string[],
+      photos: [] as string[],
+    },
+    user_id: '',
+    sales_rep_id: '',
   });
 
-  // Project Form State
-  const [projectForm, setProjectForm] = useState({
-    client_id: '',
-    name: '',
-    description: '',
-    status: 'active' as Project['status'],
-    budget: '',
-    start_date: '',
-    end_date: '',
-  });
+  // Memoized sets of linked and available accounts
+  const linkedUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    clients.forEach(c => {
+      if (c.user_id) ids.add(c.user_id);
+    });
+    return ids;
+  }, [clients]);
+
+  const availableUsers = useMemo(() => {
+    return clientUsers.filter(u => !linkedUserIds.has(u.id) || u.id === clientForm.user_id);
+  }, [clientUsers, linkedUserIds, clientForm.user_id]);
 
   const loadData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [clientsRes, projectsRes, tasksRes] = await Promise.all([
+      const [clientsRes, tasksRes, usersRes] = await Promise.all([
         clientsApi.list().catch(() => ({ clients: [] })),
-        projectsApi.list().catch(() => ({ projects: [] })),
         tasksApi.list().catch(() => ({ tasks: [] })),
+        usersApi.list().catch(() => ({ users: [] })),
       ]);
       setClients(clientsRes.clients || []);
-      setProjects(projectsRes.projects || []);
       setTasks(tasksRes.tasks || []);
+      setClientUsers((usersRes.users || []).filter((u: any) => u.role === 'client'));
+      setTeamMembers((usersRes.users || []).filter((u: any) => u.role === 'sales'));
+      setAllTeamUsers((usersRes.users || []).filter((u: any) => u.role !== 'client'));
     } catch (err) {
-      console.error('Failed to load clients and projects', err);
+      console.error('Failed to load clients, tasks, and team', err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -727,6 +724,9 @@ export default function ClientsDashboardPage() {
 
   // Reset Client Form
   const resetClientForm = (client?: Client) => {
+    setCreateAccountInline(false);
+    setNewAccountEmail('');
+    setNewAccountPassword('');
     if (client) {
       setClientForm({
         name: client.name || '',
@@ -734,7 +734,7 @@ export default function ClientsDashboardPage() {
         email: client.email || '',
         phone: client.phone || '',
         status: client.status || 'active',
-        pipeline_stage: client.pipeline_stage || 'won',
+        pipeline_stage: client.pipeline_stage || 'new_lead',
         start_date: client.start_date ? client.start_date.split('T')[0] : '',
         address: client.address || '',
         content_plan_link: client.content_plan_link || '',
@@ -743,6 +743,14 @@ export default function ClientsDashboardPage() {
         num_stories: client.num_stories ?? 0,
         num_photos: client.num_photos ?? 0,
         other_deliverables: client.other_deliverables || '',
+        deliverables_schedule: {
+          posts: client.deliverables_schedule?.posts || [],
+          reels: client.deliverables_schedule?.reels || [],
+          stories: client.deliverables_schedule?.stories || [],
+          photos: client.deliverables_schedule?.photos || [],
+        },
+        user_id: client.user_id || '',
+        sales_rep_id: client.sales_rep_id || '',
       });
       setSelectedClient(client);
       setModalMode('edit');
@@ -753,7 +761,7 @@ export default function ClientsDashboardPage() {
         email: '',
         phone: '',
         status: 'active',
-        pipeline_stage: 'won',
+        pipeline_stage: 'new_lead',
         start_date: '',
         address: '',
         content_plan_link: '',
@@ -762,38 +770,16 @@ export default function ClientsDashboardPage() {
         num_stories: 0,
         num_photos: 0,
         other_deliverables: '',
+        deliverables_schedule: {
+          posts: [],
+          reels: [],
+          stories: [],
+          photos: [],
+        },
+        user_id: '',
+        sales_rep_id: '',
       });
       setSelectedClient(null);
-      setModalMode('create');
-    }
-    setErrorMsg('');
-  };
-
-  // Reset Project Form
-  const resetProjectForm = (project?: Project, clientId?: string) => {
-    if (project) {
-      setProjectForm({
-        client_id: project.client_id || '',
-        name: project.name || '',
-        description: project.description || '',
-        status: project.status || 'active',
-        budget: project.budget !== undefined ? project.budget.toString() : '',
-        start_date: project.start_date ? project.start_date.split('T')[0] : '',
-        end_date: project.end_date ? project.end_date.split('T')[0] : '',
-      });
-      setSelectedProject(project);
-      setModalMode('edit');
-    } else {
-      setProjectForm({
-        client_id: clientId || clients[0]?.id || '',
-        name: '',
-        description: '',
-        status: 'active',
-        budget: '',
-        start_date: '',
-        end_date: '',
-      });
-      setSelectedProject(null);
       setModalMode('create');
     }
     setErrorMsg('');
@@ -807,6 +793,7 @@ export default function ClientsDashboardPage() {
       return;
     }
     setSubmitting(true);
+    setErrorMsg('');
     try {
       if (modalMode === 'create') {
         await clientsApi.create(clientForm);
@@ -814,33 +801,6 @@ export default function ClientsDashboardPage() {
         await clientsApi.update(selectedClient.id, clientForm);
       }
       setClientModalOpen(false);
-      loadData(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Action failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Project Submit
-  const handleProjectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectForm.name || !projectForm.client_id) {
-      setErrorMsg('Project Name and Client selection are required');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const data = {
-        ...projectForm,
-        budget: projectForm.budget ? Number(projectForm.budget) : 0,
-      };
-      if (modalMode === 'create') {
-        await projectsApi.create(data);
-      } else if (selectedProject) {
-        await projectsApi.update(selectedProject.id, data);
-      }
-      setProjectModalOpen(false);
       loadData(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Action failed');
@@ -860,83 +820,17 @@ export default function ClientsDashboardPage() {
     }
   };
 
-  const handleDeleteProject = async (id: string, name: string) => {
-    if (!confirm(t('clients.deleteProjectConfirm').replace('{name}', name))) return;
-    try {
-      await projectsApi.delete(id);
-      loadData(true);
-    } catch (err) {
-      alert('Failed to delete project');
-    }
-  };
-
-  // Helpers: get tasks for a specific project
-  const getProjectTasks = (projectId: string): Task[] => {
-    return tasks.filter(tTask => tTask.project_id === projectId);
-  };
-
-  // Open progress modal for a client
-  const openProgressModal = (client: Client) => {
-    setProgressClient(client);
-    setProgressForm({
-      done_posts: client.done_posts ?? 0,
-      done_reels: client.done_reels ?? 0,
-      done_stories: client.done_stories ?? 0,
-      done_photos: client.done_photos ?? 0,
-      done_other: client.done_other ?? false,
-    });
-    setProgressModalOpen(true);
-  };
-
-  // Save progress
-  const handleProgressSave = async () => {
-    if (!progressClient) return;
-    setSavingProgress(true);
-    try {
-      await clientsApi.update(progressClient.id, progressForm);
-      setProgressModalOpen(false);
-      loadData(true);
-    } catch (err) {
-      alert('Failed to update progress');
-    } finally {
-      setSavingProgress(false);
-    }
-  };
-
   // Filter lists
-  const filteredClients = clients.filter(c => {
+  const potentialClients = clients.filter(c => c.pipeline_stage !== 'won' && c.sales_rep_id);
+  const wonClients = clients.filter(c => c.pipeline_stage === 'won' && c.sales_rep_id);
+
+  const filteredClients = (subTab === 'potential' ? potentialClients : wonClients).filter(c => {
     const q = clientSearch.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
       (c.company && c.company.toLowerCase().includes(q)) ||
       (c.email && c.email.toLowerCase().includes(q))
     );
-  });
-
-  const filteredProjects = projects.filter(p => {
-    const q = projectSearch.toLowerCase();
-    return (
-      p.name.toLowerCase().includes(q) ||
-      (p.client?.name && p.client.name.toLowerCase().includes(q))
-    );
-  });
-
-  // Group projects by client for Projects tab
-  const projectsByClient: { client: Client; projects: Project[] }[] = [];
-  const clientMap = new Map<string, Client>();
-  clients.forEach(c => clientMap.set(c.id, c));
-
-  const groupedMap = new Map<string, Project[]>();
-  filteredProjects.forEach(p => {
-    const cid = p.client_id;
-    if (!groupedMap.has(cid)) groupedMap.set(cid, []);
-    groupedMap.get(cid)!.push(p);
-  });
-  groupedMap.forEach((projs, cid) => {
-    const client = clientMap.get(cid);
-    if (client) {
-      projectsByClient.push({ client, projects: projs });
-    }
   });
 
   return (
@@ -949,15 +843,11 @@ export default function ClientsDashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {activeTab === 'clients' ? (
+          {activeTab === 'clients' && (
             <Button onClick={() => { resetClientForm(); setClientModalOpen(true); }}>
               <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.addClient')}
             </Button>
-          ) : activeTab === 'projects' ? (
-            <Button onClick={() => { resetProjectForm(); setProjectModalOpen(true); }} disabled={clients.length === 0}>
-              <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.createProject')}
-            </Button>
-          ) : null}
+          )}
         </div>
       </div>
 
@@ -967,28 +857,18 @@ export default function ClientsDashboardPage() {
           onClick={() => setActiveTab('clients')}
           className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
             activeTab === 'clients'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+              ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           👥 {t('clients.clientsList')}
-        </button>
-        <button
-          onClick={() => setActiveTab('projects')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'projects'
-              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          🚀 {t('clients.projectsList')}
         </button>
         {user?.role === 'owner' && (
           <button
             onClick={() => setActiveTab('reports')}
             className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'reports'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -1005,7 +885,57 @@ export default function ClientsDashboardPage() {
         <>
           {/* ══════ 1. CLIENTS TAB ══════ */}
           {activeTab === 'clients' && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 text-start">
+              {/* Sub-tabs for Potential vs Closed Won */}
+              <div className="flex gap-2">
+                <Button
+                  variant={subTab === 'potential' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSubTab('potential')}
+                  className="text-xs font-semibold"
+                >
+                  🎯 {t('sales.leads') || 'Potential Leads'} ({potentialClients.length})
+                </Button>
+                <Button
+                  variant={subTab === 'won' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSubTab('won')}
+                  className="text-xs font-semibold"
+                >
+                  🏆 {t('sales.won') || 'Closed Won'} ({wonClients.length})
+                </Button>
+              </div>
+
+              {/* Potential leads KPI metrics */}
+              {subTab === 'potential' && potentialClients.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-2 text-start">
+                  <Card className="bg-slate-50/50 dark:bg-slate-900/10 border-border/80">
+                    <CardContent className="p-3">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{t('sales.newLead') || 'New Leads'}</span>
+                      <p className="text-lg font-black text-foreground mt-0.5">{potentialClients.filter(c => c.pipeline_stage === 'new_lead').length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-border/80">
+                    <CardContent className="p-3">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{t('sales.contacted') || 'Contacted'}</span>
+                      <p className="text-lg font-black text-foreground mt-0.5">{potentialClients.filter(c => c.pipeline_stage === 'contacted').length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-indigo-50/50 dark:bg-indigo-900/10 border-border/80">
+                    <CardContent className="p-3">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{t('sales.meetingScheduled') || 'Meetings'}</span>
+                      <p className="text-lg font-black text-foreground mt-0.5">{potentialClients.filter(c => c.pipeline_stage === 'meeting_scheduled' || c.pipeline_stage === 'meeting_done').length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-rose-50/50 dark:bg-rose-900/10 border-border/80">
+                    <CardContent className="p-3">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground">{t('sales.lost') || 'Lost'}</span>
+                      <p className="text-lg font-black text-foreground mt-0.5">{potentialClients.filter(c => c.pipeline_stage === 'lost').length}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
               {/* Search Bar */}
               <div className="relative w-full max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 rtl:left-auto rtl:right-3" />
@@ -1022,118 +952,55 @@ export default function ClientsDashboardPage() {
               {filteredClients.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {filteredClients.map(c => {
-                    const clientProjects = projects.filter(p => p.client_id === c.id);
                     const isExpanded = expandedClientId === c.id;
 
-                    return (
-                      <ClientCard
-                        key={c.id}
-                        client={c}
-                        clientProjects={clientProjects}
-                        getProjectTasks={getProjectTasks}
-                        locale={locale}
-                        t={t}
-                        isExpanded={isExpanded}
-                        onToggleExpand={() => setExpandedClientId(isExpanded ? null : c.id)}
-                        onEditClick={(client) => {
-                          resetClientForm(client);
-                          setClientModalOpen(true);
-                        }}
-                        onDeleteClick={handleDeleteClient}
-                        onUpdateProgressClick={openProgressModal}
-                        expandedProjectId={expandedProjectId}
-                        onToggleExpandProject={setExpandedProjectId}
-                        onEditProjectClick={(proj) => {
-                          resetProjectForm(proj);
-                          setProjectModalOpen(true);
-                        }}
-                        onDeleteProjectClick={handleDeleteProject}
-                        onNewProjectClick={(clientId) => {
-                          resetProjectForm(undefined, clientId);
-                          setProjectModalOpen(true);
-                        }}
-                      />
-                    );
+                    if (subTab === 'potential') {
+                      return (
+                        <PotentialClientCard
+                          key={c.id}
+                          client={c}
+                          locale={locale}
+                          t={t}
+                          isExpanded={isExpanded}
+                          onToggleExpand={() => setExpandedClientId(isExpanded ? null : c.id)}
+                          onEditClick={(client) => {
+                            resetClientForm(client);
+                            setClientModalOpen(true);
+                          }}
+                          onDeleteClick={handleDeleteClient}
+                          onCloseWonClick={(client) => {
+                            setClientToClose(client);
+                            setCloseWonOpen(true);
+                          }}
+                          onUpdate={() => loadData(true)}
+                        />
+                      );
+                    } else {
+                      return (
+                        <ClosedDealCard
+                          key={c.id}
+                          client={c}
+                          locale={locale}
+                          t={t}
+                          onEditClick={(client) => {
+                            resetClientForm(client);
+                            setClientModalOpen(true);
+                          }}
+                          onDeleteClick={handleDeleteClient}
+                        />
+                      );
+                    }
                   })}
                 </div>
               ) : (
-                <div className="text-center py-10 border rounded-lg border-dashed text-muted-foreground text-sm bg-card">
+                <div className="text-center py-10 border border-dashed rounded-lg text-muted-foreground text-sm bg-card w-full">
                   {t('clients.noClientsFound')}
                 </div>
               )}
             </div>
           )}
 
-          {/* ══════ 2. PROJECTS TAB ══════ */}
-          {activeTab === 'projects' && (
-            <div className="flex flex-col gap-4">
-              {/* Search Bar */}
-              <div className="relative w-full max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 rtl:left-auto rtl:right-3" />
-                <Input
-                  type="text"
-                  placeholder={t('clients.searchProjects')}
-                  value={projectSearch}
-                  onChange={e => setProjectSearch(e.target.value)}
-                  className="pl-9 rtl:pl-3 rtl:pr-9"
-                />
-              </div>
-
-              {/* Projects grouped by client */}
-              <div className="flex flex-col gap-6">
-                {projectsByClient.map(({ client, projects: clientProjs }) => (
-                  <div key={client.id} className="space-y-3">
-                    {/* Client group header */}
-                    <div className="flex items-center gap-3 px-1 text-start">
-                      <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                        {client.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-foreground">{client.name}</h3>
-                        {client.company && <p className="text-xs text-muted-foreground">{client.company}</p>}
-                      </div>
-                      <Badge variant="outline" className="ml-auto rtl:ml-0 rtl:mr-auto text-xs">
-                        {clientProjs.length} {t('clients.projects')}
-                      </Badge>
-                    </div>
-
-                    {/* Project cards under this client */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-11 rtl:pl-0 rtl:pr-11">
-                      {clientProjs.map(p => {
-                        const pTasks = getProjectTasks(p.id);
-                        const isProjExpanded = expandedProjectId === p.id;
-
-                        return (
-                          <ProjectCard
-                            key={p.id}
-                            project={p}
-                            projectTasks={pTasks}
-                            locale={locale}
-                            t={t}
-                            isExpanded={isProjExpanded}
-                            onToggleExpand={() => setExpandedProjectId(isProjExpanded ? null : p.id)}
-                            onEditClick={(proj) => {
-                              resetProjectForm(proj);
-                              setProjectModalOpen(true);
-                            }}
-                            onDeleteClick={handleDeleteProject}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {filteredProjects.length === 0 && (
-                <div className="text-center py-10 border border-dashed rounded-lg text-muted-foreground text-sm">
-                  {t('clients.noClientsFound')}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════ 3. CUSTOM REPORTS TAB ══════ */}
+          {/* ══════ 2. CUSTOM REPORTS TAB ══════ */}
           {activeTab === 'reports' && user?.role === 'owner' && renderCustomReportView()}
         </>
       )}
@@ -1143,6 +1010,7 @@ export default function ClientsDashboardPage() {
         isOpen={clientModalOpen}
         onClose={() => setClientModalOpen(false)}
         title={modalMode === 'create' ? t('clients.addClient') : t('clients.editClient')}
+        maxWidth={640}
       >
         <form onSubmit={handleClientSubmit} className="flex flex-col gap-4 text-start">
           {errorMsg && (
@@ -1172,6 +1040,17 @@ export default function ClientsDashboardPage() {
             />
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="c_address">{t('clients.address') || 'Address'}</Label>
+            <Textarea
+              id="c_address"
+              placeholder="Building, street name, city, country..."
+              value={clientForm.address}
+              onChange={e => setClientForm({ ...clientForm, address: e.target.value })}
+              rows={2}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="c_email">{t('team.emailAddress')}</Label>
@@ -1194,7 +1073,7 @@ export default function ClientsDashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="c_status">{t('clients.statusLabel')}</Label>
               <Select
@@ -1211,6 +1090,25 @@ export default function ClientsDashboardPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label htmlFor="c_pipeline_stage">{t('clients.stageCol') || 'Pipeline Stage'}</Label>
+              <Select
+                value={clientForm.pipeline_stage}
+                onValueChange={v => setClientForm({ ...clientForm, pipeline_stage: (v || 'new_lead') as Client['pipeline_stage'] })}
+              >
+                <SelectTrigger id="c_pipeline_stage">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
+                  <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                  <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
+                  <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
+                  <SelectItem value="lost">{t('sales.lost')}</SelectItem>
+                  <SelectItem value="won">{t('sales.won')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="c_start_date">{t('finance.startDate')}</Label>
               <Input
                 id="c_start_date"
@@ -1221,275 +1119,229 @@ export default function ClientsDashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_address">{t('clients.addressTimeline')}</Label>
-            <Textarea
-              id="c_address"
-              placeholder="Building, street name, city, country..."
-              value={clientForm.address}
-              onChange={e => setClientForm({ ...clientForm, address: e.target.value })}
-              rows={2}
-            />
-          </div>
+
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_content_plan">{t('clients.contentPlanLink')}</Label>
-            <Input
-              id="c_content_plan"
-              type="url"
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-              value={clientForm.content_plan_link}
-              onChange={e => setClientForm({ ...clientForm, content_plan_link: e.target.value })}
-            />
+            <Label htmlFor="c_sales_rep">{t('clients.salesRepCol') || 'Sales Representative'}</Label>
+            <Select
+              value={clientForm.sales_rep_id || 'none'}
+              onValueChange={v => setClientForm({ ...clientForm, sales_rep_id: v === 'none' ? '' : (v || '') })}
+            >
+              <SelectTrigger id="c_sales_rep">
+                <span className="truncate">
+                  {clientForm.sales_rep_id
+                    ? `👤 ${allTeamUsers.find(u => u.id === clientForm.sales_rep_id)?.name || clientForm.sales_rep_id}`
+                    : "Select sales rep..."}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unassigned</SelectItem>
+                {teamMembers.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    👤 {m.name} ({m.role})
+                  </SelectItem>
+                ))}
+                {clientForm.sales_rep_id && !teamMembers.some(m => m.id === clientForm.sales_rep_id) && (() => {
+                  const rep = allTeamUsers.find(u => u.id === clientForm.sales_rep_id);
+                  return (
+                    <SelectItem value={clientForm.sales_rep_id}>
+                      👤 {rep ? `${rep.name} (${rep.role})` : clientForm.sales_rep_id}
+                    </SelectItem>
+                  );
+                })()}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Content Deliverables */}
-          <div className="border-t border-border pt-4 text-start">
-            <h4 className="text-sm font-bold mb-3">🎬 {t('clients.deliverables')}</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+
+          {clientForm.pipeline_stage === 'won' && (
+            <>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_posts">{t('clients.numPosts')}</Label>
+                <Label htmlFor="c_content_plan">{t('clients.contentPlanLink')}</Label>
                 <Input
-                  id="c_posts"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_posts}
-                  onChange={e => setClientForm({ ...clientForm, num_posts: parseInt(e.target.value) || 0 })}
+                  id="c_content_plan"
+                  type="url"
+                  placeholder="https://docs.google.com/spreadsheets/d/..."
+                  value={clientForm.content_plan_link}
+                  onChange={e => setClientForm({ ...clientForm, content_plan_link: e.target.value })}
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_reels">{t('clients.numReels')}</Label>
-                <Input
-                  id="c_reels"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_reels}
-                  onChange={e => setClientForm({ ...clientForm, num_reels: parseInt(e.target.value) || 0 })}
-                />
+
+              {/* Content Deliverables */}
+              <div className="border-t border-border pt-4 text-start">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold">🎬 {t('clients.deliverables')}</h4>
+                  {(clientForm.num_posts > 0 || clientForm.num_reels > 0 || clientForm.num_stories > 0 || clientForm.num_photos > 0) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setScheduleModalOpen(true)}
+                      className="h-7 text-xs flex items-center gap-1"
+                    >
+                      <Calendar className="size-3" />
+                      {t('clients.configureSchedule') || 'Configure Schedule Outline'}
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="c_posts">{t('clients.numPosts')}</Label>
+                    <Input
+                      id="c_posts"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={clientForm.num_posts}
+                      onChange={e => setClientForm({ ...clientForm, num_posts: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="c_reels">{t('clients.numReels')}</Label>
+                    <Input
+                      id="c_reels"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={clientForm.num_reels}
+                      onChange={e => setClientForm({ ...clientForm, num_reels: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="c_stories">{t('clients.numStories')}</Label>
+                    <Input
+                      id="c_stories"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={clientForm.num_stories}
+                      onChange={e => setClientForm({ ...clientForm, num_stories: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="c_photos">{t('clients.numPhotos')}</Label>
+                    <Input
+                      id="c_photos"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={clientForm.num_photos}
+                      onChange={e => setClientForm({ ...clientForm, num_photos: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5 mt-3">
+                  <Label htmlFor="c_other_deliverables">{t('clients.otherDeliverables')}</Label>
+                  <Input
+                    id="c_other_deliverables"
+                    placeholder="e.g. Brochures, Flyers, Brand Guidelines..."
+                    value={clientForm.other_deliverables}
+                    onChange={e => setClientForm({ ...clientForm, other_deliverables: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_stories">{t('clients.numStories')}</Label>
-                <Input
-                  id="c_stories"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_stories}
-                  onChange={e => setClientForm({ ...clientForm, num_stories: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_photos">{t('clients.numPhotos')}</Label>
-                <Input
-                  id="c_photos"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_photos}
-                  onChange={e => setClientForm({ ...clientForm, num_photos: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5 mt-3">
-              <Label htmlFor="c_other_deliverables">{t('clients.otherDeliverables')}</Label>
-              <Input
-                id="c_other_deliverables"
-                placeholder="e.g. Brochures, Flyers, Brand Guidelines..."
-                value={clientForm.other_deliverables}
-                onChange={e => setClientForm({ ...clientForm, other_deliverables: e.target.value })}
-              />
-            </div>
-          </div>
+            </>
+          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button type="button" variant="outline" onClick={() => setClientModalOpen(false)}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? t('clients.savingProgress') : t('common.save')}
+              {submitting ? t('common.loading') : t('common.save')}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── PROJECT CREATE / EDIT MODAL ── */}
+      {/* Schedule Configuration Modal */}
       <Modal
-        isOpen={projectModalOpen}
-        onClose={() => setProjectModalOpen(false)}
-        title={modalMode === 'create' ? t('clients.newProject') : t('clients.editProject')}
+        isOpen={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        title={t('clients.configureScheduleTitle') || 'Configure Deliverables Schedule'}
       >
-        <form onSubmit={handleProjectSubmit} className="flex flex-col gap-4 text-start">
-          {errorMsg && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md">
-              {errorMsg}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_client">{t('clients.selectClient')} *</Label>
-            <Select
-              value={projectForm.client_id}
-              onValueChange={v => setProjectForm({ ...projectForm, client_id: v || '' })}
-            >
-              <SelectTrigger id="p_client">
-                <SelectValue placeholder={t('clients.selectClient')} />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} {c.company ? `(${c.company})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_name">{t('clients.projectName')} *</Label>
-            <Input
-              id="p_name"
-              placeholder="e.g. Q3 SEO Optimization"
-              value={projectForm.name}
-              onChange={e => setProjectForm({ ...projectForm, name: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_desc">{t('clients.projectDescription')}</Label>
-            <Textarea
-              id="p_desc"
-              placeholder="Describe targets, deliverables, details..."
-              value={projectForm.description}
-              onChange={e => setProjectForm({ ...projectForm, description: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="p_status">{t('clients.statusLabel')}</Label>
-            <Select
-              value={projectForm.status}
-              onValueChange={v => setProjectForm({ ...projectForm, status: v as Project['status'] })}
-            >
-              <SelectTrigger id="p_status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="planning">📝 {t('clients.planning')}</SelectItem>
-                <SelectItem value="active">⚡ {t('clients.active')}</SelectItem>
-                <SelectItem value="on_hold">🔄 {t('clients.onHold')}</SelectItem>
-                <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_start">{t('clients.startDate')}</Label>
-              <Input
-                id="p_start"
-                type="date"
-                value={projectForm.start_date}
-                onChange={e => setProjectForm({ ...projectForm, start_date: e.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p_end">{t('clients.endDate')}</Label>
-              <Input
-                id="p_end"
-                type="date"
-                value={projectForm.end_date}
-                onChange={e => setProjectForm({ ...projectForm, end_date: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t">
-            <Button type="button" variant="outline" onClick={() => setProjectModalOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? t('clients.savingProgress') : (modalMode === 'create' ? t('clients.createProjectBtn') : t('common.saveChanges'))}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ── PROGRESS UPDATE MODAL ── */}
-      <Modal
-        isOpen={progressModalOpen}
-        onClose={() => setProgressModalOpen(false)}
-        title={`${t('clients.progressTitle')} — ${progressClient?.name || ''}`}
-      >
-        <div className="flex flex-col gap-5 text-start">
+        <div className="flex flex-col gap-6 max-h-[70vh] overflow-y-auto px-1 py-2">
           <p className="text-xs text-muted-foreground">
-            {t('clients.progressTitle')}
+            {t('clients.scheduleExplanation') || 'Pick calendar dates for each deliverable item. The system will use these day numbers to auto-schedule outline tasks for the upcoming months.'}
           </p>
 
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { key: 'done_posts', label: t('clients.donePosts'), total: progressClient?.num_posts ?? 0 },
-              { key: 'done_reels', label: t('clients.doneReels'), total: progressClient?.num_reels ?? 0 },
-              { key: 'done_stories', label: t('clients.doneStories'), total: progressClient?.num_stories ?? 0 },
-              { key: 'done_photos', label: t('clients.donePhotos'), total: progressClient?.num_photos ?? 0 },
-            ].map(item => (
-              <div key={item.key} className="flex flex-col gap-1.5">
-                <Label htmlFor={`prog_${item.key}`}>
-                  {item.label} <span className="text-muted-foreground font-normal">/ {item.total}</span>
-                </Label>
-                <Input
-                  id={`prog_${item.key}`}
-                  type="number"
-                  min="0"
-                  max={item.total}
-                  value={(progressForm as any)[item.key]}
-                  onChange={e => setProgressForm(prev => ({
-                    ...prev,
-                    [item.key]: parseInt(e.target.value) || 0,
-                  }))}
-                />
-              </div>
-            ))}
-          </div>
+          {(['posts', 'reels', 'stories', 'photos'] as const).map(typeKey => {
+            const count = clientForm[
+              typeKey === 'posts' ? 'num_posts' :
+              typeKey === 'reels' ? 'num_reels' :
+              typeKey === 'stories' ? 'num_stories' : 'num_photos'
+            ] || 0;
 
-          {/* Others toggle */}
-          {progressClient?.other_deliverables && (
-            <div className="flex items-center justify-between bg-muted/30 rounded-lg px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold">{t('clients.others')}</div>
-                <div className="text-xs text-muted-foreground">{progressClient.other_deliverables}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProgressForm(prev => ({ ...prev, done_other: !prev.done_other }))}
-                className={`size-8 rounded-md border-2 flex items-center justify-center transition-all ${
-                  progressForm.done_other
-                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'border-border bg-background hover:border-muted-foreground/50'
-                }`}
-              >
-                {progressForm.done_other && <Check className="size-4" />}
-              </button>
-            </div>
-          )}
+            if (count === 0) return null;
 
-          <div className="flex justify-end gap-3 pt-3 border-t">
-            <Button variant="outline" onClick={() => setProgressModalOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleProgressSave} disabled={savingProgress}>
-              {savingProgress ? (
-                <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('clients.savingProgress')}</>
-              ) : (
-                <><Check className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('clients.saveProgress')}</>
-              )}
+            const labelMap = {
+              posts: t('clients.posts') || 'Posts',
+              reels: t('clients.reels') || 'Reels',
+              stories: t('clients.stories') || 'Stories',
+              photos: t('clients.photos') || 'Photos',
+            };
+
+            const singularLabelMap = {
+              posts: t('closedClients.plan.post') || 'Post',
+              reels: t('closedClients.plan.reel') || 'Reel',
+              stories: t('closedClients.plan.story') || 'Story',
+              photos: t('closedClients.plan.photo') || 'Photo',
+            };
+
+            return (
+              <div key={typeKey} className="border-t border-border pt-4 first:border-0 first:pt-0 text-start">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                  {labelMap[typeKey]} ({count})
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Array.from({ length: count }).map((_, idx) => {
+                    const value = clientForm.deliverables_schedule?.[typeKey]?.[idx] || '';
+                    return (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <Label className="text-[10px] text-muted-foreground font-medium">
+                          {singularLabelMap[typeKey]} {idx + 1}
+                        </Label>
+                        <Input
+                          type="date"
+                          value={value}
+                          onChange={(e) => {
+                            const currentList = [...(clientForm.deliverables_schedule?.[typeKey] || [])];
+                            currentList[idx] = e.target.value;
+                            setClientForm({
+                              ...clientForm,
+                              deliverables_schedule: {
+                                ...clientForm.deliverables_schedule,
+                                [typeKey]: currentList
+                              }
+                            });
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border">
+            <Button type="button" onClick={() => setScheduleModalOpen(false)}>
+              {t('common.done')}
             </Button>
           </div>
         </div>
       </Modal>
+
+      {/* Close Won Deal Modal */}
+      <CloseWonModal
+        isOpen={closeWonOpen}
+        onClose={() => { setCloseWonOpen(false); setClientToClose(null); }}
+        client={clientToClose}
+        t={t}
+        locale={locale}
+        onSuccess={() => loadData(true)}
+      />
     </div>
   );
 }

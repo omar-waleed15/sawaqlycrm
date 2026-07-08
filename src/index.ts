@@ -16,6 +16,8 @@ import salariesRoutes from './routes/salaries';
 import analyticsRoutes from './routes/finance_analytics';
 import salesRoutes from './routes/sales';
 import chatRoutes from './routes/chat';
+import closedClientRoutes from './routes/closed_clients';
+import remindersRoutes from './routes/reminders';
 
 dotenv.config();
 
@@ -53,6 +55,8 @@ app.use('/api/salaries', salariesRoutes);
 app.use('/api/finance-analytics', analyticsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/closed-clients', closedClientRoutes);
+app.use('/api/reminders', remindersRoutes);
 
 // 404 handler
 app.use((_req, res) => {

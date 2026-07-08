@@ -7,18 +7,16 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 async function test() {
-  const targetId = '0f14f070-2dfd-41af-970d-fa28ba8aa49d';
-  console.log('Querying profile by ID:', targetId);
+  console.log('Querying clients with sales_rep profiles join...');
   const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', targetId)
-    .single();
+    .from('clients')
+    .select('*, sales_rep:profiles!clients_sales_rep_id_fkey(id, name)');
 
   if (error) {
-    console.error('Error fetching profile:', error);
+    console.error('Error fetching clients:', error);
   } else {
-    console.log('Profile found:', data);
+    console.log('Clients count:', data.length);
+    console.log('Clients sample:', data.slice(0, 2));
   }
 }
 

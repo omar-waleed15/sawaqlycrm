@@ -265,13 +265,13 @@ export default function DashboardPage() {
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* My Active Tasks */}
-                    <Card className="hover:shadow-md transition-shadow border-indigo-100 bg-indigo-50/10 dark:bg-indigo-950/5">
+                    <Card className="hover:shadow-md transition-shadow border-[#1D61E7]/15 bg-[#1D61E7]/5 dark:bg-[#1D61E7]/5">
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي النشطة' : 'My Active Tasks'}</span>
-                        <ClipboardList className="size-4 text-indigo-500" />
+                        <ClipboardList className="size-4 text-[#1D61E7]" />
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400">{myActiveTasks.length}</div>
+                        <div className="text-3xl font-extrabold text-[#1D61E7]">{myActiveTasks.length}</div>
                         <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
                           {locale === 'ar' ? 'المهام المسندة إلي وغير المنتهية' : 'Pending tasks assigned to me'}
                         </p>
@@ -333,11 +333,11 @@ export default function DashboardPage() {
                 <CardHeader className="border-b pb-4 flex flex-row items-center justify-between gap-4">
                   <div>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <DollarSign className="size-4 text-indigo-500" /> {t('dashboard.revenueBilling')}
+                      <DollarSign className="size-4 text-[#1D61E7]" /> {t('dashboard.revenueBilling')}
                     </CardTitle>
                     <CardDescription className="text-xs mt-0.5">{t('dashboard.revenueBillingDesc')}</CardDescription>
                   </div>
-                  <Link href="/dashboard/finance" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs font-semibold gap-1 text-indigo-600 hover:text-indigo-700")}>
+                  <Link href="/dashboard/finance" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs font-semibold gap-1 text-[#1D61E7] hover:text-[#1553c7]")}>
                     {t('dashboard.viewAll')} <ArrowRight className="size-3.5" />
                   </Link>
                 </CardHeader>
@@ -392,8 +392,8 @@ export default function DashboardPage() {
                           <Link href="/dashboard/finance" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-7 text-[11px] font-bold py-1 px-3 shrink-0")}>{t('dashboard.review')}</Link>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 p-3 border border-l-4 border-l-indigo-500 bg-indigo-50/10 dark:bg-indigo-950/5 rounded-lg text-indigo-900 dark:text-indigo-300">
-                          <CheckCircle2 className="size-4 text-indigo-500 shrink-0" />
+                        <div className="flex items-center gap-2 p-3 border border-l-4 border-l-[#1D61E7] bg-[#1D61E7]/5 rounded-lg text-[#1D61E7]">
+                          <CheckCircle2 className="size-4 text-[#1D61E7] shrink-0" />
                           <span className="text-xs font-medium">{t('dashboard.allAccountsPaid')}</span>
                         </div>
                       )}
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                     </CardTitle>
                     <CardDescription className="text-xs mt-0.5">{t('dashboard.actionablePrioritiesDesc')}</CardDescription>
                   </div>
-                  <Link href="/dashboard/tasks" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs font-semibold gap-1 text-indigo-600 hover:text-indigo-700")}>
+                  <Link href="/dashboard/tasks" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-8 text-xs font-semibold gap-1 text-[#1D61E7] hover:text-[#1553c7]")}>
                     {t('tasks.title')} <ArrowRight className="size-3.5" />
                   </Link>
                 </CardHeader>
@@ -454,9 +454,9 @@ export default function DashboardPage() {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
             <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-              <span className="size-2 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="size-2 rounded-full bg-[#1D61E7] animate-pulse" />
               {locale === 'ar' ? 'مهامي النشطة المسندة إلي' : 'My Active Assigned Tasks'}
-              <Badge variant="secondary" className="text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+              <Badge variant="secondary" className="text-xs bg-[#1D61E7]/10 text-[#1D61E7] dark:bg-[#1D61E7]/20 dark:text-[#1D61E7]">
                 {myActiveTasks.length}
               </Badge>
             </h2>

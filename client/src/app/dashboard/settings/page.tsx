@@ -259,14 +259,7 @@ export default function SettingsPage() {
                         </td>
                         <td className="py-3.5 px-4 text-start">
                           <Badge
-                            variant={
-                              u.role === 'owner' ? 'destructive' :
-                              u.role === 'team_leader' ? 'default' :
-                              u.role === 'sales' ? 'secondary' :
-                              u.role === 'moderation' ? 'secondary' :
-                              u.role === 'account_manager' ? 'secondary' :
-                              'outline'
-                            }
+                            variant="outline"
                             className="text-[10px] py-0.5 px-1.5"
                           >
                             {u.role === 'owner' ? t('role.owner') :
@@ -430,11 +423,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{t('settings.role')}</span>
                 <Badge
-                  variant={
-                    user?.role === 'owner' ? 'destructive' :
-                    user?.role === 'team_leader' ? 'default' :
-                    'secondary'
-                  }
+                  variant="outline"
                   className="capitalize"
                 >
                   {user?.role ? t(`role.${user.role}`) : ''}
@@ -472,7 +461,7 @@ export default function SettingsPage() {
             onClick={() => setActiveTab('profile')}
             className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'profile'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -482,7 +471,7 @@ export default function SettingsPage() {
             onClick={() => setActiveTab('agency')}
             className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'agency'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -493,7 +482,7 @@ export default function SettingsPage() {
               onClick={() => setActiveTab('users')}
               className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
                 activeTab === 'users'
-                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >

@@ -1,12 +1,12 @@
 'use client';
 
-import { Client, Project, Task } from '@/types';
+import { Client, Task } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCairoDate } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
-import ProjectCard from '@/components/ProjectCard';
+import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,25 +27,19 @@ import {
   ExternalLink,
   Briefcase,
   Sliders,
-  BarChart3
+  Plus
 } from 'lucide-react';
 
 interface ClientCardProps {
   client: Client;
-  clientProjects: Project[];
-  getProjectTasks: (projectId: string) => Task[];
+  clientTasks: Task[];
   locale: string;
   t: any;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onEditClick: (client: Client) => void;
   onDeleteClick: (clientId: string, clientName: string) => void;
-  onUpdateProgressClick: (client: Client) => void;
-  expandedProjectId: string | null;
-  onToggleExpandProject: (projectId: string | null) => void;
-  onEditProjectClick: (project: Project) => void;
-  onDeleteProjectClick: (projectId: string, projectName: string) => void;
-  onNewProjectClick: (clientId: string) => void;
+  onNewTaskClick: (clientId: string) => void;
 }
 
 function formatDate(dateStr?: string, locale: string = 'en'): string {
@@ -55,22 +49,16 @@ function formatDate(dateStr?: string, locale: string = 'en'): string {
 
 export default function ClientCard({
   client,
-  clientProjects,
-  getProjectTasks,
+  clientTasks,
   locale,
   t,
   isExpanded,
   onToggleExpand,
   onEditClick,
   onDeleteClick,
-  onUpdateProgressClick,
-  expandedProjectId,
-  onToggleExpandProject,
-  onEditProjectClick,
-  onDeleteProjectClick,
-  onNewProjectClick,
+  onNewTaskClick,
 }: ClientCardProps) {
-
+  const router = useRouter();
 
   return (
     <Card
@@ -114,10 +102,6 @@ export default function ClientCard({
                 <Pencil className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
                 {t('common.edit')}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onUpdateProgressClick(client)}>
-                <BarChart3 className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
-                {t('clients.updateProgress')}
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
@@ -136,7 +120,7 @@ export default function ClientCard({
             {client.status === 'active' ? t('clients.active') : t('clients.inactive')}
           </Badge>
           <Badge variant="outline" className="text-[10px] px-2 py-0.5 font-semibold bg-muted/30 text-muted-foreground">
-            💼 {clientProjects.length} {t('clients.projects')}
+            📋 {clientTasks.length} {t('tasks.title')}
           </Badge>
         </div>
 
@@ -228,7 +212,7 @@ export default function ClientCard({
           )}
         </div>
 
-        {/* Footer Area: View Projects Action */}
+        {/* Footer Area: View Tasks Action */}
         <div className="mt-auto pt-2">
           <div className="h-px bg-border/60 my-2" />
           <button
@@ -236,8 +220,11 @@ export default function ClientCard({
             className="flex items-center justify-between w-full text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors py-1 select-none"
           >
             <div className="flex items-center gap-1.5">
-              <Briefcase className="size-3.5" />
-              <span>{t('clients.projects')} ({clientProjects.length})</span>
+              <Sliders className="size-3.5" />
+              <span>{t('tasks.activeTasks')} ({clientTasks.filter(tData => {
+                const allCompleted = tData.task_assignees && tData.task_assignees.length > 0 && tData.task_assignees.every(a => a.status === 'completed');
+                return !allCompleted;
+              }).length})</span>
             </div>
             <div className="flex items-center gap-1">
               <span>{isExpanded ? t('common.close') : t('common.view')}</span>
@@ -247,43 +234,64 @@ export default function ClientCard({
         </div>
       </CardContent>
 
-      {/* Expanded Projects Grid Drawer */}
+      {/* Expanded Tasks list drawer */}
       {isExpanded && (
-        <div className="border-t border-border bg-muted/10 p-4 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-end">
+        <div className="border-t border-border bg-muted/10 p-4 flex flex-col gap-3 text-start" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">📋 Client Tasks</span>
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs bg-background"
-              onClick={() => onNewProjectClick(client.id)}
+              onClick={() => onNewTaskClick(client.id)}
             >
-              <Briefcase className="size-3.5 mr-1 rtl:ml-1 rtl:mr-0 text-indigo-500" /> {t('clients.newProject')}
+              <Plus className="size-3.5 mr-1 rtl:ml-1 rtl:mr-0 text-indigo-500" /> {t('tasks.createTask')}
             </Button>
           </div>
 
-          {clientProjects.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4">
-              {clientProjects.map(p => {
-                const pTasks = getProjectTasks(p.id);
-                const isProjExpanded = expandedProjectId === p.id;
+          {clientTasks.length > 0 ? (
+            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {clientTasks.map(tData => {
+                const allCompleted = tData.task_assignees && tData.task_assignees.length > 0 && tData.task_assignees.every(a => a.status === 'completed');
                 return (
-                  <ProjectCard
-                    key={p.id}
-                    project={p}
-                    projectTasks={pTasks}
-                    locale={locale}
-                    t={t}
-                    isExpanded={isProjExpanded}
-                    onToggleExpand={() => onToggleExpandProject(isProjExpanded ? null : p.id)}
-                    onEditClick={onEditProjectClick}
-                    onDeleteClick={onDeleteProjectClick}
-                  />
+                  <div
+                    key={tData.id}
+                    onClick={() => router.push(`/dashboard/tasks/${tData.id}`)}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-background hover:bg-muted/30 transition cursor-pointer text-xs animate-in fade-in"
+                  >
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className={cn("font-semibold text-foreground truncate", allCompleted && "line-through text-muted-foreground/60")}>
+                        {tData.title}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {tData.due_date && (
+                          <span className="text-[10px] text-muted-foreground">
+                            📅 {tData.due_date.split('T')[0]}
+                          </span>
+                        )}
+                        {tData.is_deliverable && (
+                          <span className="text-[9px] font-bold text-indigo-500 uppercase">
+                            🎯 {tData.deliverable_type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-semibold",
+                      allCompleted
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                    )}>
+                      {allCompleted ? t('status.completed') : t('status.todo')}
+                    </span>
+                  </div>
                 );
               })}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground/75 italic py-3 text-center border border-dashed rounded-lg bg-background/50">
-              {t('clients.noProjects')}
+              {t('tasks.noMyTasks')}
             </p>
           )}
         </div>

@@ -124,7 +124,7 @@ export default function IdeasPage() {
   const fetchUsers = useCallback(async () => {
     try {
       const { users: data } = await usersApi.list();
-      setUsers(data);
+      setUsers((data || []).filter((u: any) => u.role !== 'client'));
     } catch {
       // ignore
     }
