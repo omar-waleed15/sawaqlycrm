@@ -40,7 +40,6 @@ import { MoreVertical, Pencil, Trash2, Loader2, Save, X, ArrowRight, MessageSqua
 
 interface TaskCardProps {
   task: Task;
-  onScheduleClick?: (task: Task) => void;
   onTaskUpdated?: (task: Task) => void;
   onTaskDeleted?: (taskId: string) => void;
 }
@@ -68,7 +67,7 @@ function formatDuration(totalSeconds: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskDeleted }: TaskCardProps) {
+export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCardProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { t, locale } = useLanguage();
@@ -189,11 +188,7 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
   const unassignedMembers = members.filter(m => !assigneeIds.includes(m.id));
 
   const handleClick = () => {
-    if (onScheduleClick) {
-      onScheduleClick(task);
-    } else {
-      router.push(`/dashboard/tasks/${task.id}`);
-    }
+    router.push(`/dashboard/tasks/${task.id}`);
   };
 
   const handleToggleArchive = async () => {
@@ -345,26 +340,12 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
           </div>
 
           {/* Secondary Widgets Section */}
-          {(isOwner && submittedCount > 0) || task.publish_date || loggedTimeText ? (
+          {(isOwner && submittedCount > 0) || loggedTimeText ? (
             <div className="flex flex-col gap-2 mt-1">
               {/* Submission progress for admin */}
               {isOwner && submittedCount > 0 && (
                 <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
                   📤 {t('tasks.submissionsPending', { count: submittedCount })}
-                </div>
-              )}
-
-              {/* Publish Date Badge */}
-              {task.publish_date && (
-                <div className="flex flex-col gap-1">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded px-1.5 py-0.5 w-fit">
-                    📢 {t('tasks.publish')} {formatDate(task.publish_date, locale)}
-                  </span>
-                  {task.publish_notes && (
-                    <p className="text-[11px] text-muted-foreground italic line-clamp-1 leading-relaxed ps-1 text-start">
-                      📝 {task.publish_notes}
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -494,14 +475,7 @@ export default function TaskCard({ task, onScheduleClick, onTaskUpdated, onTaskD
             </div>
           </div>
 
-          {/* Schedule Action Button */}
-          {onScheduleClick && isOwner && !task.publish_date && (
-            <div className="mt-2 pt-2 border-t border-dashed border-border">
-              <span className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-md py-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors">
-                🗓️ {t('tasks.clickToSchedule')}
-              </span>
-            </div>
-          )}
+
         </CardContent>
       </Card>
 

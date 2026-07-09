@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { tasksApi, contractsApi, clientsApi, salesApi } from '@/lib/api';
-import { Task, Contract, Client, SalesCallLog } from '@/types';
+import { tasksApi, contractsApi, clientsApi, salesApi, contentsApi } from '@/lib/api';
+import { Task, Contract, Client, SalesCallLog, ContentItem } from '@/types';
 import Modal from '@/components/Modal';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,20 @@ import {
   Mail,
   Building2,
   Clock,
+  X,
+  FileText,
+  HelpCircle,
+  Video,
+  Image as ImageIcon,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
+const getLocalDateString = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 function formatCurrency(amount: number, locale?: string): string {
   const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
@@ -43,13 +56,6 @@ function formatCurrency(amount: number, locale?: string): string {
 function formatDate(date: Date, locale?: string): string {
   return formatCairoDate(date, locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
-
-const getLocalDateString = (d: Date) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; color: string; bg: string }> = {
   new_lead:          { labelKey: 'sales.newLead',       color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
@@ -70,6 +76,7 @@ export default function CalendarPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,17 +146,19 @@ export default function CalendarPage() {
     const fetchClients = (user.role === 'owner' || user.role === 'sales' || user.role === 'team_leader' || user.role === 'account_manager')
       ? clientsApi.list()
       : Promise.resolve({ clients: [] as Client[] });
+    const fetchContents = contentsApi.list();
 
-    Promise.all([fetchTasks, fetchContracts, fetchClients])
-      .then(([tasksData, contractsData, clientsData]) => {
+    Promise.all([fetchTasks, fetchContracts, fetchClients, fetchContents])
+      .then(([tasksData, contractsData, clientsData, contentsData]) => {
         setTasks(tasksData.tasks);
         setContracts(contractsData.contracts);
         setClients(clientsData.clients || []);
+        setContents(contentsData.contents || []);
         setError(null);
       })
       .catch(err => {
         console.error('Failed to load calendar data:', err);
-        setError('Failed to fetch tasks, contracts, or clients.');
+        setError('Failed to fetch tasks, contracts, clients, or content.');
       })
       .finally(() => setLoading(false));
   }, [user]);
@@ -261,13 +270,12 @@ export default function CalendarPage() {
     return dates;
   };
 
-  // Compile all calendar events for the active month view
   const eventsByDay = useMemo(() => {
-    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; publications: Task[]; meetings: Client[]; targetSlots: any[] }> = {};
+    const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; meetings: Client[]; targetSlots: any[]; contents: ContentItem[] }> = {};
     
     calendarCells.forEach(cell => {
       const dateStr = getLocalDateString(cell.date);
-      map[dateStr] = { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
+      map[dateStr] = { tasks: [], payments: [], meetings: [], targetSlots: [], contents: [] };
     });
 
     tasks.forEach(task => {
@@ -277,10 +285,13 @@ export default function CalendarPage() {
           map[dateStr].tasks.push(task);
         }
       }
-      if (task.publish_date) {
-        const dateStr = getCairoDateString(task.publish_date);
+    });
+
+    contents.forEach(item => {
+      if (item.scheduled_date) {
+        const dateStr = item.scheduled_date.substring(0, 10);
         if (map[dateStr]) {
-          map[dateStr].publications.push(task);
+          map[dateStr].contents.push(item);
         }
       }
     });
@@ -342,6 +353,8 @@ export default function CalendarPage() {
             const targetDateStr = dateStr.substring(0, 10);
             if (map[targetDateStr]) {
               const typeKey = tKey === 'posts' ? 'post' : tKey === 'reels' ? 'reel' : tKey === 'stories' ? 'story' : 'photo';
+              
+              // 1. Check matching tasks
               const matchingTasks = map[targetDateStr].tasks
                 .filter(t => 
                   t.client_id === client.id && 
@@ -349,6 +362,16 @@ export default function CalendarPage() {
                   t.deliverable_type === typeKey
                 )
                 .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
+
+              // 2. Check matching scheduled content items
+              const matchingContents = map[targetDateStr].contents
+                .filter(c =>
+                  c.client_id === client.id &&
+                  c.content_type === typeKey
+                )
+                .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
+
+              const contentIdx = idx - matchingTasks.length;
 
               if (idx < matchingTasks.length) {
                 // The slot is filled by an actual task!
@@ -362,6 +385,20 @@ export default function CalendarPage() {
                   scheduled_date: dateStr,
                   isFilled: true,
                   task: matchedTask,
+                });
+              } else if (contentIdx >= 0 && contentIdx < matchingContents.length) {
+                // The slot is filled by a content item!
+                const matchedContent = matchingContents[contentIdx];
+                const platformLabel = matchedContent.platform ? ` (${matchedContent.platform.toUpperCase()})` : '';
+                map[targetDateStr].targetSlots.push({
+                  id: matchedContent.id,
+                  client_id: client.id,
+                  client_name: client.name,
+                  title: `✨ ${matchedContent.title || 'Untitled Content'}${platformLabel}`,
+                  content_type: typeKey,
+                  scheduled_date: dateStr,
+                  isFilled: true,
+                  content: matchedContent,
                 });
               } else {
                 // The slot is empty
@@ -381,7 +418,7 @@ export default function CalendarPage() {
       }
     });
 
-    // Filter out matched tasks from general lists so they do not show up twice
+    // Filter out matched tasks/contents from general lists so they do not show up twice
     calendarCells.forEach(cell => {
       const dateStr = getLocalDateString(cell.date);
       const dayData = map[dateStr];
@@ -392,13 +429,20 @@ export default function CalendarPage() {
           
         if (filledTaskIds.length > 0) {
           dayData.tasks = dayData.tasks.filter(t => !filledTaskIds.includes(t.id));
-          dayData.publications = dayData.publications.filter(t => !filledTaskIds.includes(t.id));
+        }
+
+        const filledContentIds = dayData.targetSlots
+          .filter(slot => slot.isFilled && slot.content)
+          .map(slot => slot.content.id);
+
+        if (filledContentIds.length > 0) {
+          dayData.contents = dayData.contents.filter(c => !filledContentIds.includes(c.id));
         }
       }
     });
 
     return map;
-  }, [calendarCells, tasks, contracts, clients, isOwner]);
+  }, [calendarCells, tasks, contracts, clients, contents, isOwner]);
 
   // Compute month statistics
   const monthStats = useMemo(() => {
@@ -440,9 +484,9 @@ export default function CalendarPage() {
   }, [calendarCells, eventsByDay, isOwner, isTaskAdmin, user]);
 
   const selectedDayEvents = useMemo(() => {
-    if (!selectedDate) return { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
+    if (!selectedDate) return { tasks: [], payments: [], meetings: [], targetSlots: [], contents: [] };
     const dateStr = getLocalDateString(selectedDate);
-    return eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
+    return eventsByDay[dateStr] || { tasks: [], payments: [], meetings: [], targetSlots: [], contents: [] };
   }, [selectedDate, eventsByDay]);
 
   const handleDayClick = (date: Date) => {
@@ -515,16 +559,16 @@ export default function CalendarPage() {
           <div className="grid grid-cols-7 grid-rows-5 bg-border gap-[1px]">
             {calendarCells.map((cell) => {
               const dateStr = getLocalDateString(cell.date);
-              const dayEvents = eventsByDay[dateStr] || { tasks: [], payments: [], publications: [], meetings: [], targetSlots: [] };
+              const dayEvents = eventsByDay[dateStr] || { tasks: [], payments: [], meetings: [], targetSlots: [], contents: [] };
               const isToday = getCairoTodayString() === dateStr;
               
               const displayTasks = dayEvents.tasks.slice(0, isOwner ? 1 : 2);
               const displayPayments = isOwner ? dayEvents.payments.slice(0, 1) : [];
-              const displayPublications = (dayEvents.publications || []).slice(0, 1);
               const displayMeetings = isOwner ? (dayEvents.meetings || []).slice(0, 1) : [];
               const displayTargetSlots = (dayEvents.targetSlots || []).slice(0, 1);
-              const totalItems = displayTasks.length + displayPayments.length + displayPublications.length + displayMeetings.length + displayTargetSlots.length;
-              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.publications || []).length + (dayEvents.meetings || []).length + (dayEvents.targetSlots || []).length;
+              const displayContents = (dayEvents.contents || []).slice(0, 1);
+              const totalItems = displayTasks.length + displayPayments.length + displayMeetings.length + displayTargetSlots.length + displayContents.length;
+              const actualTotal = dayEvents.tasks.length + dayEvents.payments.length + (dayEvents.meetings || []).length + (dayEvents.targetSlots || []).length + (dayEvents.contents || []).length;
               const hasMore = actualTotal > totalItems;
               const extraCount = actualTotal - totalItems;
 
@@ -580,48 +624,62 @@ export default function CalendarPage() {
                       </div>
                     ))}
 
-                    {/* Publications */}
-                    {displayPublications.map(tTask => {
-                      const pubCompleted = isTaskCompleted(tTask);
+
+
+                    {/* Target Slots */}
+                    {displayTargetSlots.map(slot => {
+                      const isTaskFilled = slot.isFilled && slot.task;
+                      const isContentFilled = slot.isFilled && slot.content;
+                      const taskCompleted = isTaskFilled ? isTaskCompleted(slot.task) : false;
+                      const contentPublished = isContentFilled ? slot.content.status === 'published' : false;
+                      const isUrgent = isTaskFilled ? slot.task.priority === 'urgent' : false;
+                      const isHigh = isTaskFilled ? slot.task.priority === 'high' : false;
+
+                      let badgeClasses = 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300';
+                      if (isTaskFilled) {
+                        badgeClasses = taskCompleted
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                          : isUrgent
+                          ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
+                          : isHigh
+                          ? 'bg-orange-50 border-orange-200 text-orange-700'
+                          : 'bg-sky-50 border-sky-200 text-sky-700';
+                      } else if (isContentFilled) {
+                        badgeClasses = contentPublished
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                          : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300';
+                      }
+
                       return (
                         <div
-                          key={`pub-${tTask.id}`}
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            pubCompleted
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
-                              : 'bg-sky-50 border-sky-200 text-sky-700'
-                          }`}
-                          title={`Publish${pubCompleted ? ' (Done)' : ''}: ${tTask.title}`}
+                          key={slot.id}
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${badgeClasses}`}
+                          title={slot.title}
                         >
-                          {pubCompleted ? <CheckCircle2 className="size-2.5 shrink-0" /> : <Megaphone className="size-2 shrink-0" />}
-                          <span className={pubCompleted ? 'line-through opacity-70' : ''}>{tTask.title}</span>
+                          <span className="shrink-0">{isContentFilled ? '✨' : '🎯'}</span>
+                          <span>{slot.title}</span>
                         </div>
                       );
                     })}
 
-                    {/* Target Slots */}
-                    {displayTargetSlots.map(slot => {
-                      const taskCompleted = slot.isFilled ? isTaskCompleted(slot.task) : false;
-                      const isUrgent = slot.isFilled ? slot.task.priority === 'urgent' : false;
-                      const isHigh = slot.isFilled ? slot.task.priority === 'high' : false;
+                    {/* Contents */}
+                    {displayContents.map(item => {
+                      const published = item.status === 'published';
+                      const platformLabel = item.platform ? ` (${item.platform.toUpperCase()})` : '';
                       return (
                         <div
-                          key={slot.id}
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            slot.isFilled
-                              ? taskCompleted
-                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
-                                : isUrgent
-                                ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
-                                : isHigh
-                                ? 'bg-orange-50 border-orange-200 text-orange-700'
-                                : 'bg-sky-50 border-sky-200 text-sky-700'
-                              : 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300'
+                          key={`content-${item.id}`}
+                          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
+                            published
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                              : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300'
                           }`}
-                          title={slot.title}
+                          title={`Content: ${item.title || 'Untitled'}${platformLabel}`}
                         >
-                          <span className="shrink-0">🎯</span>
-                          <span>{slot.title}</span>
+                          <span className="shrink-0">✨</span>
+                          <span className={published ? 'line-through opacity-70' : ''}>
+                            {item.title || 'Untitled Content'}
+                          </span>
                         </div>
                       );
                     })}
@@ -802,7 +860,11 @@ export default function CalendarPage() {
                           size="sm"
                           onClick={() => {
                             setIsModalOpen(false);
-                            router.push(`/dashboard/tasks/${slot.id}`);
+                            if (slot.content) {
+                              router.push('/dashboard/content');
+                            } else {
+                              router.push(`/dashboard/tasks/${slot.id}`);
+                            }
                           }}
                           className="h-7 text-xs font-semibold shrink-0"
                         >
@@ -815,47 +877,57 @@ export default function CalendarPage() {
               </div>
             )}
 
-            {/* Publications Section */}
-            <div className="flex flex-col gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
-                <Megaphone className="size-3.5 text-sky-500" /> {t('calendar.publicationsScheduled')} ({selectedDayEvents.publications.length})
-              </h3>
-              {selectedDayEvents.publications.length > 0 ? (
+            {/* Content Hub Items Section */}
+            {selectedDayEvents.contents && selectedDayEvents.contents.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-1.5">
+                  <Sparkles className="size-3.5 text-amber-500" /> {t('contentHub.title') || 'Content Hub'} ({selectedDayEvents.contents.length})
+                </h3>
                 <div className="flex flex-col gap-2">
-                  {selectedDayEvents.publications.map(tTask => {
-                    const pubDone = isTaskCompleted(tTask);
+                  {selectedDayEvents.contents.map(item => {
+                    const published = item.status === 'published';
                     return (
-                      <div key={tTask.id} className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
-                        pubDone ? 'border-l-emerald-500' : 'border-l-sky-500'
+                      <div key={item.id} className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
+                        published ? 'border-l-4 border-l-emerald-500' : ''
                       }`}>
                         <div className="flex-1 overflow-hidden text-start">
-                          <div className="flex items-center gap-2">
-                            {pubDone && <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />}
-                            <h4 className={`font-bold text-xs ${pubDone ? 'line-through text-muted-foreground' : ''}`}>{tTask.title}</h4>
-                            {pubDone && <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">{t('calendar.doneLabel')}</Badge>}
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <h4 className="font-bold text-xs truncate max-w-[200px]">{item.title || 'Untitled Content'}</h4>
+                            <Badge className={published ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}>
+                              {published ? t('contentHub.status.published') : t('contentHub.status.draft')}
+                            </Badge>
+                            {item.platform && (
+                              <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 font-semibold uppercase">
+                                {item.platform}
+                              </Badge>
+                            )}
                           </div>
-                          {tTask.description && (
-                            <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                              {tTask.description}
+                          {item.caption && (
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                              {item.caption}
                             </p>
                           )}
-                          {tTask.publish_notes && (
-                            <div className="bg-sky-50/50 border border-sky-100 rounded-md p-2 text-[10px] text-sky-800 italic mt-2">
-                              📝 {tTask.publish_notes}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 mt-2 text-[9px] text-muted-foreground">
+                            <span>🎬 {item.content_type}</span>
+                            {item.client && (
+                              <>
+                                <span>•</span>
+                                <span>👥 {t('taskDetail.client') || 'Client'}: {item.client.name}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push(`/dashboard/tasks/${tTask.id}`); }} className="h-7 text-xs font-semibold shrink-0">
-                          {t('common.view')}
+                        <Button variant="outline" size="sm" onClick={() => { setIsModalOpen(false); router.push('/dashboard/content'); }} className="h-7 text-xs font-semibold shrink-0">
+                          {t('common.open') || 'Open'}
                         </Button>
                       </div>
                     );
                   })}
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground/60 italic py-2 pl-1 rtl:pr-1 rtl:pl-0 text-start">{t('calendar.noPublications')}</p>
-              )}
-            </div>
+              </div>
+            )}
+
+
 
             {/* Tasks Due Section */}
             <div className="flex flex-col gap-2">

@@ -92,6 +92,13 @@ router.get('/portal/data', authMiddleware, async (req: AuthRequest, res: Respons
       .in('status', ['approved', 'published'])
       .order('scheduled_date', { ascending: true });
 
+    // Fetch new content items
+    const { data: contents, error: contentsErr } = await supabaseAdmin
+      .from('contents')
+      .select('id, title, content_type, status, scheduled_date, drive_link, platform, media_urls, caption, sound, created_at, updated_at')
+      .eq('client_id', client.id)
+      .order('scheduled_date', { ascending: true });
+
     // 4. Fetch performance reports (Views, Engagement, etc.)
     const { data: reports, error: reportsErr } = await supabaseAdmin
       .from('client_reports')
@@ -103,6 +110,7 @@ router.get('/portal/data', authMiddleware, async (req: AuthRequest, res: Respons
       client: populatedClient,
       faq: faq || [],
       contentPlans: contentPlans || [],
+      contents: contents || [],
       reports: reports || [],
     });
   } catch (err: any) {

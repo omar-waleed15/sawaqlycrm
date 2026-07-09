@@ -27,6 +27,7 @@ import {
   StickyNote,
   Sun,
   Moon,
+  Film,
 } from 'lucide-react';
 
 interface NavItem {
@@ -39,8 +40,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard',          labelKey: 'nav.dashboard',     icon: LayoutDashboard, allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
   { href: '/dashboard/tasks',    labelKey: 'nav.allTasks',      icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'member', 'moderation', 'account_manager'] },
-  { href: '/dashboard/chat',     labelKey: 'nav.globalChat',    icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
+  { href: '/dashboard/content',  labelKey: 'nav.content',       icon: Film,            allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager'] },
   { href: '/dashboard/reminders', labelKey: 'nav.reminders',     icon: StickyNote,      allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
+  { href: '/dashboard/chat',     labelKey: 'nav.globalChat',    icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager'] },
+  { href: '/dashboard/client-chat', labelKey: 'nav.clientChat',  icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'account_manager'] },
   { href: '/dashboard/team',     labelKey: 'nav.team',          icon: Users,           allowedRoles: ['owner'] },
   { href: '/dashboard/finance',  labelKey: 'nav.finance',       icon: Briefcase,       allowedRoles: ['owner'] },
   { href: '/dashboard/clients',  labelKey: 'nav.clients',       icon: Users,           allowedRoles: ['owner', 'team_leader', 'account_manager'] },

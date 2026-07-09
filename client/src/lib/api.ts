@@ -365,3 +365,36 @@ export const remindersApi = {
   delete: (id: string) =>
     request(`/reminders/${id}`, { method: 'DELETE' }),
 };
+
+// Contents API
+export const contentsApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<{ contents: import('@/types').ContentItem[] }>(`/contents${qs}`);
+  },
+  create: (data: Partial<import('@/types').ContentItem>) =>
+    request<{ content: import('@/types').ContentItem }>('/contents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<import('@/types').ContentItem>) =>
+    request<{ content: import('@/types').ContentItem }>(`/contents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    request(`/contents/${id}`, { method: 'DELETE' }),
+  upload: (formData: FormData) =>
+    uploadFile('/contents/upload', formData) as Promise<{ public_urls: string[] }>,
+};
+
+// Client Chat API
+export const clientChatApi = {
+  listRooms: () => request<{ rooms: any[] }>('/client-chat/rooms'),
+  listMessages: (clientId: string) => request<{ messages: any[] }>(`/client-chat/rooms/${clientId}/messages`),
+  sendMessage: (clientId: string, content: string) =>
+    request<{ message: any }>(`/client-chat/rooms/${clientId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+};

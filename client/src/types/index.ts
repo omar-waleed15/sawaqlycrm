@@ -41,8 +41,6 @@ export interface Task {
   drive_link?: string;
   content_type?: string;
   content_description?: string;
-  publish_date?: string;
-  publish_notes?: string;
   completion_note?: string;      // legacy
   creator_id: string;
   assignee_id?: string;          // legacy — use task_assignees
@@ -499,4 +497,22 @@ export interface Reminder {
   created_at: string;
   sender?: { name: string; avatar_url?: string };
   receiver?: { name: string; avatar_url?: string };
+}
+
+export interface ContentItem {
+  id: string;
+  client_id?: string;
+  title?: string;
+  caption?: string;
+  description?: string;
+  content_type: 'post' | 'photo' | 'reel' | 'story';
+  sound?: string;
+  drive_link?: string;
+  status: 'draft' | 'published';
+  media_urls?: string[];
+  platform?: string;
+  scheduled_date?: string;
+  client?: { id: string; name: string; company?: string };
+  created_at?: string;
+  updated_at?: string;
 }

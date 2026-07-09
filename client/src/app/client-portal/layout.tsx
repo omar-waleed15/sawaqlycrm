@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe, MessageSquare } from 'lucide-react';
 
 export default function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -75,6 +75,7 @@ export default function ClientPortalLayout({ children }: { children: React.React
           <nav className="flex flex-col gap-1.5 p-4">
             {[
               { label: t('portal.overview'), href: '/client-portal', icon: LayoutDashboard },
+              { label: t('portal.chat') || 'Chat', href: '/client-portal/chat', icon: MessageSquare },
               { label: t('portal.contentPlan'), href: '/client-portal/content', icon: FileText },
               { label: t('portal.calendar'), href: '/client-portal/calendar', icon: Calendar },
               { label: t('portal.faq'), href: '/client-portal/faq', icon: HelpCircle },

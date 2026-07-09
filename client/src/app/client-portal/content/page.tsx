@@ -2,23 +2,29 @@
 
 import { useEffect, useState } from 'react';
 import { request } from '@/lib/api';
-import { ClientContentPlan } from '@/types';
+import { ClientContentPlan, ContentItem } from '@/types';
 import { useLanguage } from '@/lib/i18n';
 import { Loader2, ExternalLink, FileText, Calendar } from 'lucide-react';
 
 interface PortalData {
+  client: any;
   contentPlans: ClientContentPlan[];
+  contents: ContentItem[];
 }
 
 export default function ClientContentHistoryPage() {
   const { t, locale } = useLanguage();
   const [plans, setPlans] = useState<ClientContentPlan[]>([]);
+  const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     request<PortalData>('/clients/portal/data')
-      .then((res: PortalData) => setPlans(res.contentPlans))
+      .then((res: PortalData) => {
+        setPlans(res.contentPlans || []);
+        setContents(res.contents || []);
+      })
       .catch((err: any) => setError(err.message || 'Failed to load content schedule'))
       .finally(() => setLoading(false));
   }, []);
@@ -74,7 +80,7 @@ export default function ClientContentHistoryPage() {
     }
   ];
 
-  const plansToUse = plans && plans.length > 0 ? plans : mockPlans;
+  const contentsToUse = contents && contents.length > 0 ? contents : (plans && plans.length > 0 ? plans : mockPlans);
 
   const getContentTypeBadgeColor = (type?: string) => {
     switch (type) {
@@ -118,7 +124,7 @@ export default function ClientContentHistoryPage() {
         <div className="bg-red-50 border border-red-200 text-red-600 text-[10px] uppercase font-mono tracking-wider px-4 py-3 rounded-lg max-w-md mx-auto">
           {error}
         </div>
-      ) : plansToUse.length === 0 ? (
+      ) : contentsToUse.length === 0 ? (
         <div className="border border-dashed border-[#E2E8F0] bg-white py-16 text-center rounded-xl flex flex-col items-center justify-center gap-3 shadow-xs">
           <FileText className="size-8 text-[#94A3B8]" />
           <h3 className="text-[10px] font-bold text-[#0F172A] uppercase tracking-widest font-mono">{t('portal.noContent')}</h3>
@@ -128,7 +134,7 @@ export default function ClientContentHistoryPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {plansToUse.map(plan => (
+          {contentsToUse.map(plan => (
             <div key={plan.id} className="border border-[#E2E8F0] bg-white hover:border-[#1D61E7]/50 transition-all p-5 flex flex-col justify-between rounded-xl shadow-xs text-start">
               <div className="flex flex-col gap-4">
                 
@@ -142,10 +148,47 @@ export default function ClientContentHistoryPage() {
                   <span className={`px-2 py-0.5 text-[8px] font-mono font-bold border uppercase tracking-wider ${getStatusBadgeColor(plan.status)}`}>
                     {plan.status}
                   </span>
+                  {(plan as any).platform && (
+                    <span className="px-2 py-0.5 text-[8px] font-mono font-bold border border-[#1D61E7]/25 bg-[#1D61E7]/5 text-[#1D61E7] uppercase tracking-wider">
+                      {(plan as any).platform}
+                    </span>
+                  )}
                 </div>
 
                 {/* Title */}
-                <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider font-mono">{plan.title}</h4>
+                <h4 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider font-mono">{plan.title || 'Untitled Content'}</h4>
+
+                {/* Caption / Notes */}
+                {((plan as any).notes || (plan as any).caption) && (
+                  <p className="text-[11px] text-[#64748B] leading-relaxed whitespace-pre-wrap">
+                    {(plan as any).notes || (plan as any).caption}
+                  </p>
+                )}
+
+                {/* Sound */}
+                {(plan as any).sound && (
+                  <p className="text-[10px] text-[#64748B] font-mono">
+                    🎵 {(plan as any).sound}
+                  </p>
+                )}
+
+                {/* Media Files Gallery */}
+                {(plan as any).media_urls && (plan as any).media_urls.length > 0 && (
+                  <div className="flex gap-1.5 overflow-x-auto py-1">
+                    {(plan as any).media_urls.map((url: string, index: number) => {
+                      const isVideo = url.toLowerCase().endsWith('.mp4') || url.includes('/video/');
+                      return (
+                        <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="size-16 shrink-0 rounded-lg overflow-hidden border border-[#E2E8F0] bg-slate-900 flex items-center justify-center relative hover:opacity-85 transition-opacity">
+                          {isVideo ? (
+                            <span className="text-[8px] text-white font-mono font-bold">VIDEO</span>
+                          ) : (
+                            <img src={url} alt="" className="size-full object-cover" />
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Date */}
                 <div className="flex items-center gap-1.5 text-[10px] text-[#64748B] font-semibold uppercase tracking-wider font-mono">

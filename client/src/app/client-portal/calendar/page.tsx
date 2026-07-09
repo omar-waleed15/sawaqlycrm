@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { request } from '@/lib/api';
-import { Client, ClientContentPlan } from '@/types';
+import { Client, ClientContentPlan, ContentItem } from '@/types';
 import { useLanguage } from '@/lib/i18n';
 import { ChevronLeft, ChevronRight, Loader2, ExternalLink, Calendar as CalendarIcon, Megaphone, X } from 'lucide-react';
 
 interface PortalData {
   client: Client;
   contentPlans: ClientContentPlan[];
+  contents: ContentItem[];
 }
 
 const TYPE_STYLES: Record<string, string> = {
@@ -21,6 +22,7 @@ const TYPE_STYLES: Record<string, string> = {
 const STATUS_STYLES: Record<string, string> = {
   published: 'bg-[#0c2411] border-[#1b3d22] text-[#4ade80]',
   approved: 'bg-[#1D61E7]/10 border-[#1D61E7]/30 text-[#60a5fa]',
+  draft: 'bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300',
 };
 
 export default function ClientPortalCalendarPage() {
@@ -46,6 +48,7 @@ export default function ClientPortalCalendarPage() {
 
   const client = data?.client;
   const plans = useMemo(() => data?.contentPlans || [], [data]);
+  const contents = useMemo(() => data?.contents || [], [data]);
 
   const mockPlans: ClientContentPlan[] = [
     {
@@ -156,6 +159,15 @@ export default function ClientPortalCalendarPage() {
         
         const typeKey = typeKeyMap[tKey];
         const targetDateStr = dateStr.substring(0, 10);
+        
+        const matchingContents = contents
+          .filter(c => 
+            c.scheduled_date && 
+            c.scheduled_date.substring(0, 10) === targetDateStr && 
+            c.content_type === typeKey
+          )
+          .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
+
         const matchingPlans = plansToUse
           .filter(p => 
             p.scheduled_date && 
@@ -164,7 +176,19 @@ export default function ClientPortalCalendarPage() {
           )
           .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
 
-        if (idx < matchingPlans.length) {
+        if (idx < matchingContents.length) {
+          const matchedContent = matchingContents[idx];
+          slots.push({
+            id: matchedContent.id,
+            title: matchedContent.title || matchedContent.caption || `Slot • ${typeLabelMap[tKey]}`,
+            content_type: typeKey,
+            status: matchedContent.status,
+            scheduled_date: dateStr,
+            isTargetSlot: true,
+            isFilled: true,
+            content: matchedContent,
+          });
+        } else if (idx < matchingPlans.length) {
           const matchedPlan = matchingPlans[idx];
           slots.push({
             id: matchedPlan.id,
@@ -191,16 +215,22 @@ export default function ClientPortalCalendarPage() {
     });
 
     return slots;
-  }, [clientToUse, plansToUse]);
+  }, [clientToUse, plansToUse, contents]);
 
   const allCalendarItems = useMemo(() => {
     const filledPlanIds = virtualSlots
       .filter(slot => slot.isFilled && slot.plan)
       .map(slot => slot.plan.id);
 
+    const filledContentIds = virtualSlots
+      .filter(slot => slot.isFilled && slot.content)
+      .map(slot => slot.content.id);
+
     const unfilledPlans = plansToUse.filter(p => !filledPlanIds.includes(p.id));
-    return [...unfilledPlans, ...virtualSlots];
-  }, [plansToUse, virtualSlots]);
+    const unfilledContents = contents.filter(c => !filledContentIds.includes(c.id));
+
+    return [...unfilledPlans, ...unfilledContents, ...virtualSlots];
+  }, [plansToUse, contents, virtualSlots]);
 
   const scheduledPlans = useMemo(() => {
     return allCalendarItems.filter(p => !!p.scheduled_date);
@@ -447,9 +477,9 @@ export default function ClientPortalCalendarPage() {
                             </div>
                           </div>
 
-                          {slot.isFilled && slot.plan?.drive_link && (
+                          {slot.isFilled && (slot.content?.drive_link || slot.plan?.drive_link) && (
                             <a
-                              href={slot.plan.drive_link}
+                              href={slot.content?.drive_link || slot.plan?.drive_link}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 px-3 py-1 border border-[#E2E8F0] hover:border-[#1D61E7] bg-white text-[9px] font-bold uppercase tracking-widest font-mono text-[#1D61E7] hover:text-[#1553c7] transition-all rounded-lg shadow-xs"
@@ -473,21 +503,55 @@ export default function ClientPortalCalendarPage() {
                     {selectedDatePlans
                       .filter(p => !p.isTargetSlot)
                       .map(plan => (
-                        <div key={plan.id} className="border border-[#E2E8F0] bg-[#F8FAFC] p-4 flex flex-col gap-3 text-start rounded-xl">
+                        <div key={plan.id} className="border border-[#E2E8F0] bg-white p-4 flex flex-col gap-3 text-start rounded-xl shadow-xs">
                           <div className="flex items-center justify-between gap-2">
-                            <h5 className="text-[10px] font-bold text-[#0F172A] uppercase tracking-wider font-mono">{plan.title}</h5>
-                            <span className={`inline-flex items-center px-1.5 py-0.5 border text-[8px] font-mono font-extrabold uppercase tracking-wider rounded-md ${STATUS_STYLES[plan.status]}`}>
+                            <h5 className="text-[10px] font-bold text-[#0F172A] uppercase tracking-wider font-mono">{plan.title || 'Untitled Content'}</h5>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 border text-[8px] font-mono font-extrabold uppercase tracking-wider rounded-md ${STATUS_STYLES[plan.status] || ''}`}>
                               {plan.status}
                             </span>
                           </div>
                           
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             {plan.content_type && (
                               <span className={`inline-flex items-center px-1.5 py-0.5 border text-[8px] font-mono font-extrabold uppercase tracking-wider rounded-md ${TYPE_STYLES[plan.content_type] || 'border-[#E2E8F0] text-slate-400'}`}>
                                 {plan.content_type}
                               </span>
                             )}
+                            {plan.platform && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 border border-[#1D61E7]/20 bg-[#1D61E7]/5 text-[8px] font-mono font-extrabold uppercase tracking-wider rounded-md text-[#1D61E7]">
+                                {plan.platform}
+                              </span>
+                            )}
                           </div>
+
+                          {plan.caption && (
+                            <p className="text-[10px] text-[#64748B] mt-2 leading-relaxed bg-[#F8FAFC] p-2.5 border border-[#E2E8F0] rounded-xl whitespace-pre-wrap">
+                              {plan.caption}
+                            </p>
+                          )}
+
+                          {plan.sound && (
+                            <p className="text-[9px] text-[#64748B] font-mono flex items-center gap-1">
+                              <span>🎵</span> <span className="truncate">{plan.sound}</span>
+                            </p>
+                          )}
+
+                          {plan.media_urls && plan.media_urls.length > 0 && (
+                            <div className="flex gap-1.5 overflow-x-auto mt-2 py-1">
+                              {plan.media_urls.map((url: string, index: number) => {
+                                const isVideo = url.toLowerCase().endsWith('.mp4') || url.includes('/video/');
+                                return (
+                                  <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="size-12 shrink-0 rounded-lg overflow-hidden border border-[#E2E8F0] bg-slate-900 flex items-center justify-center relative hover:opacity-85 transition-opacity">
+                                    {isVideo ? (
+                                      <span className="text-[8px] text-white font-mono font-bold">VIDEO</span>
+                                    ) : (
+                                      <img src={url} alt="" className="size-full object-cover" />
+                                    )}
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          )}
 
                           {plan.drive_link && (
                             <a
