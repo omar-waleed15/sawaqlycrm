@@ -638,7 +638,7 @@ export default function ClientsDashboardPage() {
 
             <div className="border rounded-xl bg-card shadow-sm overflow-hidden">
               <div className="table-responsive">
-                <table className="table" style={{ margin: 0 }}>
+                <table className="table min-w-[900px]" style={{ margin: 0 }}>
                   <thead>
                     <tr className="text-xs text-muted-foreground bg-muted/20 border-b">
                       <th className="py-3 px-4 font-bold text-start">{t('clients.createdDate')}</th>
@@ -852,10 +852,10 @@ export default function ClientsDashboardPage() {
       </div>
 
       {/* Tabs switcher */}
-      <div className="flex border-b border-border mb-6 gap-6">
+      <div className="flex border-b border-border mb-6 gap-6 overflow-x-auto">
         <button
           onClick={() => setActiveTab('clients')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+          className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 ${
             activeTab === 'clients'
               ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
               : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -866,7 +866,7 @@ export default function ClientsDashboardPage() {
         {user?.role === 'owner' && (
           <button
             onClick={() => setActiveTab('reports')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'reports'
                 ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -1153,96 +1153,6 @@ export default function ClientsDashboardPage() {
             </Select>
           </div>
 
-
-
-          {clientForm.pipeline_stage === 'won' && (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_content_plan">{t('clients.contentPlanLink')}</Label>
-                <Input
-                  id="c_content_plan"
-                  type="url"
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  value={clientForm.content_plan_link}
-                  onChange={e => setClientForm({ ...clientForm, content_plan_link: e.target.value })}
-                />
-              </div>
-
-              {/* Content Deliverables */}
-              <div className="border-t border-border pt-4 text-start">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold">🎬 {t('clients.deliverables')}</h4>
-                  {(clientForm.num_posts > 0 || clientForm.num_reels > 0 || clientForm.num_stories > 0 || clientForm.num_photos > 0) && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setScheduleModalOpen(true)}
-                      className="h-7 text-xs flex items-center gap-1"
-                    >
-                      <Calendar className="size-3" />
-                      {t('clients.configureSchedule') || 'Configure Schedule Outline'}
-                    </Button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="c_posts">{t('clients.numPosts')}</Label>
-                    <Input
-                      id="c_posts"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={clientForm.num_posts}
-                      onChange={e => setClientForm({ ...clientForm, num_posts: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="c_reels">{t('clients.numReels')}</Label>
-                    <Input
-                      id="c_reels"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={clientForm.num_reels}
-                      onChange={e => setClientForm({ ...clientForm, num_reels: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="c_stories">{t('clients.numStories')}</Label>
-                    <Input
-                      id="c_stories"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={clientForm.num_stories}
-                      onChange={e => setClientForm({ ...clientForm, num_stories: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="c_photos">{t('clients.numPhotos')}</Label>
-                    <Input
-                      id="c_photos"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={clientForm.num_photos}
-                      onChange={e => setClientForm({ ...clientForm, num_photos: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 mt-3">
-                  <Label htmlFor="c_other_deliverables">{t('clients.otherDeliverables')}</Label>
-                  <Input
-                    id="c_other_deliverables"
-                    placeholder="e.g. Brochures, Flyers, Brand Guidelines..."
-                    value={clientForm.other_deliverables}
-                    onChange={e => setClientForm({ ...clientForm, other_deliverables: e.target.value })}
-                  />
-                </div>
-              </div>
-            </>
-          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button type="button" variant="outline" onClick={() => setClientModalOpen(false)}>

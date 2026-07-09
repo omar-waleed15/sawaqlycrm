@@ -93,6 +93,7 @@ export const ar: Record<string, string> = {
   'role.account_manager': 'مدير حسابات',
   'role.teamMember': 'عضو الفريق',
   'role.client': 'عميل',
+  'role.content_creator': 'صانع محتوى',
 
   // ── لوحة التحكم ────────────────────────────────────────────────────
   'dashboard.greeting.morning': 'صباح الخير',
@@ -945,9 +946,10 @@ export const ar: Record<string, string> = {
   'closedClients.incompleteSetupDesc': 'يرجى إكمال تفاصيل الملف الشخصي، رابط خطة المحتوى، والتسليمات.',
   'closedClients.clientSince': 'عميل منذ',
 
-  // التبويبات الفرعية
   'closedClients.tab.faq': 'نظرة عامة والأسئلة الشائعة',
+  'closedClients.tab.contentHub': 'مستودع المحتوى',
   'closedClients.tab.tasks': 'المهام',
+  'closedClients.tab.contentList': 'جدول المحتوى',
   'closedClients.tab.contentPlan': 'خطة المحتوى',
   'closedClients.tab.ideas': 'الأفكار',
   'closedClients.tab.calendar': 'التقويم',
@@ -1185,5 +1187,6 @@ export const ar: Record<string, string> = {
   'contentHub.noClient': 'غير مرتبط بعميل',
   'contentHub.openDrive': 'فتح درايف',
   'contentHub.mediaFiles': 'ملفات الميديا المرفقة',
+  'contentHub.untitled': 'محتوى بدون عنوان',
 };
 

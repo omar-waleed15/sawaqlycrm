@@ -746,6 +746,7 @@ export default function TeamPage() {
                          member.role === 'sales' ? t('role.sales') :
                          member.role === 'moderation' ? t('role.moderation') :
                          member.role === 'account_manager' ? t('role.account_manager') :
+                         member.role === 'content_creator' ? (t('role.content_creator') || 'Content Creator') :
                          member.role === 'client' ? t('role.client') :
                          t('role.member')}
                       </Badge>
@@ -868,8 +869,8 @@ export default function TeamPage() {
                 <SelectItem value="sales">{t('role.sales')}</SelectItem>
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
+                <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
-
               </SelectContent>
             </Select>
           </div>
@@ -938,6 +939,7 @@ export default function TeamPage() {
                 <SelectItem value="sales">{t('role.sales')}</SelectItem>
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
+                <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
                 <SelectItem value="client">{t('role.client')}</SelectItem>
               </SelectContent>

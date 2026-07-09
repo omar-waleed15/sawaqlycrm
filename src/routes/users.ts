@@ -11,9 +11,9 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars is plenty
 });
 
-// GET /api/users — List all team members (owner, team leader, sales)
+// GET /api/users — List all team members (owner, team leader, sales, moderation, account_manager, content_creator)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager'].includes(req.user.role)) {
+  if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
     res.status(403).json({ error: 'Access denied.' });
     return;
   }
@@ -267,7 +267,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
     return;
   }
 
-  const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'];
+  const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client', 'content_creator'];
   const userRole = validRoles.includes(role) ? role : 'member';
 
   try {
@@ -339,7 +339,7 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
     // 2. Update profiles table
     const updates: Record<string, string> = {};
     if (name) updates.name = name;
-    if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'].includes(role)) updates.role = role;
+    if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role)) updates.role = role;
     if (email) updates.email = email;
 
     if (Object.keys(updates).length > 0) {

@@ -75,10 +75,12 @@ export default function IdeasPage() {
 
   // Redirect unauthorized users
   useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'moderation' && user.role !== 'account_manager') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'moderation' && user.role !== 'account_manager' && user.role !== 'content_creator') {
       router.replace('/dashboard');
     }
   }, [user, router]);
+
+  const canPushToTask = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager' || user?.role === 'sales';
 
   const [ideas, setIdeas] = useState<ContentIdea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -425,13 +427,15 @@ export default function IdeasPage() {
                   <div className="h-px bg-border my-1 mt-auto" />
 
                   {/* Push to Task button */}
-                  <Button
-                    onClick={() => openPush(idea)}
-                    className="w-full text-xs font-semibold gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
-                    size="sm"
-                  >
-                    🚀 {t('ideas.pushToTask')}
-                  </Button>
+                  {canPushToTask && (
+                    <Button
+                      onClick={() => openPush(idea)}
+                      className="w-full text-xs font-semibold gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      size="sm"
+                    >
+                      🚀 {t('ideas.pushToTask')}
+                    </Button>
+                  )}
 
                   {/* Footer: date + action buttons */}
                   <div className="flex items-center justify-between mt-1 text-[11px] text-muted-foreground">

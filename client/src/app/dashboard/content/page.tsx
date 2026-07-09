@@ -18,6 +18,11 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { formatCairoDateTime, getCairoDateParts } from '@/lib/dateUtils';
+import { ar } from 'date-fns/locale/ar';
+import { cn } from '@/lib/utils';
 import {
   Plus,
   Loader2,
@@ -37,10 +42,81 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const parseScheduledDate = (dateStr: string | undefined) => {
+  if (!dateStr) {
+    return {
+      date: undefined,
+      hour: '12',
+      minute: '00',
+      ampm: 'AM'
+    };
+  }
+  try {
+    const parts = getCairoDateParts(dateStr);
+    const cairoDate = new Date(parts.year, parts.month - 1, parts.day);
+    
+    let h12 = parts.hour;
+    let ampm = 'AM';
+    if (h12 >= 12) {
+      ampm = 'PM';
+      if (h12 > 12) h12 -= 12;
+    }
+    if (h12 === 0) h12 = 12;
+    
+    return {
+      date: cairoDate,
+      hour: String(h12),
+      minute: String(parts.minute).padStart(2, '0'),
+      ampm
+    };
+  } catch (e) {
+    return { date: undefined, hour: '12', minute: '00', ampm: 'AM' };
+  }
+};
+
+const buildCairoDateTime = (
+  date: Date | undefined,
+  hour: string,
+  minute: string,
+  ampm: string
+): string => {
+  if (!date) return '';
+  
+  let h = parseInt(hour, 10);
+  const m = parseInt(minute, 10);
+  
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  const offsetFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    timeZoneName: 'longOffset'
+  });
+  const offsetPart = offsetFormatter.formatToParts(new Date(year, date.getMonth(), date.getDate(), h, m))
+    .find(p => p.type === 'timeZoneName')?.value;
+  
+  let offset = '+02:00';
+  if (offsetPart) {
+    const match = offsetPart.match(/GMT([+-]\d+)/);
+    if (match) {
+      offset = match[1].padStart(3, '0') + ':00';
+    } else if (offsetPart.includes('GMT')) {
+      offset = '+00:00';
+    }
+  }
+  
+  return `${year}-${month}-${day}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00${offset}`;
+};
+
 export default function ContentHubPage() {
   const { user } = useAuth();
   const { t, locale } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
 
   // State
   const [contents, setContents] = useState<ContentItem[]>([]);
@@ -50,7 +126,6 @@ export default function ContentHubPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [clientFilter, setClientFilter] = useState('all');
   const [platformFilter, setPlatformFilter] = useState('all');
 
@@ -80,6 +155,18 @@ export default function ContentHubPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [tempScheduledDate, setTempScheduledDate] = useState('');
+
+  const parsedDateTime = parseScheduledDate(tempScheduledDate);
+
+  // Sync temp state when picker opens
+  useEffect(() => {
+    if (isDatePickerOpen) {
+      setTempScheduledDate(formData.scheduled_date || '');
+    }
+  }, [isDatePickerOpen, formData.scheduled_date]);
+
   // Fetch initial data
   useEffect(() => {
     fetchData();
@@ -93,7 +180,7 @@ export default function ContentHubPage() {
         clientsApi.list()
       ]);
       setContents(contentsRes.contents || []);
-      setClients(clientsRes.clients || []);
+      setClients((clientsRes.clients || []).filter(c => c.pipeline_stage === 'won'));
     } catch (err) {
       console.error('Error fetching data for Content Hub:', err);
     } finally {
@@ -131,7 +218,7 @@ export default function ContentHubPage() {
       client_id: item.client_id || '',
       content_type: item.content_type,
       platform: item.platform || '',
-      scheduled_date: item.scheduled_date ? item.scheduled_date.substring(0, 10) : '',
+      scheduled_date: item.scheduled_date || '',
       caption: item.caption || '',
       description: item.description || '',
       sound: item.sound || '',
@@ -249,18 +336,19 @@ export default function ContentHubPage() {
 
   // Filter content items
   const filteredContents = contents.filter(item => {
+    const displayTitle = item.title || t('contentHub.untitled') || 'Untitled';
     const matchesSearch =
       !searchQuery ||
-      item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      displayTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.caption || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.client?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesType = typeFilter === 'all' || item.content_type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     const matchesClient = clientFilter === 'all' || item.client_id === clientFilter;
     const matchesPlatform = platformFilter === 'all' || item.platform === platformFilter;
 
-    return matchesSearch && matchesType && matchesStatus && matchesClient && matchesPlatform;
+    return matchesSearch && matchesType && matchesClient && matchesPlatform;
   });
 
   return (
@@ -276,28 +364,8 @@ export default function ContentHubPage() {
         </Button>
       </div>
 
-      {/* Stats Summary Widgets */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-        <div className="bg-card border rounded-xl p-4 shadow-xs">
-          <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{t('contentHub.total')}</div>
-          <div className="text-xl font-extrabold mt-1">{contents.length}</div>
-        </div>
-        <div className="bg-card border rounded-xl p-4 shadow-xs">
-          <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{t('contentHub.status.published')}</div>
-          <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
-            {contents.filter(c => c.status === 'published').length}
-          </div>
-        </div>
-        <div className="bg-card border rounded-xl p-4 shadow-xs">
-          <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{t('contentHub.status.draft')}</div>
-          <div className="text-xl font-extrabold text-amber-500 mt-1">
-            {contents.filter(c => c.status === 'draft').length}
-          </div>
-        </div>
-      </div>
-
       {/* Filter and Search Bar */}
-      <div className="bg-card border rounded-xl p-4 shadow-sm mt-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="mt-6 flex flex-col md:flex-row gap-4 items-center justify-between w-full">
         <div className="w-full md:w-1/3">
           <Input
             value={searchQuery}
@@ -306,10 +374,11 @@ export default function ContentHubPage() {
             className="w-full text-xs"
           />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
           {/* Client Filter */}
           <Select value={clientFilter} onValueChange={(val) => setClientFilter(val || 'all')}>
-            <SelectTrigger className="text-xs h-9 bg-background">
+            <SelectTrigger className="text-xs h-9 bg-background flex gap-1 items-center justify-start">
+              <span className="text-muted-foreground font-medium shrink-0">{locale === 'ar' ? 'العميل:' : 'Client:'}</span>
               <SelectValue placeholder="All Clients" />
             </SelectTrigger>
             <SelectContent>
@@ -322,7 +391,8 @@ export default function ContentHubPage() {
 
           {/* Type Filter */}
           <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val || 'all')}>
-            <SelectTrigger className="text-xs h-9 bg-background">
+            <SelectTrigger className="text-xs h-9 bg-background flex gap-1 items-center justify-start">
+              <span className="text-muted-foreground font-medium shrink-0">{locale === 'ar' ? 'النوع:' : 'Type:'}</span>
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
@@ -336,7 +406,8 @@ export default function ContentHubPage() {
 
           {/* Platform Filter */}
           <Select value={platformFilter} onValueChange={(val) => setPlatformFilter(val || 'all')}>
-            <SelectTrigger className="text-xs h-9 bg-background">
+            <SelectTrigger className="text-xs h-9 bg-background flex gap-1 items-center justify-start">
+              <span className="text-muted-foreground font-medium shrink-0">{locale === 'ar' ? 'المنصة:' : 'Platform:'}</span>
               <SelectValue placeholder="All Platforms" />
             </SelectTrigger>
             <SelectContent>
@@ -344,18 +415,6 @@ export default function ContentHubPage() {
               <SelectItem value="tiktok">{t('contentHub.platform.tiktok')}</SelectItem>
               <SelectItem value="instagram">{t('contentHub.platform.instagram')}</SelectItem>
               <SelectItem value="facebook">{t('contentHub.platform.facebook')}</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'all')}>
-            <SelectTrigger className="text-xs h-9 bg-background">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="draft">{t('contentHub.status.draft')}</SelectItem>
-              <SelectItem value="published">{t('contentHub.status.published')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -378,14 +437,14 @@ export default function ContentHubPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {filteredContents.map(item => (
-            <ContentCard key={item.id} item={item} onEdit={handleOpenEdit} onDelete={handleDeleteItem} onToggleStatus={handleToggleStatus} t={t} />
+            <ContentCard key={item.id} item={item} onEdit={handleOpenEdit} onDelete={handleDeleteItem} t={t} />
           ))}
         </div>
       )}
 
       {/* Create / Edit Modal Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-2xl text-start max-h-[90vh] overflow-y-auto">
+        <DialogContent ref={dialogContentRef} className="sm:max-w-2xl text-start max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">
               {editingItem ? t('contentHub.edit') : t('contentHub.create')}
@@ -419,7 +478,7 @@ export default function ContentHubPage() {
 
             <div className="grid grid-cols-2 gap-4">
               {/* Client Selection */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 col-span-2">
                 <Label className="text-xs font-semibold">{t('contentHub.fields.client')}</Label>
                 <Select
                   value={formData.client_id}
@@ -470,23 +529,6 @@ export default function ContentHubPage() {
                     <SelectItem value="tiktok">{t('contentHub.platform.tiktok')}</SelectItem>
                     <SelectItem value="instagram">{t('contentHub.platform.instagram')}</SelectItem>
                     <SelectItem value="facebook">{t('contentHub.platform.facebook')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Status Selector */}
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-semibold">{t('contentHub.fields.status')}</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(val) => setFormData(prev => ({ ...prev, status: (val || 'draft') as any }))}
-                >
-                  <SelectTrigger className="text-xs h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">{t('contentHub.status.draft')}</SelectItem>
-                    <SelectItem value="published">{t('contentHub.status.published')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -543,15 +585,146 @@ export default function ContentHubPage() {
             </div>
 
             {/* Scheduled Date */}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="scheduledDate" className="text-xs font-semibold">{t('contentHub.fields.scheduledDate')}</Label>
-              <Input
-                id="scheduledDate"
-                type="date"
-                value={formData.scheduled_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, scheduled_date: e.target.value }))}
-                className="text-xs h-9"
-              />
+            <div className="flex flex-col gap-1.5 text-start w-full">
+              <Label className="text-xs font-semibold">{t('contentHub.fields.scheduledDate')}</Label>
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger
+                  className={cn(
+                    "flex items-center w-full text-xs h-9 justify-start text-left font-normal bg-background hover:bg-muted/50 border border-input rounded-lg px-3 shadow-2xs cursor-pointer select-none",
+                    !formData.scheduled_date && "text-muted-foreground"
+                  )}
+                >
+                  📅 {formData.scheduled_date ? formatCairoDateTime(formData.scheduled_date, locale) : (locale === 'ar' ? 'اختر التاريخ والوقت...' : 'Select date and time...')}
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-80 p-0 z-[200] bg-white border shadow-md rounded-xl animate-fade-in"
+                  align="start"
+                  container={dialogContentRef}
+                >
+                  <div className="flex flex-col w-full">
+                    {/* Calendar Day Picker */}
+                    <Calendar
+                      mode="single"
+                      selected={parsedDateTime.date}
+                      onSelect={(newDate) => {
+                        const updated = buildCairoDateTime(newDate, parsedDateTime.hour, parsedDateTime.minute, parsedDateTime.ampm);
+                        setTempScheduledDate(updated);
+                      }}
+                      className="rounded-t-xl w-full"
+                      classNames={{
+                        root: "w-full p-3 flex flex-col items-center",
+                        months: "w-full",
+                        month: "w-full flex flex-col gap-4",
+                      }}
+                      locale={locale === 'ar' ? ar : undefined}
+                    />
+                    
+                    {/* Time Picker Controls */}
+                    <div className="p-3 border-t bg-slate-50/50 flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          {locale === 'ar' ? 'الوقت' : 'Time'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        {/* Hour */}
+                        <Select
+                          value={parsedDateTime.hour}
+                          onValueChange={(h) => {
+                            const updated = buildCairoDateTime(parsedDateTime.date, h || '12', parsedDateTime.minute, parsedDateTime.ampm);
+                            setTempScheduledDate(updated);
+                          }}
+                        >
+                          <SelectTrigger className="text-xs h-8 w-14 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48 z-[210]">
+                            {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => (
+                              <SelectItem key={h} value={h}>{h.padStart(2, '0')}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <span className="text-slate-400 font-bold">:</span>
+
+                        {/* Minute */}
+                        <Select
+                          value={parsedDateTime.minute}
+                          onValueChange={(m) => {
+                            const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, m || '00', parsedDateTime.ampm);
+                            setTempScheduledDate(updated);
+                          }}
+                        >
+                          <SelectTrigger className="text-xs h-8 w-14 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-48 z-[210]">
+                            {Array.from({ length: 60 }, (_, i) => String(i)).map(m => (
+                              <SelectItem key={m} value={m.padStart(2, '0')}>{m.padStart(2, '0')}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* AM/PM toggle buttons */}
+                        <div className="flex items-center border rounded-lg bg-background overflow-hidden p-0.5 h-8 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'AM');
+                              setTempScheduledDate(updated);
+                            }}
+                            className={cn(
+                              "text-[10px] font-bold h-full px-2.5 rounded-md transition-colors cursor-pointer",
+                              parsedDateTime.ampm === 'AM'
+                                ? "bg-indigo-600 text-white"
+                                : "text-slate-600 hover:bg-slate-100"
+                            )}
+                          >
+                            AM
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'PM');
+                              setTempScheduledDate(updated);
+                            }}
+                            className={cn(
+                              "text-[10px] font-bold h-full px-2.5 rounded-md transition-colors cursor-pointer",
+                              parsedDateTime.ampm === 'PM'
+                                ? "bg-indigo-600 text-white"
+                                : "text-slate-600 hover:bg-slate-100"
+                            )}
+                          >
+                            PM
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* OK / Cancel Action Footer */}
+                    <div className="p-2 border-t bg-slate-50/80 rounded-b-xl flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsDatePickerOpen(false)}
+                        className="px-3 h-7 text-[10px] font-bold text-slate-600 hover:bg-slate-200 border rounded-md cursor-pointer transition-colors"
+                      >
+                        {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, scheduled_date: tempScheduledDate }));
+                          setIsDatePickerOpen(false);
+                        }}
+                        className="px-3.5 h-7 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md cursor-pointer transition-colors"
+                      >
+                        {locale === 'ar' ? 'موافق' : 'OK'}
+                      </button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Hidden file input */}
@@ -657,13 +830,11 @@ function ContentCard({
   item,
   onEdit,
   onDelete,
-  onToggleStatus,
   t
 }: {
   item: ContentItem;
   onEdit: (item: ContentItem) => void;
   onDelete: (id: string) => void;
-  onToggleStatus: (item: ContentItem) => void;
   t: (key: string) => string;
 }) {
   const { locale } = useLanguage();
@@ -684,10 +855,27 @@ function ContentCard({
     setActiveMediaIndex(prev => (prev - 1 + mediaUrls.length) % mediaUrls.length);
   };
 
+  const getInitials = (name: string) => {
+    if (!name) return 'C';
+    return name.trim().split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  };
+
   return (
-    <div className="bg-card border rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow h-full">
+    <div className="bg-card border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-xs overflow-hidden flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+      {/* Title & Date Header */}
+      <div className="p-3 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/10">
+        <h3 className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate max-w-[65%] text-start" title={item.title || ''}>
+          {item.title || t('contentHub.untitled') || 'Untitled'}
+        </h3>
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium shrink-0 flex items-center gap-1 bg-slate-150/80 dark:bg-slate-800/60 px-2 py-0.5 rounded-md">
+          📅 {item.scheduled_date 
+            ? formatCairoDateTime(item.scheduled_date, locale) 
+            : (item.created_at ? new Date(item.created_at).toLocaleDateString(locale) : '')}
+        </span>
+      </div>
+
       {/* Media Carousel / Preview Frame */}
-      <div className="relative aspect-video bg-slate-900 border-b overflow-hidden flex items-center justify-center group select-none">
+      <div className="relative aspect-video bg-slate-955 border-b border-slate-100 dark:border-slate-800/60 overflow-hidden flex items-center justify-center group select-none">
         {mediaUrls.length > 0 ? (
           isVideo ? (
             <video
@@ -714,17 +902,17 @@ function ContentCard({
           <>
             <button
               onClick={prevMedia}
-              className="absolute left-2 top-1/2 -translate-y-1/2 size-7 bg-black/40 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 z-10"
+              className="absolute left-2 top-1/2 -translate-y-1/2 size-7 bg-slate-900/40 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-900/60 z-10 cursor-pointer"
             >
               <ChevronLeft className="size-4" />
             </button>
             <button
               onClick={nextMedia}
-              className="absolute right-2 top-1/2 -translate-y-1/2 size-7 bg-black/40 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 z-10"
+              className="absolute right-2 top-1/2 -translate-y-1/2 size-7 bg-slate-900/40 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-900/60 z-10 cursor-pointer"
             >
               <ChevronRight className="size-4" />
             </button>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/50 text-[9px] text-white font-bold rounded-full font-mono">
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-slate-900/60 backdrop-blur-xs text-[9px] text-white font-bold rounded-full font-mono">
               {activeMediaIndex + 1} / {mediaUrls.length}
             </div>
           </>
@@ -732,118 +920,92 @@ function ContentCard({
 
         {/* Badges Overlay */}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start z-10">
-          <Badge className="bg-black/60 hover:bg-black/75 text-white backdrop-blur-xs font-bold text-[9px] border-0 py-0.5 px-2 capitalize">
+          <Badge className="bg-slate-900/70 hover:bg-slate-900/80 text-white backdrop-blur-xs font-bold text-[9px] border-0 py-0.5 px-2 capitalize">
             {item.content_type}
           </Badge>
           {item.platform && item.platform !== 'none' && (
-            <Badge className={`border-0 py-0.5 px-2 text-[9px] font-bold text-white uppercase tracking-wider ${
-              item.platform === 'tiktok' ? 'bg-[#ff0050]' :
-              item.platform === 'instagram' ? 'bg-gradient-to-tr from-[#fdf497] via-[#fd5949] to-[#d6249f]' :
-              'bg-[#1877f2]'
-            }`}>
+            <Badge className="bg-slate-800/80 hover:bg-slate-800/90 border-0 py-0.5 px-2 text-[9px] font-bold text-white uppercase tracking-wider">
               {t(`contentHub.platform.${item.platform}`)}
-            </Badge>
-          )}
-          {item.status === 'published' ? (
-            <Badge className="bg-emerald-500 text-white border-0 py-0.5 px-2 text-[9px] font-bold">
-              {t('contentHub.status.published')}
-            </Badge>
-          ) : (
-            <Badge className="bg-slate-500 text-white border-0 py-0.5 px-2 text-[9px] font-bold">
-              {t('contentHub.status.draft')}
             </Badge>
           )}
         </div>
       </div>
 
       {/* Card Details */}
-      <div className="p-4 flex-1 flex flex-col gap-3">
-        {/* Client Tag */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 max-w-[70%]">
-            <span className="size-2 rounded-full bg-indigo-500 shrink-0" />
-            <span className="text-[10px] font-extrabold text-indigo-600 truncate uppercase tracking-wider dark:text-indigo-400">
-              {item.client?.name || t('contentHub.noClient')}
-            </span>
-          </div>
-          <span className="text-[10px] text-muted-foreground/60 font-mono">
-            {item.created_at ? new Date(item.created_at).toLocaleDateString(locale) : ''}
-          </span>
-        </div>
+      <div className="p-3 flex-1 flex flex-col gap-2.5">
+        {/* Content Caption */}
+        {item.caption && (
+          <p className="text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed font-normal line-clamp-3 text-start">
+            {item.caption}
+          </p>
+        )}
 
-        {/* Content Description */}
-        <div className="flex-1 text-start">
-          {item.title && <h3 className="font-bold text-xs text-foreground line-clamp-1 mb-1">{item.title}</h3>}
-          {item.caption && (
-            <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed font-normal line-clamp-3">
-              {item.caption}
-            </p>
-          )}
-          {item.description && (
-            <div className="mt-2.5 bg-muted/30 border border-border/40 rounded-lg p-2.5 text-[10px] text-muted-foreground leading-relaxed italic">
-              {item.description}
-            </div>
-          )}
-        </div>
-
-        {/* Music Sound Badges */}
-        {(item.sound || item.drive_link) && (
-          <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/40">
-            {item.sound && (
-              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-400 rounded-md py-0.5 px-2 text-[9px] font-bold">
-                <Music className="size-2.5 shrink-0 text-amber-500" />
-                <span className="truncate max-w-[120px]">{item.sound}</span>
-              </div>
-            )}
-            {item.drive_link && (
-              <a
-                href={item.drive_link}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 bg-sky-50 border border-sky-200 text-sky-800 dark:bg-sky-950/20 dark:border-sky-900/40 dark:text-sky-400 rounded-md py-0.5 px-2 text-[9px] font-bold hover:bg-sky-100 transition-colors"
-              >
-                <ExternalLink className="size-2.5 shrink-0 text-sky-500" />
-                <span>{t('contentHub.openDrive')}</span>
-              </a>
-            )}
+        {/* Staff Notes (Description) */}
+        {item.description && (
+          <div className="border-l-2 border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/10 py-1.5 px-2.5 rounded-r-lg text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed text-start italic">
+            {item.description}
           </div>
         )}
-      </div>
 
-      {/* Card Actions Footer */}
-      <div className="px-4 py-3 bg-muted/15 border-t flex items-center justify-between gap-2 shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onToggleStatus(item)}
-          className={`h-7 px-2.5 text-[10px] font-bold flex items-center gap-1 transition-colors ${
-            item.status === 'published'
-              ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-900 text-amber-800'
-              : 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-900 text-emerald-800'
-          }`}
-        >
-          <CheckCircle className="size-3" />
-          {item.status === 'published' ? t('contentHub.actions.markDraft') : t('contentHub.actions.markPublished')}
-        </Button>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onEdit(item)}
-            className="size-7 text-muted-foreground hover:text-slate-800 hover:bg-slate-100 rounded-md"
-            title="Edit Content"
-          >
-            <Edit2 className="size-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(item.id)}
-            className="size-7 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 rounded-md"
-            title="Delete Content"
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
+        {/* Bottom Group: Attachments & Client + Actions Row */}
+        <div className="mt-auto pt-2 flex flex-col gap-2 border-t border-slate-100 dark:border-slate-800/60">
+          {/* Attachment Tags (Music/Sound & Google Drive) */}
+          {(item.sound || item.drive_link) && (
+            <div className="flex flex-wrap gap-1.5 pb-1">
+              {item.sound && (
+                <div className="flex items-center gap-1 bg-slate-105 border border-slate-200/40 text-slate-600 dark:bg-slate-850 dark:border-slate-700/60 dark:text-slate-350 rounded-md py-0.5 px-2 text-[9px] font-bold">
+                  <Music className="size-2.5 shrink-0 text-slate-500" />
+                  <span className="truncate max-w-[120px]">{item.sound}</span>
+                </div>
+              )}
+              {item.drive_link && (
+                <a
+                  href={item.drive_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 bg-slate-105 border border-slate-200/40 text-slate-600 dark:bg-slate-850 dark:border-slate-700/60 dark:text-slate-350 rounded-md py-0.5 px-2 text-[9px] font-bold hover:bg-slate-200 transition-colors"
+                >
+                  <ExternalLink className="size-2.5 shrink-0 text-slate-500" />
+                  <span>{t('contentHub.openDrive')}</span>
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Client Name & Actions Row */}
+          <div className="flex items-center justify-between gap-3 pt-1">
+            {/* Client Name */}
+            <div className="flex items-center gap-2 text-start min-w-0">
+              <div className="size-5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[9px] font-bold shrink-0">
+                {getInitials(item.client?.name || '')}
+              </div>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-405 truncate" title={item.client?.name || ''}>
+                {item.client?.name || t('contentHub.noClient')}
+              </span>
+            </div>
+
+            {/* Actions Buttons */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onEdit(item)}
+                className="size-7 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                title="Edit Content"
+              >
+                <Edit2 className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onDelete(item.id)}
+                className="size-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-md transition-colors"
+                title="Delete Content"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

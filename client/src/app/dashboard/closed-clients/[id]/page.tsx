@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { closedClientsApi } from '@/lib/api';
@@ -8,7 +8,8 @@ import { Client, ClientFAQ, ClientContentPlan, ClientIdea, ClientReport } from '
 import { useLanguage } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import ClosedClientFAQ from '@/components/closed-client/ClosedClientFAQ';
-import ClosedClientContentPlan from '@/components/closed-client/ClosedClientContentPlan';
+import ClosedClientContentHub from '@/components/closed-client/ClosedClientContentHub';
+import ClosedClientDeliverables from '@/components/closed-client/ClosedClientDeliverables';
 import ClosedClientIdeas from '@/components/closed-client/ClosedClientIdeas';
 import ClosedClientCalendar from '@/components/closed-client/ClosedClientCalendar';
 import ClosedClientReport from '@/components/closed-client/ClosedClientReport';
@@ -24,12 +25,14 @@ import {
   BarChart3,
   UserCog,
   ListTodo,
+  BookOpen,
 } from 'lucide-react';
 
-type SubTab = 'faq' | 'tasks' | 'contentPlan' | 'ideas' | 'calendar' | 'report' | 'account';
+type SubTab = 'faq' | 'contentHub' | 'tasks' | 'contentPlan' | 'ideas' | 'calendar' | 'report' | 'account';
 
 const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ElementType }[] = [
   { key: 'faq', labelKey: 'closedClients.tab.faq', icon: HelpCircle },
+  { key: 'contentHub', labelKey: 'closedClients.tab.contentHub', icon: BookOpen },
   { key: 'tasks', labelKey: 'closedClients.tab.tasks', icon: ListTodo },
   { key: 'contentPlan', labelKey: 'closedClients.tab.contentPlan', icon: FileText },
   { key: 'ideas', labelKey: 'closedClients.tab.ideas', icon: Lightbulb },
@@ -57,7 +60,7 @@ export default function ClosedClientDetailPage() {
 
   // Navigation Guard
   useEffect(() => {
-    if (user && !['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && !['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) {
       router.replace('/dashboard');
     }
   }, [user, router]);
@@ -87,7 +90,7 @@ export default function ClosedClientDetailPage() {
   }, [clientId]);
 
   useEffect(() => {
-    if (user && ['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && ['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) {
       loadAll();
     }
   }, [user, loadAll]);
@@ -118,7 +121,19 @@ export default function ClosedClientDetailPage() {
     } catch { /* silent */ }
   };
 
-  if (!user || !['owner', 'team_leader', 'account_manager'].includes(user.role)) return null;
+  const visibleTabs = useMemo(() => {
+    return SUB_TABS.filter(tab => {
+      if (tab.key === 'account') {
+        return user?.role === 'owner';
+      }
+      if (tab.key === 'tasks') {
+        return user?.role !== 'content_creator';
+      }
+      return true;
+    });
+  }, [user]);
+
+  if (!user || !['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) return null;
 
   return (
     <div className="page-container fade-in">
@@ -155,14 +170,14 @@ export default function ClosedClientDetailPage() {
 
           {/* Sub-tabs */}
           <div className="flex border-b border-border mb-6 gap-4 sm:gap-6 overflow-x-auto">
-            {SUB_TABS.map(tab => {
+            {visibleTabs.map((tab: any) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
               return (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -179,11 +194,14 @@ export default function ClosedClientDetailPage() {
           {activeTab === 'faq' && (
             <ClosedClientFAQ client={client} faqList={faqList} onRefresh={refreshFaq} />
           )}
-          {activeTab === 'tasks' && (
+          {activeTab === 'contentHub' && (
+            <ClosedClientContentHub clientId={clientId} client={client} />
+          )}
+          {activeTab === 'tasks' && user?.role !== 'content_creator' && (
             <ClosedClientTasks clientId={clientId} client={client} />
           )}
           {activeTab === 'contentPlan' && (
-            <ClosedClientContentPlan clientId={clientId} plans={plans} onRefresh={refreshPlans} />
+            <ClosedClientDeliverables client={client} onRefresh={loadAll} />
           )}
           {activeTab === 'ideas' && (
             <ClosedClientIdeas clientId={clientId} ideas={ideas} onRefresh={refreshIdeas} />
@@ -194,7 +212,7 @@ export default function ClosedClientDetailPage() {
           {activeTab === 'report' && (
             <ClosedClientReport clientId={clientId} reports={reports} onRefresh={refreshReports} />
           )}
-          {activeTab === 'account' && (
+          {activeTab === 'account' && user?.role === 'owner' && (
             <ClosedClientAccount client={client} onClientUpdated={loadAll} />
           )}
         </>

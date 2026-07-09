@@ -93,6 +93,7 @@ export const en: Record<string, string> = {
   'role.account_manager': 'Account Manager',
   'role.teamMember': 'Team Member',
   'role.client': 'Client',
+  'role.content_creator': 'Content Creator',
 
   // ── Dashboard ───────────────────────────────────────────────────────
   'dashboard.greeting.morning': 'Good morning',
@@ -945,9 +946,10 @@ export const en: Record<string, string> = {
   'closedClients.incompleteSetupDesc': 'Please complete profile details, content plan link, and deliverables.',
   'closedClients.clientSince': 'Client since',
 
-  // Sub-tabs
   'closedClients.tab.faq': 'Overview & FAQ',
+  'closedClients.tab.contentHub': 'Content Hub',
   'closedClients.tab.tasks': 'Tasks',
+  'closedClients.tab.contentList': 'Content List',
   'closedClients.tab.contentPlan': 'Content Plan',
   'closedClients.tab.ideas': 'Ideas',
   'closedClients.tab.calendar': 'Calendar',
@@ -1185,5 +1187,6 @@ export const en: Record<string, string> = {
   'contentHub.noClient': 'No Client Linked',
   'contentHub.openDrive': 'Open Drive',
   'contentHub.mediaFiles': 'Attached Media Files',
+  'contentHub.untitled': 'Untitled Content',
 };
 

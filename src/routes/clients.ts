@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOnly, ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrSalesOrTeamLeaderOrAccountManager, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator } from '../middleware/roleCheck';
 import { populateDynamicDeliverables } from '../lib/deliverables';
 
 const router = Router();
@@ -119,7 +119,7 @@ router.get('/portal/data', authMiddleware, async (req: AuthRequest, res: Respons
 });
 
 // GET /api/clients — List all clients
-router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, error } = await supabaseAdmin
       .from('clients')
@@ -189,7 +189,7 @@ router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async
 });
 
 // PUT /api/clients/:id — Update a client
-router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
 

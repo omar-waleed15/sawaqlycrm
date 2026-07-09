@@ -92,7 +92,6 @@ export default function ClosedClientsPage() {
   const [newAccountPassword, setNewAccountPassword] = useState('');
 
   // Client Form State
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [clientForm, setClientForm] = useState({
     name: '',
     company: '',
@@ -132,14 +131,14 @@ export default function ClosedClientsPage() {
 
   // Navigation Guard
   useEffect(() => {
-    if (user && !['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && !['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) {
       router.replace('/dashboard');
     }
   }, [user, router]);
 
   // Load data
   useEffect(() => {
-    if (user && ['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && ['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) {
       loadClients();
     }
   }, [user]);
@@ -272,7 +271,7 @@ export default function ClosedClientsPage() {
     });
   };
 
-  if (!user || !['owner', 'team_leader', 'account_manager'].includes(user.role)) return null;
+  if (!user || !['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(user.role)) return null;
 
   return (
     <div className="page-container fade-in">
@@ -281,10 +280,12 @@ export default function ClosedClientsPage() {
           <h1 className="page-header-title">{t('closedClients.title')}</h1>
           <p className="page-header-subtitle">{t('closedClients.subtitle')}</p>
         </div>
-        <Button onClick={() => resetClientForm()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-          <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" />
-          {t('clients.addClient')}
-        </Button>
+        {['owner', 'team_leader', 'account_manager'].includes(user.role) && (
+          <Button onClick={() => resetClientForm()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
+            <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" />
+            {t('clients.addClient')}
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -360,32 +361,34 @@ export default function ClosedClientsPage() {
                     </span>
 
                     {/* Actions Menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 p-0 text-muted-foreground hover:text-foreground rounded-md shrink-0 hover:bg-muted"
+                    {['owner', 'team_leader', 'account_manager'].includes(user.role) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 p-0 text-muted-foreground hover:text-foreground rounded-md shrink-0 hover:bg-muted"
+                            >
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => resetClientForm(client)}>
+                            <Pencil className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
+                            onClick={() => handleDeleteClient(client.id, client.name)}
                           >
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => resetClientForm(client)}>
-                          <Pencil className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
-                          {t('common.edit')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 dark:focus:bg-rose-950/20"
-                          onClick={() => handleDeleteClient(client.id, client.name)}
-                        >
-                          <Trash2 className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0" />
-                          {t('common.delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Trash2 className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0" />
+                            {t('common.delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
 
@@ -575,92 +578,6 @@ export default function ClosedClientsPage() {
 
 
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c_plan_link">{t('clients.contentPlanLink')}</Label>
-            <Input
-              id="c_plan_link"
-              placeholder="https://docs.google.com/..."
-              value={clientForm.content_plan_link}
-              onChange={e => setClientForm({ ...clientForm, content_plan_link: e.target.value })}
-            />
-          </div>
-
-          {/* Deliverables Setup */}
-          <div className="pt-2 border-t border-border">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                🎯 {t('clients.monthlyDeliverablesSetup')}
-              </h4>
-              {(clientForm.num_posts > 0 || clientForm.num_reels > 0 || clientForm.num_stories > 0 || clientForm.num_photos > 0) && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setScheduleModalOpen(true)}
-                  className="h-7 text-xs flex items-center gap-1"
-                >
-                  <Calendar className="size-3" />
-                  {t('clients.configureSchedule') || 'Configure Schedule Outline'}
-                </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_posts">{t('clients.numPosts')}</Label>
-                <Input
-                  id="c_posts"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_posts}
-                  onChange={e => setClientForm({ ...clientForm, num_posts: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_reels">{t('clients.numReels')}</Label>
-                <Input
-                  id="c_reels"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_reels}
-                  onChange={e => setClientForm({ ...clientForm, num_reels: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_stories">{t('clients.numStories')}</Label>
-                <Input
-                  id="c_stories"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_stories}
-                  onChange={e => setClientForm({ ...clientForm, num_stories: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="c_photos">{t('clients.numPhotos')}</Label>
-                <Input
-                  id="c_photos"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={clientForm.num_photos}
-                  onChange={e => setClientForm({ ...clientForm, num_photos: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5 mt-3">
-              <Label htmlFor="c_other_deliverables">{t('clients.otherDeliverables')}</Label>
-              <Input
-                id="c_other_deliverables"
-                placeholder="e.g. Brochures, Flyers..."
-                value={clientForm.other_deliverables}
-                onChange={e => setClientForm({ ...clientForm, other_deliverables: e.target.value })}
-              />
-            </div>
-          </div>
-
           <div className="flex justify-end gap-3 pt-3 border-t">
             <Button type="button" variant="outline" onClick={() => setClientModalOpen(false)}>
               {t('common.cancel')}
@@ -670,84 +587,6 @@ export default function ClosedClientsPage() {
             </Button>
           </div>
         </form>
-      </Modal>
-
-      {/* Schedule Configuration Modal */}
-      <Modal
-        isOpen={scheduleModalOpen}
-        onClose={() => setScheduleModalOpen(false)}
-        title={t('clients.configureScheduleTitle') || 'Configure Deliverables Schedule'}
-      >
-        <div className="flex flex-col gap-6 max-h-[70vh] overflow-y-auto px-1 py-2">
-          <p className="text-xs text-muted-foreground">
-            {t('clients.scheduleExplanation') || 'Pick calendar dates for each deliverable item. The system will use these day numbers to auto-schedule outline tasks for the upcoming months.'}
-          </p>
-
-          {(['posts', 'reels', 'stories', 'photos'] as const).map(typeKey => {
-            const count = clientForm[
-              typeKey === 'posts' ? 'num_posts' :
-              typeKey === 'reels' ? 'num_reels' :
-              typeKey === 'stories' ? 'num_stories' : 'num_photos'
-            ] || 0;
-
-            if (count === 0) return null;
-
-            const labelMap = {
-              posts: t('clients.posts') || 'Posts',
-              reels: t('clients.reels') || 'Reels',
-              stories: t('clients.stories') || 'Stories',
-              photos: t('clients.photos') || 'Photos',
-            };
-
-            const singularLabelMap = {
-              posts: t('closedClients.plan.post') || 'Post',
-              reels: t('closedClients.plan.reel') || 'Reel',
-              stories: t('closedClients.plan.story') || 'Story',
-              photos: t('closedClients.plan.photo') || 'Photo',
-            };
-
-            return (
-              <div key={typeKey} className="border-t border-border pt-4 first:border-0 first:pt-0 text-start">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                  {labelMap[typeKey]} ({count})
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Array.from({ length: count }).map((_, idx) => {
-                    const value = clientForm.deliverables_schedule?.[typeKey]?.[idx] || '';
-                    return (
-                      <div key={idx} className="flex flex-col gap-1">
-                        <Label className="text-[10px] text-muted-foreground font-medium">
-                          {singularLabelMap[typeKey]} {idx + 1}
-                        </Label>
-                        <Input
-                          type="date"
-                          value={value}
-                          onChange={(e) => {
-                            const currentList = [...(clientForm.deliverables_schedule?.[typeKey] || [])];
-                            currentList[idx] = e.target.value;
-                            setClientForm({
-                              ...clientForm,
-                              deliverables_schedule: {
-                                ...clientForm.deliverables_schedule,
-                                [typeKey]: currentList
-                              }
-                            });
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border">
-            <Button type="button" onClick={() => setScheduleModalOpen(false)}>
-              {t('common.done')}
-            </Button>
-          </div>
-        </div>
       </Modal>
     </div>
   );

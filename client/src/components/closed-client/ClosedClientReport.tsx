@@ -194,7 +194,7 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
       ) : (
         <Card className="border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left rtl:text-right px-4 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.month')}</th>

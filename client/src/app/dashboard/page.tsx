@@ -49,9 +49,10 @@ export default function DashboardPage() {
   const isMember = user?.role === 'member';
   const isModerator = user?.role === 'moderation';
   const isAccountManager = user?.role === 'account_manager';
+  const isContentCreator = user?.role === 'content_creator';
 
   const showFinanceAndClients = isOwner || isSales;
-  const showTasks = isOwner || isTeamLeader || isMember || isModerator || isAccountManager;
+  const showTasks = isOwner || isTeamLeader || isMember || isModerator || isAccountManager || isContentCreator;
   const isTaskAdmin = isOwner || isTeamLeader || isModerator || isAccountManager;
 
   const [stats, setStats] = useState<DashboardStats | null>(null);

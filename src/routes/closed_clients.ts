@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrSalesOrTeamLeaderOrAccountManager } from '../middleware/roleCheck';
+import { ownerOrSalesOrTeamLeaderOrAccountManager, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator } from '../middleware/roleCheck';
 import multer from 'multer';
 import { populateDynamicDeliverables } from '../lib/deliverables';
 
@@ -13,7 +13,7 @@ const upload = multer({
 });
 
 // ── List all won clients ─────────────────────────────────────────────────
-router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, error } = await supabaseAdmin
       .from('clients')
@@ -30,7 +30,7 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async 
 });
 
 // ── Get single won client ────────────────────────────────────────────────
-router.get('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   try {
     const { data, error } = await supabaseAdmin
@@ -52,7 +52,7 @@ router.get('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, asy
 // FAQ CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   try {
     const { data, error } = await supabaseAdmin
@@ -130,7 +130,7 @@ router.delete('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccou
 // CONTENT PLANS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   try {
     const { data, error } = await supabaseAdmin
@@ -218,7 +218,7 @@ router.delete('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLe
 // IDEAS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   try {
     const { data, error } = await supabaseAdmin
@@ -346,7 +346,7 @@ router.delete('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAc
 // REPORTS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.get('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   try {
     const { data, error } = await supabaseAdmin

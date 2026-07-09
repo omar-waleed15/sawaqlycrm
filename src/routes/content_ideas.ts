@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOrTeamLeader } from '../middleware/roleCheck';
+import { ownerOrTeamLeaderOrContentCreator } from '../middleware/roleCheck';
 
 const router = Router();
 
 // GET /api/ideas — List all content ideas (owner only)
-router.get('/', authMiddleware, ownerOrTeamLeader, async (_req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authMiddleware, ownerOrTeamLeaderOrContentCreator, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, error } = await supabaseAdmin
       .from('content_ideas')
@@ -25,7 +25,7 @@ router.get('/', authMiddleware, ownerOrTeamLeader, async (_req: AuthRequest, res
 });
 
 // POST /api/ideas — Create a new content idea (owner only)
-router.post('/', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authMiddleware, ownerOrTeamLeaderOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { title, description, content_type, drive_link, content_description, rating } = req.body;
 
   if (!title) {
@@ -66,7 +66,7 @@ router.post('/', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res
 });
 
 // PUT /api/ideas/:id — Update a content idea (owner only)
-router.put('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', authMiddleware, ownerOrTeamLeaderOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { title, description, content_type, drive_link, content_description, rating } = req.body;
 
@@ -104,7 +104,7 @@ router.put('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, r
 });
 
 // DELETE /api/ideas/:id — Delete a content idea (owner only)
-router.delete('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id', authMiddleware, ownerOrTeamLeaderOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   try {
