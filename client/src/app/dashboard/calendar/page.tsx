@@ -42,6 +42,11 @@ const getLocalDateString = (d: Date) => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+const getLocalMonthString = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
 
 function formatCurrency(amount: number, locale?: string): string {
   const formatted = new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
@@ -83,6 +88,13 @@ export default function CalendarPage() {
   // Modal state
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'calendar' | 'agenda'>('calendar');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('agenda');
+    }
+  }, []);
 
   // Lead Details Modal state
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -507,18 +519,54 @@ export default function CalendarPage() {
           </p>
         </div>
         
-        {/* Navigation Controls */}
-        <div className="flex items-center gap-2 bg-card border p-1 rounded-xl shadow-sm shrink-0 self-stretch sm:self-auto justify-between sm:justify-start">
-          <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-            <ChevronLeft className="size-4 rtl:rotate-180" />
-          </Button>
-          <Button variant="secondary" size="sm" onClick={setToday} className="h-8 text-xs font-semibold px-3">
-            {t('common.today')}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-            <ChevronRight className="size-4 rtl:rotate-180" />
-          </Button>
-          <span className="text-xs font-bold text-foreground px-3 select-none">{currentMonthLabel}</span>
+        {/* Navigation & View Controls */}
+        <div className="flex flex-wrap items-center gap-3 self-stretch sm:self-auto">
+          {/* View Switcher Toggle */}
+          <div className="flex items-center gap-1 bg-card border p-1 rounded-xl shadow-sm h-10 shrink-0">
+            <Button
+              variant={viewMode === 'calendar' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('calendar')}
+              className="h-8 text-xs font-semibold px-3 flex items-center gap-1.5"
+            >
+              <CalendarDays className="size-4" />
+              <span>Grid</span>
+            </Button>
+            <Button
+              variant={viewMode === 'agenda' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('agenda')}
+              className="h-8 text-xs font-semibold px-3 flex items-center gap-1.5"
+            >
+              <ClipboardList className="size-4" />
+              <span>Agenda</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 bg-card border p-1 rounded-xl shadow-sm shrink-0 flex-1 sm:flex-initial justify-between sm:justify-start h-10">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
+              <ChevronLeft className="size-4 rtl:rotate-180" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
+              <ChevronRight className="size-4 rtl:rotate-180" />
+            </Button>
+            <div className="border-l border-border pl-2 h-6 flex items-center justify-center">
+              <input
+                type="month"
+                className="bg-transparent border-0 text-xs font-bold text-foreground focus:outline-hidden focus:ring-0 p-0 cursor-pointer text-center w-28 md:w-32 font-sans"
+                value={getLocalMonthString(currentMonth)}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const [year, month] = e.target.value.split('-');
+                    const newDate = new Date(Number(year), Number(month) - 1, 1);
+                    if (!isNaN(newDate.getTime())) {
+                      setCurrentMonth(newDate);
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -536,7 +584,7 @@ export default function CalendarPage() {
           <Loader2 className="size-8 text-primary animate-spin" />
           <p className="text-sm text-muted-foreground">{t('calendar.loadingSchedule')}</p>
         </Card>
-      ) : (
+      ) : viewMode === 'calendar' ? (
         <Card className="overflow-hidden border border-border shadow-md">
           {/* Weekday Names Header */}
           <div className="grid grid-cols-7 border-b bg-muted/40 font-semibold text-xs text-muted-foreground select-none text-center py-2.5">
@@ -576,19 +624,20 @@ export default function CalendarPage() {
                 <div
                   key={cell.key}
                   onClick={() => handleDayClick(cell.date)}
-                  className={`min-h-[100px] p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors relative text-start ${
+                  className={`min-h-[50px] md:min-h-[100px] p-1 md:p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors relative text-start ${
                     cell.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/45 bg-muted/5'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-xs font-bold flex items-center justify-center rounded-full size-5 ${
+                  <div className="flex items-center justify-between mb-1 md:mb-1.5">
+                    <span className={`text-[10px] md:text-xs font-bold flex items-center justify-center rounded-full size-4 md:size-5 ${
                       isToday ? 'bg-indigo-600 text-white shadow-sm' : ''
                     }`}>
                       {cell.date.getDate()}
                     </span>
                   </div>
                   
-                  <div className="flex flex-col gap-1 overflow-hidden flex-1 pb-1">
+                  {/* Desktop Verbose Event List */}
+                  <div className="hidden md:flex flex-col gap-1 overflow-hidden flex-1 pb-1">
                     {/* Payments */}
                     {isOwner && displayPayments.map(({ contract, amount }) => {
                       // Check if any installment for this day is paid
@@ -638,16 +687,16 @@ export default function CalendarPage() {
                       let badgeClasses = 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300';
                       if (isTaskFilled) {
                         badgeClasses = taskCompleted
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
-                          : isUrgent
-                          ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
-                          : isHigh
-                          ? 'bg-orange-50 border-orange-200 text-orange-700'
-                          : 'bg-sky-50 border-sky-200 text-sky-700';
+                           ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                           : isUrgent
+                           ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold'
+                           : isHigh
+                           ? 'bg-orange-50 border-orange-200 text-orange-700'
+                           : 'bg-sky-50 border-sky-200 text-sky-700';
                       } else if (isContentFilled) {
                         badgeClasses = contentPublished
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
-                          : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300';
+                           ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
+                           : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300';
                       }
 
                       return (
@@ -716,11 +765,213 @@ export default function CalendarPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Mobile Compact Dot Indicators */}
+                  <div className="flex md:hidden flex-row flex-wrap gap-0.5 justify-center mt-auto pb-0.5">
+                    {dayEvents.payments.length > 0 && (
+                      <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    )}
+                    {dayEvents.meetings && dayEvents.meetings.length > 0 && (
+                      <span className="size-1.5 rounded-full bg-indigo-500 shrink-0" />
+                    )}
+                    {dayEvents.tasks.length > 0 && (
+                      <span className="size-1.5 rounded-full bg-blue-500 shrink-0" />
+                    )}
+                    {((dayEvents.targetSlots && dayEvents.targetSlots.length > 0) || (dayEvents.contents && dayEvents.contents.length > 0)) && (
+                      <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         </Card>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {(() => {
+            // Group and filter calendar cells that are in current month and have at least one event
+            const activeMonthCellsWithEvents = calendarCells.filter(cell => {
+              if (!cell.isCurrentMonth) return false;
+              const dateStr = getLocalDateString(cell.date);
+              const dayEvents = eventsByDay[dateStr];
+              if (!dayEvents) return false;
+              
+              const totalItems = dayEvents.tasks.length + 
+                (isOwner ? dayEvents.payments.length : 0) + 
+                (isOwner ? (dayEvents.meetings || []).length : 0) + 
+                (dayEvents.targetSlots || []).length + 
+                (dayEvents.contents || []).length;
+              return totalItems > 0;
+            });
+
+            if (activeMonthCellsWithEvents.length === 0) {
+              return (
+                <Card className="p-8 text-center text-muted-foreground bg-card border border-border">
+                  <p className="text-sm font-semibold">{t('calendar.noEvents') || 'No scheduled events for this month.'}</p>
+                </Card>
+              );
+            }
+
+            return activeMonthCellsWithEvents.map(cell => {
+              const dateStr = getLocalDateString(cell.date);
+              const dayEvents = eventsByDay[dateStr];
+              const isToday = getCairoTodayString() === dateStr;
+              const formattedDate = formatCairoDate(cell.date, locale, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+              return (
+                <div key={cell.key} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-3">
+                  {/* Date Header */}
+                  <div className="flex justify-between items-center border-b pb-2 border-border/40">
+                    <span className={`text-sm font-bold text-foreground px-2 py-0.5 rounded-lg ${isToday ? 'bg-indigo-100 text-indigo-700' : ''}`}>
+                      {formattedDate}
+                    </span>
+                    {isToday && <span className="text-[10px] bg-indigo-600 text-white px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider">Today</span>}
+                  </div>
+
+                  {/* Events List */}
+                  <div className="flex flex-col gap-2.5">
+                    {/* 1. Payments */}
+                    {isOwner && dayEvents.payments.map(({ contract, amount }) => {
+                      const isPaid = contract.installments?.some(
+                        inst => inst.due_date?.split('T')[0] === dateStr && inst.paid
+                      ) || false;
+                      return (
+                        <div
+                          key={`pay-${contract.id}-${amount}`}
+                          className={`p-3 border rounded-lg flex items-center justify-between text-xs transition-all cursor-pointer ${
+                            isPaid
+                              ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-400'
+                              : 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100/40'
+                          }`}
+                          onClick={() => handleDayClick(cell.date)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isPaid ? <CheckCircle2 className="size-4 shrink-0 text-emerald-600" /> : <DollarSign className="size-4 shrink-0 text-green-600" />}
+                            <div>
+                              <span className={`font-bold block ${isPaid ? 'line-through opacity-70' : ''}`}>Payment: {formatCurrency(amount, locale)}</span>
+                              <span className="text-[10px] text-muted-foreground block">{contract.name}</span>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-green-100 text-green-700'}`}>
+                            {isPaid ? t('finance.paid') : t('finance.unpaid')}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* 2. Meetings */}
+                    {isOwner && dayEvents.meetings?.map(client => (
+                      <div
+                        key={`meet-${client.id}`}
+                        className="p-3 border border-indigo-100 rounded-lg bg-indigo-50/30 text-indigo-900 flex items-center gap-2 text-xs cursor-pointer hover:bg-indigo-50/60"
+                        onClick={() => handleDayClick(cell.date)}
+                      >
+                        <Calendar className="size-4 shrink-0 text-indigo-500" />
+                        <div>
+                          <span className="font-bold block">Meeting with Client</span>
+                          <span className="text-[10px] text-indigo-700 block">{client.name} {client.company ? `(${client.company})` : ''}</span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* 3. Target Slots */}
+                    {dayEvents.targetSlots?.map(slot => {
+                      const isTaskFilled = slot.isFilled && slot.task;
+                      const isContentFilled = slot.isFilled && slot.content;
+                      const taskCompleted = isTaskFilled ? isTaskCompleted(slot.task) : false;
+                      const contentPublished = isContentFilled ? slot.content.status === 'published' : false;
+
+                      let badgeBg = 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100/40';
+                      if (isTaskFilled) {
+                        badgeBg = taskCompleted ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/40' : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100/40';
+                      } else if (isContentFilled) {
+                        badgeBg = contentPublished ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/40' : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100/40';
+                      }
+
+                      return (
+                        <div
+                          key={slot.id}
+                          className={`p-3 border rounded-lg flex items-center gap-2 text-xs cursor-pointer ${badgeBg}`}
+                          onClick={() => handleDayClick(cell.date)}
+                        >
+                          <span className="text-base shrink-0">{isContentFilled ? '✨' : '🎯'}</span>
+                          <div>
+                            <span className="font-bold block">{slot.title}</span>
+                            <span className="text-[10px] text-muted-foreground block uppercase tracking-wider">{slot.content_type} outline</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* 4. Contents */}
+                    {dayEvents.contents?.map(item => {
+                      const published = item.status === 'published';
+                      return (
+                        <div
+                          key={`content-${item.id}`}
+                          className={`p-3 border rounded-lg flex items-center justify-between text-xs transition-all cursor-pointer ${
+                            published ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/40' : 'bg-amber-50/30 border-amber-200 text-amber-800 hover:bg-amber-100/40'
+                          }`}
+                          onClick={() => handleDayClick(cell.date)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-base shrink-0">✨</span>
+                            <div>
+                              <span className={`font-bold block ${published ? 'line-through opacity-70' : ''}`}>Content: {item.title || 'Untitled'}</span>
+                              <span className="text-[10px] text-muted-foreground block text-capitalize">{item.platform ? `${item.platform.toUpperCase()} - ${item.content_type}` : item.content_type}</span>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {published ? 'Published' : 'Draft'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* 5. Tasks */}
+                    {dayEvents.tasks.map(tTask => {
+                      const isUrgent = tTask.priority === 'urgent';
+                      const isHigh = tTask.priority === 'high';
+                      const completed = isTaskCompleted(tTask);
+                      return (
+                        <div
+                          key={`task-${tTask.id}`}
+                          className={`p-3 border rounded-lg flex items-center justify-between text-xs transition-all cursor-pointer ${
+                            completed
+                              ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/40'
+                              : isUrgent
+                              ? 'bg-rose-50 border-rose-200 text-rose-800 font-bold hover:bg-rose-100/40'
+                              : isHigh
+                              ? 'bg-orange-50 border-orange-200 text-orange-800 font-semibold hover:bg-orange-100/40'
+                              : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100/40'
+                          }`}
+                          onClick={() => handleDayClick(cell.date)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {completed ? <CheckCircle2 className="size-4 shrink-0 text-emerald-600" /> : <ClipboardList className="size-4 shrink-0 text-slate-500" />}
+                            <div>
+                              <span className={`font-bold block ${completed ? 'line-through opacity-70' : ''}`}>Task: {tTask.title}</span>
+                              {tTask.task_assignees && tTask.task_assignees.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground block">
+                                  Assignees: {tTask.task_assignees.map(a => a.user?.name).join(', ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            completed ? 'bg-emerald-100 text-emerald-700' : isUrgent ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {completed ? 'Completed' : tTask.priority}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
       )}
 
       {/* Details Modal */}

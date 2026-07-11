@@ -91,7 +91,7 @@ export default function ClosedClientFAQ({ client, faqList, onRefresh }: ClosedCl
     <div className="flex flex-col gap-6">
       {/* Client Overview Header */}
       <Card className="border border-border bg-card">
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col md:flex-row md:items-start gap-6">
             {/* Avatar */}
             <div className="size-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xl font-bold shrink-0">
@@ -168,32 +168,34 @@ export default function ClosedClientFAQ({ client, faqList, onRefresh }: ClosedCl
             const isOpen = expandedId === faq.id;
             return (
               <Card key={faq.id} className="border border-border bg-card overflow-hidden transition-all duration-200">
-                <button
+                <div
                   onClick={() => setExpandedId(isOpen ? null : faq.id)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="size-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
                       <HelpCircle className="size-4 text-indigo-600 dark:text-indigo-400" />
                     </div>
-                    <span className="text-sm font-medium text-foreground truncate">{faq.question}</span>
+                    <span className="text-sm font-medium text-foreground text-start whitespace-normal break-words flex-1">{faq.question}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); openEdit(faq); }}
                       className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      title={t('common.edit') || 'Edit'}
                     >
                       <Edit className="size-3.5" />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(faq); }}
                       className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors"
+                      title={t('common.delete') || 'Delete'}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
                     {isOpen ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
                   </div>
-                </button>
+                </div>
                 {isOpen && (
                   <div className="px-4 pb-4 pt-0 border-t border-border">
                     <p className="text-sm text-muted-foreground leading-relaxed pt-3 whitespace-pre-wrap">{faq.answer}</p>

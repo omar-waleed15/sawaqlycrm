@@ -88,9 +88,9 @@ export default function ClosedClientTasks({ clientId, client }: ClosedClientTask
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <Select value={statusFilter} onValueChange={val => setStatusFilter(val || 'all')}>
-          <SelectTrigger className="w-[160px] h-9 bg-card">
+          <SelectTrigger className="w-full sm:w-[160px] h-9 bg-card">
             <SelectValue placeholder="Filter by Status" />
           </SelectTrigger>
           <SelectContent>
@@ -104,7 +104,7 @@ export default function ClosedClientTasks({ clientId, client }: ClosedClientTask
         </Select>
 
         <Select value={priorityFilter} onValueChange={val => setPriorityFilter(val || 'all')}>
-          <SelectTrigger className="w-[160px] h-9 bg-card">
+          <SelectTrigger className="w-full sm:w-[160px] h-9 bg-card">
             <SelectValue placeholder="Filter by Priority" />
           </SelectTrigger>
           <SelectContent>

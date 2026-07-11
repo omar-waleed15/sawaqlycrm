@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ClientContentPlan } from '@/types';
 import { useLanguage } from '@/lib/i18n';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,6 +49,14 @@ interface ClosedClientCalendarProps {
 
 export default function ClosedClientCalendar({ clientId, plans, client }: ClosedClientCalendarProps) {
   const { t, locale } = useLanguage();
+  const [viewMode, setViewMode] = useState<'calendar' | 'agenda'>('calendar');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('agenda');
+    }
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState<string | null>(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -189,6 +197,37 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
   // Selected date details
   const selectedDatePlans = selectedDate ? plansByDate.get(selectedDate) || [] : [];
 
+  // Group scheduled plans for the active calendarMonth
+  const agendaDays = useMemo(() => {
+    const { year, month } = calendarMonth;
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    
+    const daysMap: Record<number, any[]> = {};
+    
+    scheduledPlans.forEach(plan => {
+      if (plan.scheduled_date && plan.scheduled_date.startsWith(monthPrefix)) {
+        const datePart = plan.scheduled_date.substring(0, 10);
+        const dayNum = parseInt(datePart.split('-')[2], 10);
+        if (!daysMap[dayNum]) {
+          daysMap[dayNum] = [];
+        }
+        daysMap[dayNum].push(plan);
+      }
+    });
+    
+    return Object.keys(daysMap)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map(dayNum => {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        return {
+          dayNum,
+          dateStr,
+          plans: daysMap[dayNum]
+        };
+      });
+  }, [scheduledPlans, calendarMonth]);
+
   const handlePrevMonth = () => {
     setCalendarMonth(prev => {
       const d = new Date(prev.year, prev.month - 1);
@@ -211,110 +250,262 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-base font-semibold text-foreground">{t('closedClients.calendar.title')}</h3>
-        <p className="text-sm text-muted-foreground">{t('closedClients.calendar.subtitle')}</p>
+      {/* Header with View Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">{t('closedClients.calendar.title')}</h3>
+          <p className="text-sm text-muted-foreground">{t('closedClients.calendar.subtitle')}</p>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex items-center border rounded-lg p-0.5 bg-muted/40 self-start sm:self-auto shrink-0 select-none">
+          <button
+            type="button"
+            onClick={() => setViewMode('calendar')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'calendar'
+                ? 'bg-background shadow-xs text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {locale === 'ar' ? 'التقويم' : 'Calendar Grid'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('agenda')}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'agenda'
+                ? 'bg-background shadow-xs text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {locale === 'ar' ? 'الأجندة' : 'Agenda List'}
+          </button>
+        </div>
       </div>
 
-      {/* Calendar Card - 100% Width */}
-      <Card className="border border-border bg-card w-full shadow-md">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-            <h4 className="text-base font-bold text-foreground">{monthLabel}</h4>
-            <button
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronRight className="size-5" />
-            </button>
-          </div>
-
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {dayNames.map(d => (
-              <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-1">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Grid cells */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, idx) => {
-              if (day === null) return <div key={`pad-${idx}`} className="bg-muted/10 rounded-md" />;
-              
-              const dateStr = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const dayPlans = plansByDate.get(dateStr) || [];
-              const isSelected = selectedDate === dateStr;
-              const today = new Date();
-              const isToday = today.getFullYear() === calendarMonth.year && today.getMonth() === calendarMonth.month && today.getDate() === day;
-
-              const displayPlans = dayPlans.slice(0, 2);
-              const totalItems = displayPlans.length;
-              const hasMore = dayPlans.length > totalItems;
-              const extraCount = dayPlans.length - totalItems;
-
-              return (
-                <div
-                  key={dateStr}
-                  onClick={() => {
-                    setSelectedDate(dateStr);
-                    setIsModalOpen(true);
+      {viewMode === 'agenda' ? (
+        /* Agenda List View Card */
+        <Card className="border border-border bg-card w-full shadow-md">
+          <CardContent className="p-5">
+            {/* Calendar Month Selector */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <h4 className="text-base font-bold text-foreground">
+                <input
+                  type="month"
+                  className="bg-transparent border-0 text-sm font-bold text-foreground focus:outline-hidden focus:ring-0 p-0 cursor-pointer text-center w-28 md:w-32 font-sans"
+                  value={`${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}`}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const [year, month] = e.target.value.split('-');
+                      setCalendarMonth({
+                        year: Number(year),
+                        month: Number(month) - 1
+                      });
+                    }
                   }}
-                  className={`min-h-[100px] p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors border text-start ${
-                    isSelected
-                      ? 'border-indigo-600 bg-indigo-50/20 dark:border-indigo-500 dark:bg-indigo-950/10 ring-1 ring-indigo-500'
-                      : isToday
-                      ? 'border-indigo-200 bg-indigo-50/10 dark:border-indigo-800/40 dark:bg-indigo-950/5'
-                      : 'border-border/60 hover:border-border'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-[11px] font-bold flex items-center justify-center rounded-full size-5 ${
-                      isToday ? 'bg-indigo-600 text-white shadow-sm' : 'text-foreground'
-                    }`}>
-                      {day}
-                    </span>
-                  </div>
+                />
+              </h4>
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </div>
 
-                  <div className="flex flex-col gap-1 overflow-hidden flex-1 pb-1">
-                    {displayPlans.map(plan => {
-                      const isTarget = plan.status === 'target_outline';
-                      return (
-                        <div
-                          key={plan.id}
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            isTarget
-                              ? 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300'
-                              : 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950/20 dark:border-sky-900/40 dark:text-sky-300'
-                          }`}
-                          title={plan.title}
-                        >
-                          <span className="shrink-0">{isTarget ? '🎯' : '📝'}</span>
-                          <span>{plan.title}</span>
-                        </div>
-                      );
-                    })}
+            {/* Agenda List */}
+            {agendaDays.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground border border-dashed rounded-lg bg-muted/10">
+                <CalendarDays className="size-10 mx-auto text-muted-foreground/45 mb-3 animate-pulse" />
+                <p className="text-xs font-semibold">{t('closedClients.calendar.noScheduled') || 'No scheduled content for this month.'}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {agendaDays.map(({ dayNum, dateStr, plans }) => {
+                  const dayName = locale === 'ar'
+                    ? new Date(dateStr + 'T00:00:00').toLocaleDateString('ar-EG', { weekday: 'long' })
+                    : new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+                  const displayDate = new Date(dateStr + 'T00:00:00').toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', {
+                    day: 'numeric', month: 'short'
+                  });
 
-                    {hasMore && (
-                      <div className="text-[8px] font-extrabold text-muted-foreground text-center mt-auto bg-muted/40 py-0.5 rounded border border-dashed border-border/80">
-                        +{extraCount} more
+                  return (
+                    <div key={dateStr} className="flex gap-4 border-b border-border/40 pb-4 last:border-0 last:pb-0 text-start">
+                      {/* Left: Date badge */}
+                      <div className="flex flex-col items-center shrink-0 w-14 py-1">
+                        <span className="text-xl font-extrabold text-[#1D61E7]">{dayNum}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{dayName.slice(0, 3)}</span>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Right: Timeline list items */}
+                      <div className="flex-1 flex flex-col gap-2">
+                        {plans.map(plan => {
+                          const isTarget = plan.status === 'target_outline';
+                          return (
+                            <div
+                              key={plan.id}
+                              onClick={() => {
+                                setSelectedDate(dateStr);
+                                setIsModalOpen(true);
+                              }}
+                              className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 hover:bg-muted/10 cursor-pointer select-none transition-colors ${
+                                isTarget
+                                  ? 'border-border/80'
+                                  : 'border-l-4 border-l-sky-500 border-border/80'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                                  <span>{isTarget ? '🎯' : '📝'}</span>
+                                  <span className="truncate">{plan.title}</span>
+                                </h5>
+                                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                  {plan.content_type && (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold ${TYPE_STYLES[plan.content_type] || 'bg-muted text-muted-foreground'}`}>
+                                      {t(`closedClients.plan.${plan.content_type}`) || plan.content_type}
+                                    </span>
+                                  )}
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold ${STATUS_STYLES[plan.status]}`}>
+                                    {t(`closedClients.plan.${plan.status}`) || plan.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <ChevronRight className="size-4 text-muted-foreground self-center shrink-0 rtl:rotate-180" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* Calendar Grid Card - 100% Width */
+        <Card className="border border-border bg-card w-full shadow-md">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-6">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <h4 className="text-base font-bold text-foreground">
+                <input
+                  type="month"
+                  className="bg-transparent border-0 text-sm font-bold text-foreground focus:outline-hidden focus:ring-0 p-0 cursor-pointer text-center w-28 md:w-32 font-sans"
+                  value={`${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}`}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const [year, month] = e.target.value.split('-');
+                      setCalendarMonth({
+                        year: Number(year),
+                        month: Number(month) - 1
+                      });
+                    }
+                  }}
+                />
+              </h4>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="size-5" />
+              </button>
+            </div>
+
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {dayNames.map(d => (
+                <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-1">
+                  {d}
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+
+            {/* Grid cells */}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day, idx) => {
+                if (day === null) return <div key={`pad-${idx}`} className="bg-muted/10 rounded-md" />;
+                
+                const dateStr = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayPlans = plansByDate.get(dateStr) || [];
+                const isSelected = selectedDate === dateStr;
+                const today = new Date();
+                const isToday = today.getFullYear() === calendarMonth.year && today.getMonth() === calendarMonth.month && today.getDate() === day;
+
+                const displayPlans = dayPlans.slice(0, 2);
+                const totalItems = displayPlans.length;
+                const hasMore = dayPlans.length > totalItems;
+                const extraCount = dayPlans.length - totalItems;
+
+                return (
+                  <div
+                    key={dateStr}
+                    onClick={() => {
+                      setSelectedDate(dateStr);
+                      setIsModalOpen(true);
+                    }}
+                    className={`min-h-[100px] p-2 flex flex-col bg-card hover:bg-muted/10 cursor-pointer select-none transition-colors border text-start ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50/20 dark:border-indigo-500 dark:bg-indigo-950/10 ring-1 ring-indigo-500'
+                        : isToday
+                        ? 'border-indigo-200 bg-indigo-50/10 dark:border-indigo-800/40 dark:bg-indigo-950/5'
+                        : 'border-border/60 hover:border-border'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className={`text-[11px] font-bold flex items-center justify-center rounded-full size-5 ${
+                        isToday ? 'bg-indigo-600 text-white shadow-sm' : 'text-foreground'
+                      }`}>
+                        {day}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 overflow-hidden flex-1 pb-1">
+                      {displayPlans.map(plan => {
+                        const isTarget = plan.status === 'target_outline';
+                        return (
+                          <div
+                            key={plan.id}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
+                              isTarget
+                                ? 'bg-indigo-50/70 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300'
+                                : 'bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950/20 dark:border-sky-900/40 dark:text-sky-300'
+                            }`}
+                            title={plan.title}
+                          >
+                            <span className="shrink-0">{isTarget ? '🎯' : '📝'}</span>
+                            <span>{plan.title}</span>
+                          </div>
+                        );
+                      })}
+
+                      {hasMore && (
+                        <div className="text-[8px] font-extrabold text-muted-foreground text-center mt-auto bg-muted/40 py-0.5 rounded border border-dashed border-border/80">
+                          +{extraCount} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Details Modal */}
       <Modal
@@ -336,8 +527,8 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
                     .map(slot => (
                       <div
                         key={slot.id}
-                        className={`p-3 rounded-lg border border-l-4 bg-card flex items-start justify-between gap-3 ${
-                          slot.isFilled ? 'border-l-emerald-500' : 'border-l-indigo-500'
+                        className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
+                          slot.isFilled ? 'border-l-4 border-l-emerald-500' : 'border-border/80'
                         }`}
                       >
                         <div className="flex-1 overflow-hidden text-start">

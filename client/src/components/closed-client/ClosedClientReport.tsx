@@ -145,29 +145,31 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
             <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
               <BarChart3 className="size-4 text-indigo-500" /> {t('closedClients.report.monthlyTrend')}
             </h4>
-            <div className="flex items-end gap-2 h-40">
-              {sortedForTrend.map(r => {
-                const viewsH = (r.views / maxViews) * 100;
-                const interH = (r.interactions / maxInteractions) * 100;
-                const monthLabel = new Date(r.report_month + 'T00:00:00').toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' });
-                return (
-                  <div key={r.id} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                    <div className="flex items-end gap-0.5 w-full justify-center h-32">
-                      <div
-                        className="w-3 bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t transition-all"
-                        style={{ height: `${Math.max(viewsH, 4)}%` }}
-                        title={`${t('closedClients.report.views')}: ${r.views}`}
-                      />
-                      <div
-                        className="w-3 bg-gradient-to-t from-violet-500 to-violet-400 rounded-t transition-all"
-                        style={{ height: `${Math.max(interH, 4)}%` }}
-                        title={`${t('closedClients.report.interactions')}: ${r.interactions}`}
-                      />
+            <div className="overflow-x-auto pb-2">
+              <div className="flex items-end gap-2 h-40 min-w-[400px] md:min-w-0">
+                {sortedForTrend.map(r => {
+                  const viewsH = (r.views / maxViews) * 100;
+                  const interH = (r.interactions / maxInteractions) * 100;
+                  const monthLabel = new Date(r.report_month + 'T00:00:00').toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short' });
+                  return (
+                    <div key={r.id} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                      <div className="flex items-end gap-0.5 w-full justify-center h-32">
+                        <div
+                          className="w-3 bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-t transition-all"
+                          style={{ height: `${Math.max(viewsH, 4)}%` }}
+                          title={`${t('closedClients.report.views')}: ${r.views}`}
+                        />
+                        <div
+                          className="w-3 bg-gradient-to-t from-violet-500 to-violet-400 rounded-t transition-all"
+                          style={{ height: `${Math.max(interH, 4)}%` }}
+                          title={`${t('closedClients.report.interactions')}: ${r.interactions}`}
+                        />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground truncate w-full text-center">{monthLabel}</span>
                     </div>
-                    <span className="text-[9px] text-muted-foreground truncate w-full text-center">{monthLabel}</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center gap-4 mt-3 justify-center">
               <div className="flex items-center gap-1.5">
@@ -183,7 +185,7 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
         </Card>
       )}
 
-      {/* Reports Table */}
+      {/* Reports Section - Responsive */}
       {reports.length === 0 ? (
         <Card className="border border-dashed border-border bg-muted/30">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -192,49 +194,114 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
           </CardContent>
         </Card>
       ) : (
-        <Card className="border border-border bg-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left rtl:text-right px-4 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.month')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.views')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.interactions')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.messages')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.posts')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.reels')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.stories')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.photos')}</th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('common.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map(r => (
-                  <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">{formatMonth(r.report_month)}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.views.toLocaleString()}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.interactions.toLocaleString()}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.messages.toLocaleString()}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.num_posts}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.num_reels}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.num_stories}</td>
-                    <td className="text-center px-3 py-3 text-foreground">{r.num_photos}</td>
-                    <td className="text-center px-3 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => resetForm(r)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                          <Edit className="size-3.5" />
-                        </button>
-                        <button onClick={() => handleDelete(r)} className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors">
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    </td>
+        <>
+          {/* Desktop Table View */}
+          <Card className="hidden md:block border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="text-left rtl:text-right px-4 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.month')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.views')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.interactions')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.messages')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.posts')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.reels')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.stories')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('closedClients.report.photos')}</th>
+                    <th className="text-center px-3 py-3 font-semibold text-muted-foreground text-xs">{t('common.actions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {reports.map(r => (
+                    <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground">{formatMonth(r.report_month)}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.views.toLocaleString()}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.interactions.toLocaleString()}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.messages.toLocaleString()}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.num_posts}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.num_reels}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.num_stories}</td>
+                      <td className="text-center px-3 py-3 text-foreground">{r.num_photos}</td>
+                      <td className="text-center px-3 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => resetForm(r)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={t('common.edit')}>
+                            <Edit className="size-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(r)} className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors" title={t('common.delete')}>
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Mobile Card List View */}
+          <div className="flex flex-col gap-4 md:hidden">
+            {reports.map(r => (
+              <Card key={r.id} className="border border-border bg-card shadow-xs">
+                <CardContent className="p-4 flex flex-col gap-4 text-start">
+                  {/* Card Header: Month name & action buttons */}
+                  <div className="flex items-center justify-between border-b pb-2 border-border/60">
+                    <h5 className="font-bold text-sm text-foreground">{formatMonth(r.report_month)}</h5>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => resetForm(r)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={t('common.edit')}>
+                        <Edit className="size-4" />
+                      </button>
+                      <button onClick={() => handleDelete(r)} className="p-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 text-muted-foreground hover:text-rose-600 transition-colors" title={t('common.delete')}>
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.views')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.views.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.interactions')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.interactions.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.messages')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.messages.toLocaleString()}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.posts')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.num_posts}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.reels')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.num_reels}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.stories')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.num_stories}</span>
+                    </div>
+                    <div className="bg-muted/20 rounded-md p-2.5 flex flex-col gap-0.5 col-span-2">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('closedClients.report.photos')}</span>
+                      <span className="font-bold text-foreground text-xs mt-0.5">{r.num_photos}</span>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {r.notes && (
+                    <div className="bg-slate-50 dark:bg-slate-900/40 border border-border p-2.5 rounded-lg text-xs leading-relaxed">
+                      <div className="font-semibold text-muted-foreground mb-1">{t('closedClients.report.notes') || 'Notes'}</div>
+                      <p className="text-foreground italic whitespace-pre-wrap">{r.notes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </Card>
+        </>
       )}
 
       {/* Modal */}

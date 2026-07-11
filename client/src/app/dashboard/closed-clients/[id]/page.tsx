@@ -16,6 +16,13 @@ import ClosedClientReport from '@/components/closed-client/ClosedClientReport';
 import ClosedClientAccount from '@/components/closed-client/ClosedClientAccount';
 import ClosedClientTasks from '@/components/closed-client/ClosedClientTasks';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ArrowLeft,
   Loader2,
   HelpCircle,
@@ -46,7 +53,7 @@ export default function ClosedClientDetailPage() {
   const router = useRouter();
   const params = useParams();
   const clientId = params.id as string;
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<Client | null>(null);
@@ -168,8 +175,48 @@ export default function ClosedClientDetailPage() {
             </div>
           </div>
 
-          {/* Sub-tabs */}
-          <div className="flex border-b border-border mb-6 gap-4 sm:gap-6 overflow-x-auto">
+          {/* Sub-tabs - Responsive */}
+          {/* Mobile Tab Select Dropdown */}
+          <div className="block md:hidden mb-6 p-4 rounded-xl border border-border bg-card shadow-xs">
+            <Select
+              value={activeTab}
+              onValueChange={(val) => setActiveTab(val as SubTab)}
+            >
+              <SelectTrigger className="w-full h-10 px-3 bg-background border border-input rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  {(() => {
+                    const currentTab = visibleTabs.find(tab => tab.key === activeTab);
+                    if (currentTab) {
+                      const Icon = currentTab.icon;
+                      return (
+                        <>
+                          <Icon className="size-4 text-indigo-500 shrink-0" />
+                          <span>{t(currentTab.labelKey)}</span>
+                        </>
+                      );
+                    }
+                    return t('closedClients.tab.selectTab') || 'Select Section';
+                  })()}
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {visibleTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <SelectItem key={tab.key} value={tab.key}>
+                      <span className="flex items-center gap-2 text-xs font-semibold">
+                        <Icon className="size-4 text-indigo-500 shrink-0" />
+                        <span>{t(tab.labelKey)}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop Tabs Bar */}
+          <div className="hidden md:flex border-b border-border mb-6 gap-4 sm:gap-6 overflow-x-auto">
             {visibleTabs.map((tab: any) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;

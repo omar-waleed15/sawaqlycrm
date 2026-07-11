@@ -8,7 +8,28 @@ import { clientsApi, projectsApi, contractsApi, expensesApi, salariesApi, usersA
 import { Client, Project, Contract, FinanceStats, Expense, Salary, User, ExpenseCategory, FinanceAnalyticsPayload } from '@/types';
 import Modal from '@/components/Modal';
 import { useLanguage } from '@/lib/i18n';
-import { Loader2, MoreVertical } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Loader2,
+  MoreVertical,
+  BarChart3,
+  Briefcase,
+  DollarSign,
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Search,
+  ChevronRight,
+  TrendingUp,
+} from 'lucide-react';
 import { getCairoTodayString, formatCairoDate, getCairoDateParts } from '@/lib/dateUtils';
 
 function formatCurrency(amount: number, locale?: string): string {
@@ -548,72 +569,48 @@ export default function FinanceDashboardPage() {
         `}} />
 
         {/* Filters Toolbar */}
-        <div className="no-print" style={{
-          display: 'flex',
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          padding: 20,
-          background: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-sm)',
-        }}>
+        {/* Filters Toolbar */}
+        <div className="no-print p-5 bg-card border border-border rounded-xl shadow-xs flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between">
           {/* Left: Date ranges */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            <div className="flex flex-col gap-1 flex-1 sm:w-36">
+              <label className="text-xs font-semibold text-muted-foreground">
                 {t('team.startDate')}
               </label>
               <input
                 type="date"
-                className="form-input"
+                className="form-input text-sm w-full"
                 value={reportStartDate}
                 onChange={e => setReportStartDate(e.target.value)}
-                style={{ marginBottom: 0, padding: '6px 12px', fontSize: '0.875rem' }}
+                style={{ marginBottom: 0, padding: '8px 12px' }}
               />
             </div>
-            <span style={{ alignSelf: 'flex-end', paddingBottom: 10, color: 'var(--color-text-muted)' }}>—</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <span className="hidden sm:inline self-center pb-2 text-muted-foreground">—</span>
+            <div className="flex flex-col gap-1 flex-1 sm:w-36">
+              <label className="text-xs font-semibold text-muted-foreground">
                 {t('team.endDate')}
               </label>
               <input
                 type="date"
-                className="form-input"
+                className="form-input text-sm w-full"
                 value={reportEndDate}
                 onChange={e => setReportEndDate(e.target.value)}
-                style={{ marginBottom: 0, padding: '6px 12px', fontSize: '0.875rem' }}
+                style={{ marginBottom: 0, padding: '8px 12px' }}
               />
             </div>
           </div>
 
           {/* Middle: Category Selector Dropdown & Search */}
-          <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 280, flexWrap: 'wrap' }}>
+          <div className="flex flex-col sm:flex-row gap-3 flex-1 items-stretch">
             {/* Custom Multi-select Dropdown */}
-            <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+            <div className="relative flex-1">
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
                 {t('finance.includeExcludeCategories')}
               </label>
               <button
                 type="button"
                 onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                style={{
-                  width: '100%',
-                  textAlign: 'start',
-                  padding: '8px 12px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg)',
-                  fontSize: '0.875rem',
-                  color: 'var(--color-text-primary)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
+                className="w-full text-start px-3 py-2 border border-border bg-background rounded-lg text-sm flex items-center justify-between cursor-pointer h-10"
               >
                 <span>
                   {reportSelectedCategories.length === categoriesList.length
@@ -627,34 +624,10 @@ export default function FinanceDashboardPage() {
                 <>
                   <div
                     onClick={() => setShowCategoryDropdown(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                    className="fixed inset-0 z-40"
                   />
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    marginTop: 6,
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    boxShadow: 'var(--shadow-md)',
-                    maxHeight: 240,
-                    overflowY: 'auto',
-                    padding: 8,
-                  }}>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '6px 8px',
-                      cursor: 'pointer',
-                      fontSize: '0.8125rem',
-                      fontWeight: 700,
-                      borderBottom: '1px solid var(--color-border)',
-                      marginBottom: 6,
-                    }}>
+                  <div className="absolute top-[100%] left-0 right-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-md max-h-60 overflow-y-auto p-2">
+                    <label className="flex items-center gap-2 p-2 cursor-pointer text-xs font-bold border-b border-border/40 mb-1.5">
                       <input
                         type="checkbox"
                         checked={reportSelectedCategories.length === categoriesList.length}
@@ -665,17 +638,7 @@ export default function FinanceDashboardPage() {
                     {categoriesList.map(c => (
                       <label
                         key={c.key}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '6px 8px',
-                          cursor: 'pointer',
-                          fontSize: '0.8125rem',
-                          borderRadius: 'var(--radius-sm)',
-                          transition: 'background 0.2s',
-                        }}
-                        className="hover:bg-muted/10"
+                        className="flex items-center gap-2 p-1.5 cursor-pointer text-xs font-semibold rounded-md hover:bg-muted/40 transition-colors"
                       >
                         <input
                           type="checkbox"
@@ -691,8 +654,8 @@ export default function FinanceDashboardPage() {
             </div>
 
             {/* Text Search */}
-            <div style={{ flex: 1.5, minWidth: 220, position: 'relative' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+            <div className="relative flex-1">
+              <label className="text-xs font-semibold text-muted-foreground block mb-1">
                 {t('finance.searchTransactions')}
               </label>
               <input
@@ -700,15 +663,8 @@ export default function FinanceDashboardPage() {
                 placeholder={t('finance.searchTransactions')}
                 value={reportSearchQuery}
                 onChange={e => setReportSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg)',
-                  fontSize: '0.875rem',
-                  marginBottom: 0
-                }}
+                className="form-input text-sm w-full h-10"
+                style={{ marginBottom: 0 }}
               />
             </div>
           </div>
@@ -716,23 +672,7 @@ export default function FinanceDashboardPage() {
           {/* Right: Export Excel Button */}
           <button
             onClick={exportToExcel}
-            style={{
-              alignSelf: 'flex-end',
-              height: 38,
-              padding: '0 16px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--color-primary)',
-              color: 'white',
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: 'var(--shadow-sm)',
-              transition: 'background-color 0.2s',
-            }}
+            className="btn btn-primary w-full md:w-auto h-10 shrink-0 flex items-center justify-center gap-2 text-sm"
           >
             📊 {t('finance.exportExcel')}
           </button>
@@ -855,7 +795,8 @@ export default function FinanceDashboardPage() {
                 📄 {t('finance.transactionLedger')} ({filteredLineItems.length})
               </h3>
 
-              <div style={{ overflowX: 'auto' }}>
+              {/* Desktop Table View */}
+              <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-muted)', textAlign: 'start' }}>
@@ -945,6 +886,86 @@ export default function FinanceDashboardPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Cards List View */}
+              <div className="flex flex-col gap-4 md:hidden">
+                {filteredLineItems.map(item => (
+                  <div key={item.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-2.5">
+                    {/* Header: Date and Category */}
+                    <div className="flex justify-between items-center border-b pb-2 border-border/40">
+                      <span className="text-[10px] text-muted-foreground font-semibold">
+                        {formatDate(item.date, locale)}
+                      </span>
+                      <span className="text-[10px] bg-muted px-2 py-0.5 rounded-md font-semibold text-foreground">
+                        {getCategoryLabel(item.category)}
+                      </span>
+                    </div>
+
+                    {/* Body: Description */}
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">{item.name}</h4>
+                      {item.notes && (
+                        <p className="text-[11px] text-muted-foreground mt-1 bg-slate-50 dark:bg-slate-900/40 p-2 border border-border/60 rounded-md leading-relaxed italic">
+                          ℹ️ {item.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Footer: Type, Status, and Amount */}
+                    <div className="flex justify-between items-center border-t pt-2 border-border/40 text-xs mt-1">
+                      <div className="flex gap-2">
+                        <span style={{
+                          display: 'inline-flex',
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: '0.6875rem',
+                          fontWeight: 700,
+                          backgroundColor: item.type === 'income' ? '#f0fdf4' : '#fff1f2',
+                          color: item.type === 'income' ? '#15803d' : '#e11d48'
+                        }}>
+                          {item.type === 'income' ? t('finance.income') : t('finance.expense')}
+                        </span>
+                        <span style={{
+                          display: 'inline-flex',
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: '0.6875rem',
+                          fontWeight: 600,
+                          backgroundColor:
+                            item.status === 'paid' ? '#f0fdf4' :
+                            item.status === 'active' ? '#eff6ff' :
+                            item.status === 'deducted' ? '#fff1f2' : '#fff7ed',
+                          color:
+                            item.status === 'paid' ? '#15803d' :
+                            item.status === 'active' ? '#1d4ed8' :
+                            item.status === 'deducted' ? '#e11d48' : '#c2410c',
+                          border: `1px solid ${
+                            item.status === 'paid' ? '#bbf7d0' :
+                            item.status === 'active' ? '#bfdbfe' :
+                            item.status === 'deducted' ? '#fda4af' : '#ffedd5'
+                          }`
+                        }}>
+                          {item.status === 'paid' ? t('finance.paid') :
+                           item.status === 'active' ? t('clients.active') :
+                           item.status === 'deducted' ? 'Deducted' : t('finance.unpaid')}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontWeight: 800,
+                        color: item.type === 'income' ? '#16a34a' : '#e11d48',
+                        fontFamily: 'monospace'
+                      }} className="text-sm">
+                        {item.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(item.amount), locale)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {filteredLineItems.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>
+                    {t('finance.noTransactions')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1613,8 +1634,9 @@ export default function FinanceDashboardPage() {
             <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: 4 }}>{t('finance.revenueVsExpenses')}</h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 20 }}>{t('finance.projections')}</p>
 
-            <div style={{ position: 'relative' }}>
-              <svg viewBox={`0 0 ${barChartWidth} ${barChartHeight}`} width="100%" height="auto">
+            <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
+              <div style={{ minWidth: 500, position: 'relative' }}>
+                <svg viewBox={`0 0 ${barChartWidth} ${barChartHeight}`} width="100%" height="auto">
                 <defs>
                   <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" />
@@ -1767,6 +1789,7 @@ export default function FinanceDashboardPage() {
                 ))}
               </div>
             </div>
+          </div>
             
             {/* Chart Legend */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 12, fontSize: '0.75rem', fontWeight: 700 }}>
@@ -1929,7 +1952,8 @@ export default function FinanceDashboardPage() {
                       <span>{list.items.length} records</span>
                     </div>
 
-                    <div style={{ overflowX: 'auto' }}>
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                       <table className="table" style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0 }}>
                         <thead>
                           <tr>
@@ -1974,6 +1998,58 @@ export default function FinanceDashboardPage() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Mobile Cards List View */}
+                    <div className="flex flex-col divide-y divide-border/60 md:hidden">
+                      {list.items.map((record: any) => (
+                        <div key={record.installmentId} className="py-4 flex flex-col gap-2.5 text-start text-xs">
+                          {/* Header: Client & Amount */}
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <strong className="text-sm text-foreground">{record.clientName}</strong>
+                              {record.company && <div className="text-[10px] text-muted-foreground mt-0.5">{record.company}</div>}
+                            </div>
+                            <span className="font-extrabold text-sm text-[#1D61E7]">
+                              {formatCurrency(record.amount, locale)}
+                            </span>
+                          </div>
+
+                          {/* Body: Contract & Dates */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.contractName')}</span>
+                              <span className="font-semibold text-foreground truncate">{record.contractName}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.date')}</span>
+                              <span className="font-semibold text-foreground">{formatDate(record.dueDate, locale)}</span>
+                            </div>
+                          </div>
+
+                          {/* Footer: Days Overdue and Actions */}
+                          <div className="flex justify-between items-center mt-1 pt-2 border-t border-border/40">
+                            <div>
+                              {record.daysOverdue > 0 ? (
+                                <span className="font-bold px-2 py-0.5 rounded-md text-[11px]" style={{ color: list.color, backgroundColor: `${list.color}12` }}>
+                                  {record.daysOverdue} days overdue
+                                </span>
+                              ) : (
+                                <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md text-[11px]">
+                                  In {Math.abs(record.daysOverdue)} days
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-outline-primary py-1 px-3 text-[11px] font-semibold"
+                              onClick={() => handleToggleInstallmentPaid(record.contractId, record.installmentId, true)}
+                            >
+                              {t('finance.paid')}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
@@ -2193,14 +2269,61 @@ export default function FinanceDashboardPage() {
         </div>
       )}
 
-      {/* ── Sub-Tab Navigation Switcher ── */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '1px solid var(--color-border)',
-        marginBottom: 24,
-        gap: 16,
-        overflowX: 'auto',
-      }}>
+      {/* ── Sub-Tab Navigation Switcher (Responsive) ── */}
+      {/* Mobile Tab Select Dropdown */}
+      <div className="block md:hidden mb-6 p-4 rounded-xl border border-border bg-card shadow-xs">
+        <Select
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as any)}
+        >
+          <SelectTrigger className="w-full h-10 px-3 bg-background border border-input rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              {(() => {
+                const tabsList = [
+                  { id: 'overview', label: t('finance.overview'), icon: BarChart3 },
+                  { id: 'analytics', label: t('finance.analytics'), icon: TrendingUp },
+                  { id: 'contracts', label: t('finance.contracts'), icon: Briefcase },
+                  { id: 'expenses', label: t('finance.expenses'), icon: DollarSign },
+                  { id: 'report', label: t('finance.customReports'), icon: FileText },
+                ];
+                const currentTab = tabsList.find(tab => tab.id === activeTab);
+                if (currentTab) {
+                  const Icon = currentTab.icon;
+                  return (
+                    <>
+                      <Icon className="size-4 text-indigo-500 shrink-0" />
+                      <span>{currentTab.label}</span>
+                    </>
+                  );
+                }
+                return t('closedClients.tab.selectTab') || 'Select Section';
+              })()}
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            {[
+              { id: 'overview', label: t('finance.overview'), icon: BarChart3 },
+              { id: 'analytics', label: t('finance.analytics'), icon: TrendingUp },
+              { id: 'contracts', label: t('finance.contracts'), icon: Briefcase },
+              { id: 'expenses', label: t('finance.expenses'), icon: DollarSign },
+              { id: 'report', label: t('finance.customReports'), icon: FileText },
+            ].map(tab => {
+              const Icon = tab.icon;
+              return (
+                <SelectItem key={tab.id} value={tab.id}>
+                  <span className="flex items-center gap-2 text-xs font-semibold">
+                    <Icon className="size-4 text-indigo-500 shrink-0" />
+                    <span>{tab.label}</span>
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Desktop Tabs Bar */}
+      <div className="hidden md:flex border-b border-border mb-6 gap-6 overflow-x-auto">
         {[
           { id: 'overview', label: '📊 ' + t('finance.overview') },
           { id: 'analytics', label: '📊 ' + t('finance.analytics') },
@@ -2382,25 +2505,25 @@ export default function FinanceDashboardPage() {
       {activeTab === 'contracts' && (
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
           {/* Actions panel */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-              <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', right: 'auto' }}>🔍</span>
+          <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground size-4 rtl:left-auto rtl:right-3">🔍</span>
               <input
                 type="text"
-                className="form-input pl-9 pr-9"
+                className="form-input pl-9 rtl:pl-3 rtl:pr-9 text-sm w-full"
                 placeholder={t('finance.searchContracts')}
                 value={contractSearch}
                 onChange={e => setContractSearch(e.target.value)}
                 style={{ marginBottom: 0 }}
               />
             </div>
-            <button className="btn btn-primary" onClick={() => { resetContractForm(); setContractModalOpen(true); }} disabled={clients.filter(c => c.pipeline_stage === 'won').length === 0}>
+            <button className="btn btn-primary w-full sm:w-auto shrink-0" onClick={() => { resetContractForm(); setContractModalOpen(true); }} disabled={clients.filter(c => c.pipeline_stage === 'won').length === 0}>
               ＋ {t('finance.addContract')}
             </button>
           </div>
 
-          {/* Table */}
-          <div style={{ overflowX: 'auto' }}>
+          {/* Desktop Table View */}
+          <div className="hidden md:block" style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'start', color: 'var(--color-text-muted)' }}>
@@ -2568,6 +2691,124 @@ export default function FinanceDashboardPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Cards List View */}
+          <div className="flex flex-col gap-4 md:hidden">
+            {filteredContractsList.map(c => {
+              const ren = getRenewalStatus(c.renewal_date, c.status, t);
+              return (
+                <div key={c.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-3">
+                  {/* Title & Actions */}
+                  <div className="flex justify-between items-start gap-2 border-b pb-2 border-border/40">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">{c.name}</h4>
+                      <span className="text-[10px] text-muted-foreground mt-0.5 block">{t('taskDetail.client')}: {c.client?.name}</span>
+                    </div>
+                    <span className={`badge ${c.status === 'active' ? 'badge-completed' : 'badge-todo'}`} style={{ fontSize: '0.6875rem' }}>
+                      {c.status === 'active' ? t('clients.active') : c.status === 'expired' ? t('clients.inactive') : t('clients.onHold')}
+                    </span>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('taskDetail.project')}</span>
+                      <span className="font-semibold text-foreground truncate">{c.project ? c.project.name : 'None / Retainer'}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.amount')}</span>
+                      <span className="font-bold text-[#1D61E7]">{formatCurrency(c.amount, locale)}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.category')}</span>
+                      <span className="font-semibold text-foreground">{c.is_recurring ? '🔄 ' + t('finance.recurring') : '💳 ' + t('finance.oneTime')}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.billingCycle')}</span>
+                      <span className="font-semibold text-foreground">{c.is_recurring ? getCycleLabel(c.billing_cycle) : '—'}</span>
+                    </div>
+                    {c.is_recurring && (
+                      <div className="flex flex-col gap-0.5 col-span-2">
+                        <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.renewalDate')}</span>
+                        <span className="font-semibold px-2 py-0.5 rounded-md w-fit text-[11px] mt-0.5" style={{ backgroundColor: ren.bg, color: ren.color }}>
+                          {formatDate(c.renewal_date, locale)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Installments Checklist Toggle Button */}
+                  {!c.is_recurring && c.installments && c.installments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExpandedContractId(expandedContractId === c.id ? null : c.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted hover:bg-muted/80 text-muted-foreground w-fit cursor-pointer transition-colors border"
+                    >
+                      🗓️ {c.installments.filter(i => i.paid).length}/{c.installments.length} {t('finance.paid')} {expandedContractId === c.id ? '▲' : '▼'}
+                    </button>
+                  )}
+
+                  {/* Collapsible Installments payments breakdown */}
+                  {expandedContractId === c.id && c.installments && c.installments.length > 0 && (
+                    <div className="p-3 border rounded-lg bg-muted/20 flex flex-col gap-3">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase border-b pb-1 border-border/40">
+                        <span>Installments breakdown</span>
+                        <span>Paid: <span className="text-emerald-600">{formatCurrency(c.installments.filter(i => i.paid).reduce((sum, inst) => sum + inst.amount, 0), locale)}</span></span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {c.installments.map((inst) => (
+                          <div
+                            key={inst.id}
+                            className={`p-2.5 border rounded-lg flex flex-col gap-1.5 transition-all text-xs ${
+                              inst.paid ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/40' : 'bg-card'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className={`font-bold ${inst.paid ? 'text-emerald-600' : 'text-foreground'}`}>
+                                {formatCurrency(inst.amount, locale)}
+                              </span>
+                              <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  checked={inst.paid}
+                                  onChange={(e) => handleToggleInstallmentPaid(c.id, inst.id, e.target.checked)}
+                                  className="cursor-pointer"
+                                />
+                                {t('finance.paid')}
+                              </label>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              <span>📅 Due:</span> {formatDate(inst.due_date, locale)}
+                            </div>
+                            {inst.note && (
+                              <div className="text-[10px] italic text-muted-foreground border-t pt-1 border-border/40 mt-1">
+                                Note: {inst.note}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Edit/Delete Actions */}
+                  <div className="flex justify-end gap-2 border-t pt-2 border-border/40 mt-1">
+                    <button className="btn btn-secondary btn-sm flex items-center gap-1 py-1 px-3 text-xs" onClick={() => { resetContractForm(c); setContractModalOpen(true); }}>
+                      <Edit className="size-3.5" /> {t('common.edit')}
+                    </button>
+                    <button className="btn btn-danger btn-sm flex items-center gap-1 py-1 px-3 text-xs" onClick={() => handleDeleteContract(c.id, c.name)}>
+                      <Trash2 className="size-3.5" /> {t('common.delete')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredContractsList.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>
+                {clients.length === 0 ? 'Create a client first before managing billing contracts.' : 'No contracts match your query.'}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -2603,10 +2844,10 @@ export default function FinanceDashboardPage() {
           {expensesSubTab === 'expenses' ? (
             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
               {/* Filter controls */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 160 }}>
+              <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
+                <div className="w-full sm:w-40 shrink-0">
                   <select
-                    className="form-select"
+                    className="form-select w-full"
                     value={expenseCategoryFilter}
                     onChange={e => setExpenseCategoryFilter(e.target.value)}
                     style={{ marginBottom: 0 }}
@@ -2619,19 +2860,19 @@ export default function FinanceDashboardPage() {
                     <option value="other">📦 Other</option>
                   </select>
                 </div>
-                <div style={{ minWidth: 140 }}>
+                <div className="w-full sm:w-36 shrink-0">
                   <input
                     type="month"
-                    className="form-input"
+                    className="form-input w-full"
                     value={expenseMonthFilter}
                     onChange={e => setExpenseMonthFilter(e.target.value)}
                     style={{ marginBottom: 0 }}
                   />
                 </div>
-                <div style={{ flex: 1 }} />
+                <div className="hidden sm:block flex-1" />
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full sm:w-auto shrink-0"
                   onClick={() => { resetExpenseForm(); setExpenseModalOpen(true); }}
                 >
                   ＋ {t('finance.addExpense')}
@@ -2691,17 +2932,15 @@ export default function FinanceDashboardPage() {
                   borderRadius: 20,
                   fontSize: '0.75rem',
                   fontWeight: 700,
-                  marginLeft: 'auto',
-                  marginRight: 'auto',
                   color: 'var(--color-primary)'
-                }}>
+                }} className="w-full sm:w-auto sm:ml-auto">
                   <span>Total General Expenses:</span>
                   <span>{formatCurrency(expenses.reduce((sum, e) => sum + e.amount, 0), locale)}</span>
                 </div>
               </div>
 
-              {/* Table */}
-              <div style={{ overflowX: 'auto' }}>
+              {/* Desktop Table View */}
+              <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
@@ -2766,37 +3005,96 @@ export default function FinanceDashboardPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Cards List View */}
+              <div className="flex flex-col gap-4 md:hidden">
+                {expenses
+                  .filter(e => e.category !== 'salary')
+                  .filter(e => !expenseCategoryFilter || e.category === expenseCategoryFilter)
+                  .map(e => (
+                    <div key={e.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-2.5">
+                      {/* Header: Title and Category badge */}
+                      <div className="flex justify-between items-start gap-2 border-b pb-2 border-border/40">
+                        <div>
+                          <h4 className="font-bold text-sm text-foreground">{e.title}</h4>
+                          <span className="text-[10px] text-muted-foreground mt-0.5 block">{formatDate(e.date, locale)}</span>
+                        </div>
+                        <span className="text-[10px] bg-muted px-2 py-0.5 rounded-md font-semibold text-foreground shrink-0">
+                          {e.category === 'ads' && '📣 Ads'}
+                          {e.category === 'software' && '🖥️ Software'}
+                          {e.category === 'office' && '🏢 Office'}
+                          {e.category === 'freelancer' && '🧑‍💻 Freelancer'}
+                          {e.category === 'other' && '📦 Other'}
+                        </span>
+                      </div>
+
+                      {/* Body: Payment Type & Amount */}
+                      <div className="flex justify-between items-center text-xs">
+                        <span style={{
+                          display: 'inline-flex',
+                          padding: '2px 8px',
+                          borderRadius: 10,
+                          fontSize: '0.6875rem',
+                          fontWeight: 700,
+                          backgroundColor: e.is_recurring ? '#ede9fe' : '#f1f5f9',
+                          color: e.is_recurring ? '#6d28d9' : '#475569',
+                        }}>
+                          {e.is_recurring ? `🔄 ${t('finance.recurring')} (${e.recurrence})` : '💳 ' + t('finance.oneTime')}
+                        </span>
+                        <span className="font-extrabold text-sm text-rose-600">
+                          -{formatCurrency(e.amount, locale)}
+                        </span>
+                      </div>
+
+                      {/* Note if exists */}
+                      {e.note && (
+                        <div className="bg-slate-50 dark:bg-slate-900/40 p-2 border border-border/80 rounded-lg text-xs leading-relaxed italic text-muted-foreground">
+                          {e.note}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex justify-end gap-2 border-t pt-2 border-border/40 mt-1">
+                        <button className="btn btn-secondary btn-sm flex items-center gap-1 py-1 px-3 text-xs" onClick={() => { resetExpenseForm(e); setExpenseModalOpen(true); }}>
+                          <Edit className="size-3.5" /> {t('common.edit')}
+                        </button>
+                        <button className="btn btn-danger btn-sm flex items-center gap-1 py-1 px-3 text-xs" onClick={() => handleDeleteExpense(e.id, e.title)}>
+                          <Trash2 className="size-3.5" /> {t('common.delete')}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                {expenses.filter(e => e.category !== 'salary').filter(e => !expenseCategoryFilter || e.category === expenseCategoryFilter).length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>
+                    No general expenses registered for this month.
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
               {/* Salaries header/controls */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 140 }}>
+              <div className="flex flex-col sm:flex-row gap-3 mb-5 items-stretch sm:items-center">
+                <div className="w-full sm:w-36 shrink-0">
                   <input
                     type="month"
-                    className="form-input"
+                    className="form-input w-full"
                     value={expenseMonthFilter}
                     onChange={e => setExpenseMonthFilter(e.target.value)}
                     style={{ marginBottom: 0 }}
                   />
                 </div>
-                <div style={{
-                  display: 'flex',
-                  gap: 12,
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  color: 'var(--color-text-secondary)'
-                }}>
-                  <div>Total Salary Cost: <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatCurrency(salaries.reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
-                  <div>•</div>
-                  <div>Paid: <span style={{ fontWeight: 700, color: '#16a34a' }}>{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
-                  <div>•</div>
-                  <div>Unpaid: <span style={{ fontWeight: 700, color: '#ea580c' }}>{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 p-2.5 rounded-lg border">
+                  <div>Total Salary Cost: <span className="font-bold text-foreground">{formatCurrency(salaries.reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                  <div className="hidden sm:block">•</div>
+                  <div>Paid: <span className="font-bold text-emerald-600">{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                  <div className="hidden sm:block">•</div>
+                  <div>Unpaid: <span className="font-bold text-orange-600">{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
                 </div>
-                <div style={{ flex: 1 }} />
+                <div className="hidden sm:block flex-1" />
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full sm:w-auto shrink-0"
                   onClick={() => { resetSalaryForm(); setSalaryModalOpen(true); }}
                   disabled={usersList.length === 0}
                 >
@@ -2804,8 +3102,8 @@ export default function FinanceDashboardPage() {
                 </button>
               </div>
 
-              {/* Salaries Table */}
-              <div style={{ overflowX: 'auto' }}>
+              {/* Desktop Table View */}
+              <div className="hidden md:block" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'left', color: 'var(--color-text-muted)' }}>
@@ -2933,6 +3231,148 @@ export default function FinanceDashboardPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Cards List View */}
+              <div className="flex flex-col gap-4 md:hidden">
+                {salaries.map(s => {
+                  const netAmount = s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0);
+                  return (
+                    <div key={s.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-3">
+                      {/* Member Info Header */}
+                      <div className="flex justify-between items-center border-b pb-2 border-border/40">
+                        <div className="flex items-center gap-2">
+                          {s.user?.avatar_url ? (
+                            <img src={s.user.avatar_url} alt="" className="size-8 rounded-full object-cover border" />
+                          ) : (
+                            <div className="size-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
+                              {s.user?.name ? s.user.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-bold text-sm text-foreground">{s.user?.name || 'Unknown User'}</h4>
+                            <span className="text-[10px] text-muted-foreground uppercase mt-0.5 block">{s.user?.role?.replace('_', ' ') || 'member'}</span>
+                          </div>
+                        </div>
+                        {/* More Actions Dropdown Button */}
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm dropdown-trigger-btn p-1.5 rounded-lg flex items-center justify-center border shrink-0"
+                          onClick={(e) => handleDropdownClick(e, s)}
+                        >
+                          <MoreVertical className="size-4" />
+                        </button>
+                      </div>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.amount')}</span>
+                          <span className="font-bold text-foreground">
+                            {formatCurrency(s.amount, locale)}
+                            {user?.role === 'owner' && s.penalties && s.penalties.length > 0 && (
+                              <span className="block text-[10px] text-rose-500 font-semibold mt-0.5">
+                                Net: {formatCurrency(netAmount, locale)}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">Payment Type</span>
+                          <span className="font-semibold text-foreground">
+                            {s.is_recurring ? `🔄 ${t('finance.recurring')} (${s.recurrence || 'monthly'})` : '💳 ' + t('finance.oneTime')}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.paymentDate')}</span>
+                          <span className="font-semibold text-foreground truncate">{s.paid_date ? formatDate(s.paid_date, locale) : '—'}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.status')}</span>
+                          <label className="flex items-center gap-1.5 cursor-pointer font-semibold mt-0.5">
+                            <input
+                              type="checkbox"
+                              checked={s.paid}
+                              onChange={e => handleToggleSalaryPaid(s.id, e.target.checked)}
+                              className="cursor-pointer size-4"
+                            />
+                            <span className={s.paid ? 'text-emerald-600' : 'text-orange-500'}>
+                              {s.paid ? t('finance.paid') : t('finance.unpaid')}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Note if exists */}
+                      {s.note && (
+                        <div className="bg-slate-50 dark:bg-slate-900/40 p-2 border border-border/80 rounded-lg text-xs leading-relaxed italic text-muted-foreground">
+                          Note: {s.note}
+                        </div>
+                      )}
+
+                      {/* Installments Checklist Toggle Button */}
+                      {!s.is_recurring && s.installments && s.installments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedSalaryId(expandedSalaryId === s.id ? null : s.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted hover:bg-muted/80 text-muted-foreground w-fit cursor-pointer transition-colors border"
+                        >
+                          🗓️ {s.installments.filter(i => i.paid).length}/{s.installments.length} {t('finance.paid')} {expandedSalaryId === s.id ? '▲' : '▼'}
+                        </button>
+                      )}
+
+                      {/* Collapsible Installments breakdown */}
+                      {expandedSalaryId === s.id && s.installments && s.installments.length > 0 && (
+                        <div className="p-3 border rounded-lg bg-muted/20 flex flex-col gap-3">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase border-b pb-1 border-border/40">
+                            <span>Installments breakdown</span>
+                            <span>Paid: <span className="text-emerald-600">{formatCurrency(s.installments.filter(i => i.paid).reduce((sum, inst) => sum + inst.amount, 0), locale)}</span></span>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {s.installments.map((inst) => (
+                              <div
+                                key={inst.id}
+                                className={`p-2.5 border rounded-lg flex flex-col gap-1.5 transition-all text-xs ${
+                                  inst.paid ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900/40' : 'bg-card'
+                                }`}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <span className={`font-bold ${inst.paid ? 'text-emerald-600' : 'text-foreground'}`}>
+                                    {formatCurrency(inst.amount, locale)}
+                                  </span>
+                                  <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-semibold text-muted-foreground">
+                                    <input
+                                      type="checkbox"
+                                      checked={inst.paid}
+                                      onChange={e => handleToggleSalaryInstallmentPaid(s.id, inst.id, e.target.checked)}
+                                      className="cursor-pointer"
+                                    />
+                                    {t('finance.paid')}
+                                  </label>
+                                </div>
+                                {inst.due_date && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    <span>📅 Due:</span> {formatDate(inst.due_date, locale)}
+                                  </div>
+                                )}
+                                {inst.note && (
+                                  <div className="text-[10px] italic text-muted-foreground border-t pt-1 border-border/40 mt-1">
+                                    Note: {inst.note}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {salaries.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-text-muted)', fontSize: '0.8125rem' }}>
+                    No salary records listed for this month.
+                  </div>
+                )}
               </div>
             </div>
           )}
