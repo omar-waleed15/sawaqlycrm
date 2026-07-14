@@ -40,6 +40,7 @@ import {
   Loader2,
   BarChart3,
   Check,
+  Download,
 } from 'lucide-react';
 
 function formatDate(dateStr?: string, locale?: string): string {
@@ -87,9 +88,9 @@ export default function ClientsDashboardPage() {
   const router = useRouter();
   const { t, locale } = useLanguage();
 
-  // Navigation Guard: only owner (admin), team_leader, or account_manager
+  // Navigation Guard: only owner (admin) or team_leader
   useEffect(() => {
-    if (user && !['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && !['owner', 'team_leader'].includes(user.role)) {
       router.replace('/dashboard');
     }
   }, [user, router]);
@@ -820,6 +821,58 @@ export default function ClientsDashboardPage() {
     }
   };
 
+  // Export CSV handler
+  const handleExportCsv = () => {
+    const targetList = subTab === 'potential' ? potentialClients : wonClients;
+    if (targetList.length === 0) {
+      alert(locale === 'ar' ? 'لا توجد بيانات لتصديرها' : 'No data to export');
+      return;
+    }
+
+    const formatCleanPhone = (rawPhone: string | null | undefined): string => {
+      if (!rawPhone) return '';
+      let cleaned = rawPhone.trim().replace(/[\s-()]/g, '');
+      if (cleaned.startsWith('+20')) {
+        cleaned = cleaned.substring(1);
+      } else if (cleaned.startsWith('20')) {
+        // Already starts with 20 and no +
+      } else {
+        if (cleaned.startsWith('+')) {
+          cleaned = cleaned.substring(1);
+        }
+        if (!cleaned.startsWith('20')) {
+          cleaned = '20' + cleaned;
+        }
+      }
+      return cleaned;
+    };
+
+    const csvContent = [
+      ['name', 'phone'],
+      ...targetList.map(c => [
+        c.name || '',
+        formatCleanPhone(c.phone)
+      ])
+    ]
+      .map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = subTab === 'potential' 
+      ? `sawaqly_leads_${dateStr}.csv` 
+      : `sawaqly_clients_${dateStr}.csv`;
+      
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Filter lists
   const potentialClients = clients.filter(c => c.pipeline_stage !== 'won' && c.sales_rep_id);
   const wonClients = clients.filter(c => c.pipeline_stage === 'won' && c.sales_rep_id);
@@ -844,9 +897,15 @@ export default function ClientsDashboardPage() {
         </div>
         <div className="flex gap-2">
           {activeTab === 'clients' && (
-            <Button onClick={() => { resetClientForm(); setClientModalOpen(true); }}>
-              <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.addClient')}
-            </Button>
+            <>
+              <Button onClick={handleExportCsv} variant="outline" className="text-xs font-semibold gap-1.5 cursor-pointer">
+                <Download className="size-4" />
+                {locale === 'ar' ? 'تصدير CSV' : 'Export CSV'}
+              </Button>
+              <Button onClick={() => { resetClientForm(); setClientModalOpen(true); }}>
+                <Plus className="size-4 mr-2 rtl:ml-2 rtl:mr-0" /> {t('clients.addClient')}
+              </Button>
+            </>
           )}
         </div>
       </div>

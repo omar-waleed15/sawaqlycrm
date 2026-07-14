@@ -68,6 +68,7 @@ export default function TeamPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('member');
+  const [phone, setPhone] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -159,7 +160,7 @@ export default function TeamPage() {
     setFormError('');
 
     try {
-      await usersApi.create({ name, email, password, role });
+      await usersApi.create({ name, email, password, role, phone: phone.trim() || null });
       setIsCreateOpen(false);
       resetForm();
       loadUsers();
@@ -182,7 +183,7 @@ export default function TeamPage() {
     setFormError('');
 
     try {
-      await usersApi.update(selectedUser.id, { name, role, email });
+      await usersApi.update(selectedUser.id, { name, role, email, phone: phone.trim() || null });
       setIsEditOpen(false);
       resetForm();
       loadUsers();
@@ -216,6 +217,7 @@ export default function TeamPage() {
     setName(targetUser.name);
     setEmail(targetUser.email);
     setRole(targetUser.role);
+    setPhone(targetUser.phone || '');
     setIsEditOpen(true);
   };
 
@@ -224,6 +226,7 @@ export default function TeamPage() {
     setEmail('');
     setPassword('');
     setRole('member');
+    setPhone('');
     setFormError('');
     setSelectedUser(null);
   };
@@ -752,6 +755,9 @@ export default function TeamPage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{member.email}</p>
+                    {member.phone && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 font-sans">📞 {member.phone}</p>
+                    )}
                   </div>
                 </div>
 
@@ -856,6 +862,17 @@ export default function TeamPage() {
               required
             />
           </div>
+          
+          <div className="flex flex-col gap-1.5 font-sans">
+            <Label htmlFor="new-phone">{t('settings.phone') || 'Phone Number'}</Label>
+            <Input
+              id="new-phone"
+              type="tel"
+              placeholder="+201234567890"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+            />
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="new-role">{t('team.roleLabel')}</Label>
@@ -920,6 +937,17 @@ export default function TeamPage() {
               value={name}
               onChange={e => setName(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 font-sans">
+            <Label htmlFor="edit-phone">{t('settings.phone') || 'Phone Number'}</Label>
+            <Input
+              id="edit-phone"
+              type="tel"
+              placeholder="+201234567890"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
             />
           </div>
 

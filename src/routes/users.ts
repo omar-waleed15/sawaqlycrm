@@ -20,7 +20,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
   try {
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, name, email, role, avatar_url, created_at')
+      .select('id, name, email, role, avatar_url, phone, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -46,7 +46,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     // 1. Fetch profiles
     const profilesPromise = supabaseAdmin
       .from('profiles')
-      .select('id, name, email, role, avatar_url, created_at')
+      .select('id, name, email, role, avatar_url, phone, created_at')
       .order('created_at', { ascending: false });
 
     // 2. Fetch task assignees within the date window
@@ -188,12 +188,13 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response): 
     return;
   }
   
-  const { name, avatar_url } = req.body;
+  const { name, avatar_url, phone } = req.body;
   
   try {
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+    if (phone !== undefined) updates.phone = phone || null;
 
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: 'No fields to update' });
@@ -260,7 +261,7 @@ router.post('/profile/avatar', authMiddleware, upload.single('avatar'), async (r
 
 // POST /api/users — Create a new team member (owner only)
 router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, phone } = req.body;
 
   if (!name || !email || !password) {
     res.status(400).json({ error: 'Name, email, and password are required' });
@@ -291,6 +292,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
         name,
         email,
         role: userRole,
+        phone: phone || null,
       })
       .select()
       .single();
@@ -311,7 +313,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
 // PUT /api/users/:id — Update user (owner only)
 router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { name, role, email, password } = req.body;
+  const { name, role, email, password, phone } = req.body;
 
   try {
     // 1. Update Supabase Auth if email or password is provided
@@ -341,6 +343,7 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
     if (name) updates.name = name;
     if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role)) updates.role = role;
     if (email) updates.email = email;
+    if (phone !== undefined) updates.phone = phone || null;
 
     if (Object.keys(updates).length > 0) {
       const { data, error } = await supabaseAdmin

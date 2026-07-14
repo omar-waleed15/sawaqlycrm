@@ -118,7 +118,7 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
           const matchedPlan = matchingPlans[idx];
           slots.push({
             id: matchedPlan.id,
-            title: `🎯 ${matchedPlan.title}`,
+            title: matchedPlan.title,
             content_type: typeKey,
             status: matchedPlan.status, // Use actual status (draft, approved, published)
             scheduled_date: dateStr,
@@ -129,7 +129,7 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
         } else {
           slots.push({
             id: `target-${tKey}-${idx}`,
-            title: `🎯 Target ${typeLabelMap[tKey]} ${idx + 1}`,
+            title: `Target ${typeLabelMap[tKey]} ${idx + 1}`,
             content_type: typeKey,
             status: 'target_outline', // Custom status for styling
             scheduled_date: dateStr,
@@ -532,7 +532,7 @@ export default function ClosedClientCalendar({ clientId, plans, client }: Closed
                         }`}
                       >
                         <div className="flex-1 overflow-hidden text-start">
-                          <h4 className="font-bold text-xs">{slot.title}</h4>
+                          <h4 className="font-bold text-xs">🎯 {slot.title}</h4>
                           <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
                             <span>{t('taskDetail.client') || 'Client'}: {client?.name || ''}</span>
                             <span>•</span>

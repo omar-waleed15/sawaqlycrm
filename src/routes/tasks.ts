@@ -2,13 +2,14 @@ import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { ownerOnly, ownerOrTeamLeader, ownerOrTeamLeaderOrSales } from '../middleware/roleCheck';
+import { sendWebhookNotification } from '../lib/webhook';
 
 const router = Router();
 
 // Helper: build task select query with assignees joined
 const TASK_SELECT = `
   *,
-  creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url),
+  creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url, phone),
   client:clients(id, name, company),
   task_assignees(
     id,
@@ -22,7 +23,7 @@ const TASK_SELECT = `
     updated_at,
     total_time_spent,
     timer_started_at,
-    user:profiles(id, name, email, avatar_url)
+    user:profiles(id, name, email, avatar_url, phone)
   ),
   attachments(id),
   comments(id)
@@ -53,6 +54,44 @@ async function canAdministerTask(userId: string, role: string, taskId: string): 
 
   // They can administer only if they are NOT in the assignees list
   return !data;
+}
+
+// Helper: get computed task status based on assignees status
+function getTaskStatus(task: any, userId: string, role: string): string {
+  const assignees = task.task_assignees || [];
+  
+  if (isTaskAdmin(role)) {
+    // Admin/TL/Manager/Moderator sees the aggregate status of the task
+    if (assignees.length === 0) {
+      return 'todo';
+    }
+    const allCompleted = assignees.every((a: any) => a.status === 'completed');
+    if (allCompleted) {
+      return 'completed';
+    }
+    const anyInProgress = assignees.some((a: any) => a.status === 'in_progress' || a.status === 'revision');
+    if (anyInProgress) {
+      return 'in_progress';
+    }
+    const anySubmitted = assignees.some((a: any) => a.status === 'submitted');
+    if (anySubmitted) {
+      return 'submitted';
+    }
+    return 'todo';
+  } else {
+    // Regular member sees their own assignment status
+    const myAssignee = assignees.find((a: any) => a.user_id === userId);
+    return myAssignee ? myAssignee.status : 'todo';
+  }
+}
+
+// Helper: enrich task with computed status
+function enrichTask(task: any, userId: string, role: string): any {
+  if (!task) return task;
+  return {
+    ...task,
+    status: getTaskStatus(task, userId, role)
+  };
 }
 
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
@@ -86,11 +125,12 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
         );
       }
 
-      // Filter by status if provided (check if any assignee matches)
+      // Enrich tasks with computed status
+      tasks = tasks.map((t: any) => enrichTask(t, req.user!.id, userRole));
+
+      // Filter by status if provided (check the computed status)
       if (status) {
-        tasks = tasks.filter((t: any) =>
-          t.task_assignees?.some((a: any) => a.status === status)
-        );
+        tasks = tasks.filter((t: any) => t.status === status);
       }
 
       res.json({ tasks });
@@ -122,11 +162,12 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
       let tasks = data || [];
 
-      // Filter by status (only the member's own assignment status)
+      // Enrich tasks with computed status
+      tasks = tasks.map((t: any) => enrichTask(t, req.user!.id, userRole));
+
+      // Filter by status (which is the member's own status)
       if (status) {
-        tasks = tasks.filter((t: any) =>
-          t.task_assignees?.some((a: any) => a.user_id === req.user!.id && a.status === status)
-        );
+        tasks = tasks.filter((t: any) => t.status === status);
       }
 
       res.json({ tasks });
@@ -160,6 +201,9 @@ router.get('/daily', authMiddleware, async (req: AuthRequest, res: Response): Pr
         t.task_assignees?.some((a: any) => a.user_id === req.user!.id)
       );
     }
+
+    // Enrich tasks
+    tasks = tasks.map((t: any) => enrichTask(t, req.user!.id, req.user!.role));
 
     res.json({ tasks });
   } catch (err) {
@@ -314,7 +358,39 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
-    res.status(201).json({ task: fullTask });
+    // Dispatch webhook notifications in the background
+    if (fullTask && fullTask.task_assignees && fullTask.task_assignees.length > 0) {
+      const sender = {
+        id: req.user!.id,
+        name: req.user!.name,
+        email: req.user!.email,
+      };
+
+      for (const a of fullTask.task_assignees) {
+        if (a.user) {
+          sendWebhookNotification({
+            type: 'task',
+            action: 'assigned',
+            task: {
+              id: fullTask.id,
+              title: fullTask.title,
+              description: fullTask.description || undefined,
+              priority: fullTask.priority,
+              due_date: fullTask.due_date || undefined,
+            },
+            sender,
+            receiver: {
+              id: a.user.id,
+              name: a.user.name,
+              email: a.user.email,
+              phone: a.user.phone,
+            },
+          }).catch(err => console.error('Failed to dispatch webhook:', err));
+        }
+      }
+    }
+
+    res.status(201).json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create task' });
   }
@@ -384,7 +460,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       data.comments = data.comments.filter((c: any) => c.created_at >= twentyFourHoursAgo);
     }
 
-    res.json({ task: data });
+    res.json({ task: enrichTask(data, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch task' });
   }
@@ -396,6 +472,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
   const admin = await canAdministerTask(req.user!.id, req.user!.role, id as string);
 
   try {
+    let toAdd: string[] = [];
     // Verify task exists
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('tasks')
@@ -452,7 +529,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
           .eq('task_id', id);
 
         const currentIds = (currentAssignees || []).map((a: any) => a.user_id);
-        const toAdd = newIds.filter(uid => !currentIds.includes(uid));
+        toAdd = newIds.filter(uid => !currentIds.includes(uid));
         const toRemove = currentIds.filter((uid: string) => !newIds.includes(uid));
 
         if (toRemove.length > 0) {
@@ -551,7 +628,41 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (reFetchError) { res.status(500).json({ error: reFetchError.message }); return; }
 
-    res.json({ task: fullTask });
+    // Dispatch webhook notifications for newly added assignees
+    if (toAdd.length > 0 && fullTask && fullTask.task_assignees) {
+      const sender = {
+        id: req.user!.id,
+        name: req.user!.name,
+        email: req.user!.email,
+      };
+
+      const newlyAddedAssignees = fullTask.task_assignees.filter((a: any) => toAdd.includes(a.user_id));
+
+      for (const a of newlyAddedAssignees) {
+        if (a.user) {
+          sendWebhookNotification({
+            type: 'task',
+            action: 'assigned',
+            task: {
+              id: fullTask.id,
+              title: fullTask.title,
+              description: fullTask.description || undefined,
+              priority: fullTask.priority,
+              due_date: fullTask.due_date || undefined,
+            },
+            sender,
+            receiver: {
+              id: a.user.id,
+              name: a.user.name,
+              email: a.user.email,
+              phone: a.user.phone,
+            },
+          }).catch(err => console.error('Failed to dispatch webhook:', err));
+        }
+      }
+    }
+
+    res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update task' });
   }
@@ -595,7 +706,38 @@ router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: Aut
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
-    res.status(201).json({ task: fullTask });
+    // Dispatch webhook notification
+    if (fullTask && fullTask.task_assignees) {
+      const sender = {
+        id: req.user!.id,
+        name: req.user!.name,
+        email: req.user!.email,
+      };
+
+      const newlyAdded = fullTask.task_assignees.find((a: any) => a.user_id === user_id);
+      if (newlyAdded && newlyAdded.user) {
+        sendWebhookNotification({
+          type: 'task',
+          action: 'assigned',
+          task: {
+            id: fullTask.id,
+            title: fullTask.title,
+            description: fullTask.description || undefined,
+            priority: fullTask.priority,
+            due_date: fullTask.due_date || undefined,
+          },
+          sender,
+          receiver: {
+            id: newlyAdded.user.id,
+            name: newlyAdded.user.name,
+            email: newlyAdded.user.email,
+            phone: newlyAdded.user.phone,
+          },
+        }).catch(err => console.error('Failed to dispatch webhook:', err));
+      }
+    }
+
+    res.status(201).json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to add assignee' });
   }
@@ -628,7 +770,7 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
-    res.json({ task: fullTask });
+    res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to remove assignee' });
   }
@@ -689,7 +831,7 @@ router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (r
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
-    res.json({ task: fullTask });
+    res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update assignee' });
   }
@@ -874,7 +1016,7 @@ router.post('/:id/timer/start', authMiddleware, async (req: AuthRequest, res: Re
         .eq('id', id)
         .single();
       if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
-      res.json({ task: fullTask });
+      res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
       return;
     }
 
@@ -895,7 +1037,7 @@ router.post('/:id/timer/start', authMiddleware, async (req: AuthRequest, res: Re
       .single();
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
-    res.json({ task: fullTask });
+    res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to start timer' });
   }
@@ -926,7 +1068,7 @@ router.post('/:id/timer/stop', authMiddleware, async (req: AuthRequest, res: Res
         .eq('id', id)
         .single();
       if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
-      res.json({ task: fullTask });
+      res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
       return;
     }
 
@@ -953,7 +1095,7 @@ router.post('/:id/timer/stop', authMiddleware, async (req: AuthRequest, res: Res
       .single();
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
-    res.json({ task: fullTask });
+    res.json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to stop timer' });
   }

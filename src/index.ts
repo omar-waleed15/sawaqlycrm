@@ -20,6 +20,8 @@ import closedClientRoutes from './routes/closed_clients';
 import remindersRoutes from './routes/reminders';
 import contentRoutes from './routes/contents';
 import clientChatRoutes from './routes/client_chat';
+import notesRoutes from './routes/notes';
+import campaignsRoutes from './routes/campaigns';
 
 dotenv.config();
 
@@ -61,6 +63,8 @@ app.use('/api/closed-clients', closedClientRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/contents', contentRoutes);
 app.use('/api/client-chat', clientChatRoutes);
+app.use('/api/notes', notesRoutes);
+app.use('/api/campaigns', campaignsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

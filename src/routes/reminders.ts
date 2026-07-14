@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { sendWebhookNotification } from '../lib/webhook';
 
 const router = Router();
 
@@ -68,13 +69,42 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promis
       .insert(rows)
       .select(`
         *,
-        sender:profiles!sender_id(name, avatar_url),
-        receiver:profiles!receiver_id(name, avatar_url)
+        sender:profiles!sender_id(id, name, email, phone, avatar_url),
+        receiver:profiles!receiver_id(id, name, email, phone, avatar_url)
       `);
 
     if (error) {
       res.status(500).json({ error: error.message });
       return;
+    }
+
+    // Dispatch webhook notifications in the background
+    if (data && data.length > 0) {
+      const sender = {
+        id: req.user!.id,
+        name: req.user!.name,
+        email: req.user!.email,
+      };
+
+      for (const r of data) {
+        if (r.receiver) {
+          sendWebhookNotification({
+            type: 'reminder',
+            action: 'created',
+            reminder: {
+              id: r.id,
+              content: r.content,
+            },
+            sender,
+            receiver: {
+              id: r.receiver.id,
+              name: r.receiver.name,
+              email: r.receiver.email,
+              phone: r.receiver.phone,
+            },
+          }).catch(err => console.error('Failed to dispatch webhook:', err));
+        }
+      }
     }
 
     res.status(201).json({ reminders: data || [] });

@@ -132,9 +132,6 @@ export default function TasksPage() {
           }`}
         >
           ✅ {t('tasks.completedTasks')}
-          {completedCount > 0 && (
-            <Badge className="text-[11px] h-5 px-1.5 bg-green-600 hover:bg-green-600">{completedCount}</Badge>
-          )}
         </button>
 
         {isOwner && user?.role !== 'moderation' && (

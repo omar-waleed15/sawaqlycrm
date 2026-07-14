@@ -47,6 +47,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         email: profile.email,
         role: profile.role,
         avatar_url: profile.avatar_url,
+        phone: profile.phone,
       },
     });
   } catch (err) {

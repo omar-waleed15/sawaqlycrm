@@ -78,6 +78,7 @@ export default function ClientPortalLayout({ children }: { children: React.React
               { label: t('portal.chat') || 'Chat', href: '/client-portal/chat', icon: MessageSquare },
               { label: t('portal.contentPlan'), href: '/client-portal/content', icon: FileText },
               { label: t('portal.calendar'), href: '/client-portal/calendar', icon: Calendar },
+              { label: t('nav.notes'), href: '/client-portal/notes', icon: FileText },
               { label: t('portal.faq'), href: '/client-portal/faq', icon: HelpCircle },
               { label: t('portal.settings'), href: '/client-portal/settings', icon: Settings },
             ].map(link => {

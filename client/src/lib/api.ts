@@ -79,12 +79,12 @@ export const authApi = {
 // Users
 export const usersApi = {
   list: () => request<{ users: import('@/types').User[] }>('/users'),
-  create: (data: { name: string; email: string; password: string; role: string }) =>
+  create: (data: { name: string; email: string; password: string; role: string; phone?: string | null }) =>
     request<{ user: import('@/types').User }>('/users', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ name: string; role: string; email?: string; password?: string }>) =>
+  update: (id: string, data: Partial<{ name: string; role: string; email?: string; password?: string; phone?: string | null }>) =>
     request<{ user: import('@/types').User }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
-  updateProfile: (data: Partial<{ name: string; avatar_url: string | null }>) =>
+  updateProfile: (data: Partial<{ name: string; avatar_url: string | null; phone: string | null }>) =>
     request<{ user: import('@/types').User }>('/users/profile', { method: 'PUT', body: JSON.stringify(data) }),
   uploadAvatar: (file: File) => {
     const formData = new FormData();
@@ -397,4 +397,38 @@ export const clientChatApi = {
       method: 'POST',
       body: JSON.stringify({ content }),
     }),
+};
+
+// Personal Notes API
+export const notesApi = {
+  list: () => request<{ notes: import('@/types').PersonalNote[] }>('/notes'),
+  create: (data: Partial<import('@/types').PersonalNote>) =>
+    request<{ note: import('@/types').PersonalNote }>('/notes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<import('@/types').PersonalNote>) =>
+    request<{ note: import('@/types').PersonalNote }>(`/notes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) => request(`/notes/${id}`, { method: 'DELETE' }),
+};
+
+// Campaigns API
+export const campaignsApi = {
+  list: () => request<{ campaigns: any[] }>('/campaigns'),
+  create: (name: string, messageTemplate: string, file: File) => {
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('message_template', messageTemplate);
+    formData.append('file', file);
+    return uploadFile('/campaigns', formData) as Promise<{ campaign: any }>;
+  },
+  triggerAction: (id: string, action: 'start' | 'pause') =>
+    request<{ campaign: any }>(`/campaigns/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  delete: (id: string) => request(`/campaigns/${id}`, { method: 'DELETE' }),
 };

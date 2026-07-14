@@ -33,6 +33,7 @@ export default function SettingsPage() {
   // Profile editing state
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profileAvatarUrl, setProfileAvatarUrl] = useState(user?.avatar_url || '');
+  const [profilePhone, setProfilePhone] = useState(user?.phone || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
@@ -43,6 +44,7 @@ export default function SettingsPage() {
     if (user) {
       setProfileName(user.name);
       setProfileAvatarUrl(user.avatar_url || '');
+      setProfilePhone(user.phone || '');
     }
   }, [user]);
 
@@ -105,6 +107,7 @@ export default function SettingsPage() {
       const response = await usersApi.updateProfile({
         name: profileName.trim(),
         avatar_url: profileAvatarUrl || null,
+        phone: profilePhone.trim() || null,
       });
       setUser(response.user);
       setProfileSuccess(true);
@@ -388,6 +391,22 @@ export default function SettingsPage() {
                   required
                   disabled={profileSaving}
                 />
+              </div>
+              
+              {/* Phone Field */}
+              <div className="flex flex-col gap-1.5 text-start font-sans">
+                <Label htmlFor="profile-phone">{t('settings.phone') || 'WhatsApp Phone Number'}</Label>
+                <Input
+                  id="profile-phone"
+                  type="tel"
+                  placeholder="+201234567890"
+                  value={profilePhone}
+                  onChange={e => setProfilePhone(e.target.value)}
+                  disabled={profileSaving}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Include country code (e.g. +201012345678) to receive WhatsApp notifications.
+                </p>
               </div>
 
               {/* Email Field (ReadOnly) */}

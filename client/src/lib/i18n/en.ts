@@ -55,6 +55,8 @@ export const en: Record<string, string> = {
   'nav.globalChat': 'Global Chat',
   'nav.reminders': 'Reminders',
   'nav.clientChat': 'Client Chat',
+  'nav.notes': 'Notes',
+  'nav.campaigns': 'Campaigns',
 
   // ── Language ────────────────────────────────────────────────────────
   'lang.switch': 'Language',
@@ -931,6 +933,7 @@ export const en: Record<string, string> = {
   'settings.removePhoto': 'Remove Photo',
   'settings.profileUpdated': 'Profile updated successfully!',
   'settings.uploading': 'Uploading...',
+  'settings.phone': 'Phone Number',
 
   // ── Closed Clients ───────────────────────────────────────────────────
   'nav.closedClients': 'Clients',

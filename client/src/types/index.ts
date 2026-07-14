@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar_url?: string;
+  phone?: string;
   created_at?: string;
 }
 
@@ -515,4 +516,21 @@ export interface ContentItem {
   client?: { id: string; name: string; company?: string };
   created_at?: string;
   updated_at?: string;
+}
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface PersonalNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  type: 'text' | 'todo';
+  todo_items: TodoItem[];
+  created_at: string;
+  updated_at: string;
 }

@@ -55,6 +55,8 @@ export const ar: Record<string, string> = {
   'nav.globalChat': 'الشات الجماعي',
   'nav.reminders': 'التذكيرات',
   'nav.clientChat': 'دردشة العملاء',
+  'nav.notes': 'الملاحظات',
+  'nav.campaigns': 'الحملات',
 
   // ── اللغة ──────────────────────────────────────────────────────────
   'lang.switch': 'اللغة',
@@ -931,6 +933,7 @@ export const ar: Record<string, string> = {
   'settings.removePhoto': 'إزالة الصورة',
   'settings.profileUpdated': 'تم تحديث الملف الشخصي بنجاح!',
   'settings.uploading': 'جاري الرفع...',
+  'settings.phone': 'رقم الهاتف',
 
   // ── العملاء المغلقون ───────────────────────────────────────────────
   'nav.closedClients': 'العملاء',
