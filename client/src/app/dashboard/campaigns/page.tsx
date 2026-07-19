@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import Modal from '@/components/Modal';
+import ExcelConverter from '@/components/ExcelConverter';
 import {
   Megaphone,
   Plus,
@@ -23,6 +24,7 @@ import {
   Clock,
   Sparkles,
   Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface CampaignStats {
@@ -58,6 +60,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'converter'>('campaigns');
   
   // Create Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -174,6 +177,15 @@ export default function CampaignsPage() {
     }
   };
 
+  // Handle client-side formatted file from ExcelConverter
+  const handleUseInCampaign = (file: File, validCount: number) => {
+    setSelectedFile(file);
+    setPreviewNumberCount(validCount);
+    setError('');
+    setActiveTab('campaigns');
+    setIsCreateOpen(true);
+  };
+
   // Trigger Start / Pause Campaign Actions
   const handleCampaignAction = async (campaignId: string, action: 'start' | 'pause') => {
     try {
@@ -218,14 +230,44 @@ export default function CampaignsPage() {
         </div>
 
         {/* Action Button */}
-        <Button onClick={() => setIsCreateOpen(true)} size="sm" className="text-xs gap-1.5 py-4 cursor-pointer">
-          <Plus className="size-4" />
-          <span>{locale === 'ar' ? 'إنشاء حملة جديدة' : 'Create Campaign'}</span>
-        </Button>
+        {activeTab === 'campaigns' && (
+          <Button onClick={() => setIsCreateOpen(true)} size="sm" className="text-xs gap-1.5 py-4 cursor-pointer">
+            <Plus className="size-4" />
+            <span>{locale === 'ar' ? 'إنشاء حملة جديدة' : 'Create Campaign'}</span>
+          </Button>
+        )}
       </div>
 
-      {/* Campaigns Grid */}
-      {loading ? (
+      {/* Sub-Tabs Selector */}
+      <div className="flex border-b border-border gap-6 shrink-0 mt-2">
+        <button
+          onClick={() => setActiveTab('campaigns')}
+          className={`flex items-center gap-2 pb-3.5 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap cursor-pointer ${
+            activeTab === 'campaigns'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Megaphone className="size-4" />
+          <span>{locale === 'ar' ? 'حملات البث' : 'Broadcast Campaigns'}</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('converter')}
+          className={`flex items-center gap-2 pb-3.5 text-sm font-bold border-b-2 transition-all duration-200 whitespace-nowrap cursor-pointer ${
+            activeTab === 'converter'
+              ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FileSpreadsheet className="size-4" />
+          <span>{locale === 'ar' ? 'محول الإكسل (Excel)' : 'Excel to CSV Converter'}</span>
+        </button>
+      </div>
+
+      {/* Campaigns Grid / Converter View */}
+      {activeTab === 'converter' ? (
+        <ExcelConverter onUseInCampaign={handleUseInCampaign} />
+      ) : loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3 border border-dashed rounded-2xl bg-card/10">
           <Loader2 className="size-8 animate-spin text-primary" />
           <span className="text-xs text-muted-foreground font-semibold">{locale === 'ar' ? 'جاري تحميل الحملات...' : 'Loading campaigns...'}</span>
