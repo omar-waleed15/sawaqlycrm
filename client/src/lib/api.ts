@@ -458,12 +458,24 @@ export const campaignsApi = {
   delete: (id: string) => request(`/campaigns/${id}`, { method: 'DELETE' }),
 };
 
+export interface RoleData {
+  id: string;
+  role_key: string;
+  description: string;
+  general_roles?: string;
+  job_description?: string;
+  job_roles?: string;
+  non_negotiables?: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
 // Roles API
 export const rolesApi = {
-  list: () => request<{ roles: { id: string; role_key: string; description: string; updated_at: string; updated_by: string | null }[] }>('/roles'),
-  update: (roleKey: string, description: string) =>
-    request<{ role: { id: string; role_key: string; description: string; updated_at: string; updated_by: string | null } }>(`/roles/${roleKey}`, {
+  list: () => request<{ roles: RoleData[] }>('/roles'),
+  update: (roleKey: string, data: Partial<RoleData>) =>
+    request<{ role: RoleData }>(`/roles/${roleKey}`, {
       method: 'PUT',
-      body: JSON.stringify({ description }),
+      body: JSON.stringify(data),
     }),
 };

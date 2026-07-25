@@ -66,20 +66,28 @@ router.put('/:roleKey', authMiddleware, async (req: AuthRequest, res: Response):
     }
 
     const { roleKey } = req.params;
-    const { description } = req.body;
+    const {
+      description = '',
+      general_roles = '',
+      job_description = '',
+      job_roles = '',
+      non_negotiables = '',
+    } = req.body;
 
-    if (typeof description !== 'string') {
-      res.status(400).json({ error: 'description is required' });
-      return;
-    }
+    const updatePayload: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
+    };
+
+    if (description !== undefined) updatePayload.description = description;
+    if (general_roles !== undefined) updatePayload.general_roles = general_roles;
+    if (job_description !== undefined) updatePayload.job_description = job_description;
+    if (job_roles !== undefined) updatePayload.job_roles = job_roles;
+    if (non_negotiables !== undefined) updatePayload.non_negotiables = non_negotiables;
 
     const { data, error } = await supabaseAdmin
       .from('role_descriptions')
-      .update({
-        description,
-        updated_at: new Date().toISOString(),
-        updated_by: user.id,
-      })
+      .update(updatePayload)
       .eq('role_key', roleKey)
       .select()
       .single();
