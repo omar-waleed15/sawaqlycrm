@@ -57,6 +57,7 @@ export const en: Record<string, string> = {
   'nav.clientChat': 'Client Chat',
   'nav.notes': 'Notes',
   'nav.campaigns': 'Campaigns',
+  'nav.roles': 'Roles',
 
   // ── Language ────────────────────────────────────────────────────────
   'lang.switch': 'Language',
@@ -1202,6 +1203,22 @@ export const en: Record<string, string> = {
   'contentHub.table.actions': 'Actions',
   'contentHub.viewMedia': 'View Media',
   'contentHub.noMedia': 'No Media',
+
+  // ── Roles ──────────────────────────────────────────────────────────
+  'roles.title': 'Roles & Responsibilities',
+  'roles.subtitle': 'Define responsibilities for each team role',
+  'roles.yourRole': 'Your Role',
+  'roles.noDescription': 'No description has been set for this role yet.',
+  'roles.save': 'Save',
+  'roles.saving': 'Saving...',
+  'roles.saved': 'Saved!',
+  'roles.descriptionPlaceholder': 'Describe the responsibilities for this role...',
+  'roles.role.team_leader': 'Team Leader',
+  'roles.role.sales': 'Sales',
+  'roles.role.member': 'Member',
+  'roles.role.moderation': 'Moderation',
+  'roles.role.account_manager': 'Account Manager',
+  'roles.role.content_creator': 'Content Creator',
 };
 
 

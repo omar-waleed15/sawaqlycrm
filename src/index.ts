@@ -22,6 +22,7 @@ import contentRoutes from './routes/contents';
 import clientChatRoutes from './routes/client_chat';
 import notesRoutes from './routes/notes';
 import campaignsRoutes from './routes/campaigns';
+import rolesRoutes from './routes/roles';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ app.use('/api/contents', contentRoutes);
 app.use('/api/client-chat', clientChatRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/campaigns', campaignsRoutes);
+app.use('/api/roles', rolesRoutes);
 
 // 404 handler
 app.use((_req, res) => {

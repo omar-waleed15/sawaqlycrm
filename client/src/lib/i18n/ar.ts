@@ -57,6 +57,7 @@ export const ar: Record<string, string> = {
   'nav.clientChat': 'دردشة العملاء',
   'nav.notes': 'الملاحظات',
   'nav.campaigns': 'الحملات',
+  'nav.roles': 'الأدوار',
 
   // ── اللغة ──────────────────────────────────────────────────────────
   'lang.switch': 'اللغة',
@@ -1202,6 +1203,22 @@ export const ar: Record<string, string> = {
   'contentHub.table.actions': 'إجراءات',
   'contentHub.viewMedia': 'عرض الميديا',
   'contentHub.noMedia': 'بدون ميديا',
+
+  // ── الأدوار ──────────────────────────────────────────────────────────
+  'roles.title': 'الأدوار والمسؤوليات',
+  'roles.subtitle': 'حدّد مسؤوليات كل دور في الفريق',
+  'roles.yourRole': 'دورك',
+  'roles.noDescription': 'لم يتم تحديد وصف لهذا الدور بعد.',
+  'roles.save': 'حفظ',
+  'roles.saving': 'جاري الحفظ...',
+  'roles.saved': 'تم الحفظ!',
+  'roles.descriptionPlaceholder': 'اكتب مسؤوليات هذا الدور...',
+  'roles.role.team_leader': 'قائد الفريق',
+  'roles.role.sales': 'المبيعات',
+  'roles.role.member': 'عضو',
+  'roles.role.moderation': 'المراجعة',
+  'roles.role.account_manager': 'مدير الحسابات',
+  'roles.role.content_creator': 'صانع المحتوى',
 };
 
 

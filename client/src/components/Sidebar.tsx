@@ -30,6 +30,7 @@ import {
   Film,
   FileText,
   Megaphone,
+  Shield,
 } from 'lucide-react';
 
 interface NavItem {
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/calendar', labelKey: 'nav.calendar',      icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/campaigns', labelKey: 'nav.campaigns',   icon: Megaphone,       allowedRoles: ['owner'] },
   { href: '/dashboard/notes',    labelKey: 'nav.notes',         icon: FileText,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'content_creator'] },
+  { href: '/dashboard/roles',   labelKey: 'nav.roles',         icon: Shield,          allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/settings', labelKey: 'nav.settings',      icon: Settings,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'content_creator'] },
 ];
 
