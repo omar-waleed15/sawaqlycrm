@@ -54,7 +54,7 @@ export default function ClientFAQPage() {
     }
   ];
 
-  const faqsToUse = faqs && faqs.length > 0 ? faqs : mockFaqs;
+  const faqsToUse = faqs || [];
 
   const toggleOpen = (id: string) => {
     setOpenId(prev => (prev === id ? null : id));

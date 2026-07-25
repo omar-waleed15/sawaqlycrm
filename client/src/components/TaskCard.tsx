@@ -75,11 +75,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
   const overdue = isOverdue(task.due_date, assignees);
   const myAssignment = task.task_assignees?.find(a => a.user_id === user?.id);
 
-  // canAdminister checks: admin/owner OR leader/manager who is NOT assigned as a worker to the task
-  const isOwner = user?.role === 'owner' || (
-    (user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') &&
-    !myAssignment
-  );
+  // canAdminister checks: owner, team_leader, moderation, account_manager
+  const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   // Determine logged time text
   let loggedTimeText = '';
@@ -627,62 +624,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                   </Select>
                 </div>
 
-                {/* Monthly Deliverables Config */}
-                {form.client_id && form.client_id !== 'none' && (
-                  <div className="border border-indigo-100 bg-indigo-50/20 dark:border-indigo-950/40 dark:bg-indigo-950/5 rounded-lg p-4 flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                      <input
-                        id="edit-is_deliverable"
-                        name="is_deliverable"
-                        type="checkbox"
-                        checked={form.is_deliverable}
-                        onChange={e => setForm(prev => ({ ...prev, is_deliverable: e.target.checked }))}
-                        className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <div className="text-start">
-                        <Label htmlFor="edit-is_deliverable" className="font-bold text-sm cursor-pointer">
-                          🎯 {t('tasks.isDeliverable')}
-                        </Label>
-                        <p className="text-[11px] text-muted-foreground leading-tight">
-                          {t('tasks.isDeliverableDesc')}
-                        </p>
-                      </div>
-                    </div>
 
-                    {form.is_deliverable && (
-                      <div className="grid grid-cols-2 gap-4 pt-1">
-                        <div className="flex flex-col gap-1.5">
-                          <Label htmlFor="edit-deliverable_type">{t('tasks.deliverableType')}</Label>
-                          <Select
-                            value={form.deliverable_type}
-                            onValueChange={v => handleSelectChange('deliverable_type', v || 'post')}
-                          >
-                            <SelectTrigger id="edit-deliverable_type">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="post">📝 {t('closedClients.plan.post')}</SelectItem>
-                              <SelectItem value="reel">🎬 {t('closedClients.plan.reel')}</SelectItem>
-                              <SelectItem value="story">📸 {t('closedClients.plan.story')}</SelectItem>
-                              <SelectItem value="photo">🖼️ {t('closedClients.plan.photo')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <Label htmlFor="edit-deliverable_month">{t('tasks.deliverableMonth')}</Label>
-                          <Input
-                            id="edit-deliverable_month"
-                            name="deliverable_month"
-                            type="month"
-                            value={form.deliverable_month}
-                            onChange={handleChange}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Multi-Assignee Picker */}
                 <div className="border-t border-border pt-3">

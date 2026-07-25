@@ -40,29 +40,54 @@ export async function request<T>(
   return data as T;
 }
 
-async function uploadFile(endpoint: string, formData: FormData): Promise<unknown> {
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+function uploadFile(
+  endpoint: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void
+): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}${endpoint}`);
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  const data = await res.json();
-  if (!res.ok) {
-    if (res.status === 401 || data.error === 'Invalid or expired token') {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-      }
+    const token = getToken();
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     }
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
-  return data;
+
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: any = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { error: xhr.responseText };
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        if (xhr.status === 401 || data.error === 'Invalid or expired token') {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/login';
+          }
+        }
+        reject(new Error(data.error || `HTTP ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Network error during file upload'));
+    xhr.send(formData);
+  });
 }
 
 // Auth
@@ -384,8 +409,8 @@ export const contentsApi = {
     }),
   delete: (id: string) =>
     request(`/contents/${id}`, { method: 'DELETE' }),
-  upload: (formData: FormData) =>
-    uploadFile('/contents/upload', formData) as Promise<{ public_urls: string[] }>,
+  upload: (formData: FormData, onProgress?: (percent: number) => void) =>
+    uploadFile('/contents/upload', formData, onProgress) as Promise<{ public_urls: string[] }>,
 };
 
 // Client Chat API

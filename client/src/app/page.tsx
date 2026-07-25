@@ -12,7 +12,7 @@ export default function HomePage() {
     if (!loading) {
       if (user) {
         if (user.role === 'client') {
-          router.replace('/client-portal');
+          router.replace('/client');
           return;
         }
         router.replace('/dashboard');

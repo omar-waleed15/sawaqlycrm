@@ -128,10 +128,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);
 
-  const canAdminister = user?.role === 'owner' || (
-    (user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') &&
-    !myAssignment
-  );
+  const canAdminister = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
   const loadTask = async () => {
     try {
@@ -802,7 +799,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         )}
 
                         {/* Admin Action Forms */}
-                        {a.status === 'submitted' && a.user_id !== user?.id && (
+                        {a.status === 'submitted' && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
                             {!isWritingFeedback && !isApproving ? (
                               <>

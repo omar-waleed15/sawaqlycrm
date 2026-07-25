@@ -51,14 +51,7 @@ export default function ClientPortalDashboard() {
 
   const { client, reports } = data;
 
-  const mockReports = [
-    { id: 'mock-1', report_month: '2026-03-01', views: 4500, interactions: 320, messages: 15 },
-    { id: 'mock-2', report_month: '2026-04-01', views: 8200, interactions: 610, messages: 28 },
-    { id: 'mock-3', report_month: '2026-05-01', views: 14800, interactions: 950, messages: 42 },
-    { id: 'mock-4', report_month: '2026-06-01', views: 18500, interactions: 1250, messages: 55 }
-  ];
-
-  const reportsToUse = reports && reports.length > 0 ? reports : mockReports;
+  const reportsToUse = reports || [];
 
   const calcPercent = (done: number = 0, target: number = 0) => {
     if (target === 0) return 0;
@@ -191,7 +184,7 @@ export default function ClientPortalDashboard() {
               <div className="text-[8px] font-extrabold uppercase tracking-widest font-mono text-[#0F172A]/85">
                 {t('portal.accountHealth')}
               </div>
-              <Heart className="size-4 text-[#0F172A]/70" fill="currentColor" />
+              <TrendingUp className="size-4 text-[#0F172A]/70" />
             </div>
             <div className="flex flex-col mt-2">
               <span className="text-[9px] text-[#0F172A]/70 uppercase tracking-widest font-mono font-bold">{t('portal.overallProgress')}</span>

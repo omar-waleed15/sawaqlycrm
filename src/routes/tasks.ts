@@ -34,26 +34,9 @@ function isTaskAdmin(role: string): boolean {
   return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
 
-// Helper: check if user is allowed to administer a specific task (must NOT be assigned to it if they are team_leader, moderation, or account_manager)
-async function canAdministerTask(userId: string, role: string, taskId: string): Promise<boolean> {
-  if (role === 'owner') return true;
-  if (!['team_leader', 'moderation', 'account_manager'].includes(role)) return false;
-
-  // Check if they are in the assignees list
-  const { data, error } = await supabaseAdmin
-    .from('task_assignees')
-    .select('id')
-    .eq('task_id', taskId)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error checking task assignment for administration check:', error);
-    return false;
-  }
-
-  // They can administer only if they are NOT in the assignees list
-  return !data;
+// Helper: check if user is allowed to administer a specific task (owner, team_leader, moderation, account_manager)
+async function canAdministerTask(_userId: string, role: string, _taskId: string): Promise<boolean> {
+  return ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
 }
 
 // Helper: get computed task status based on assignees status

@@ -29,8 +29,8 @@ export default function ClientLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-4 py-12 text-[#0F172A] select-none font-sans">
-      <div className="w-full max-w-[390px] border border-[#E2E8F0] bg-white p-8 shadow-xl rounded-xl flex flex-col gap-6">
+    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-4 py-12 text-[#0F172A] select-none font-sans" suppressHydrationWarning>
+      <div className="w-full max-w-[390px] border border-[#E2E8F0] bg-white p-8 shadow-xl rounded-xl flex flex-col gap-6" suppressHydrationWarning>
         <div className="flex flex-col items-center text-center gap-3">
           <div className="w-20 h-20 flex items-center justify-center overflow-hidden shrink-0">
             <img src="/logo.png" alt="Sawaqly Marketing Agency" className="size-full object-contain" />
@@ -50,9 +50,9 @@ export default function ClientLoginPage() {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-[#64748B] font-mono">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5" suppressHydrationWarning>
+          <div className="flex flex-col gap-1.5" suppressHydrationWarning>
+            <label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-[#64748B] font-mono" suppressHydrationWarning>
               Email Address
             </label>
             <input
@@ -63,13 +63,13 @@ export default function ClientLoginPage() {
               onChange={e => setEmail(e.target.value)}
               required
               autoComplete="email"
-              autoFocus
+              suppressHydrationWarning
               className="bg-white border border-[#E2E8F0] text-[#0F172A] placeholder-[#94A3B8] focus:border-[#1D61E7] focus:ring-2 focus:ring-[#1D61E7]/25 outline-none text-xs h-10 px-3 transition-all rounded-lg"
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-[#64748B] font-mono">
+          <div className="flex flex-col gap-1.5" suppressHydrationWarning>
+            <label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-[#64748B] font-mono" suppressHydrationWarning>
               Password
             </label>
             <input
@@ -80,12 +80,14 @@ export default function ClientLoginPage() {
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
+              suppressHydrationWarning
               className="bg-white border border-[#E2E8F0] text-[#0F172A] placeholder-[#94A3B8] focus:border-[#1D61E7] focus:ring-2 focus:ring-[#1D61E7]/25 outline-none text-xs h-10 px-3 transition-all rounded-lg"
             />
           </div>
 
           <button
             type="submit"
+            suppressHydrationWarning
             className="w-full h-10 bg-[#FFD200] hover:bg-[#E6BD00] text-[#111827] font-bold uppercase tracking-widest text-[10px] mt-2 transition-colors duration-250 flex items-center justify-center rounded-lg font-mono shadow-sm"
             disabled={loading}
           >

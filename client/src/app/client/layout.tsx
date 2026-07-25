@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe, MessageSquare } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe, MessageSquare, Menu } from 'lucide-react';
 
 export default function ClientPortalLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -13,7 +13,7 @@ export default function ClientPortalLayout({ children }: { children: React.React
   const router = useRouter();
   const pathname = usePathname();
 
-  const isLoginPage = pathname === '/login' || pathname === '/client-portal/login';
+  const isLoginPage = pathname === '/login' || pathname === '/client/login';
 
   useEffect(() => {
     if (!loading && !user && !isLoginPage) {
@@ -54,40 +54,87 @@ export default function ClientPortalLayout({ children }: { children: React.React
     );
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleLocale = () => setLocale(locale === 'en' ? 'ar' : 'en');
 
+  const navLinks = [
+    { label: t('portal.overview'), href: '/client', icon: LayoutDashboard },
+    { label: t('portal.chat') || 'Chat', href: '/client/chat', icon: MessageSquare },
+    { label: t('portal.contentPlan'), href: '/client/content', icon: FileText },
+    { label: t('portal.calendar'), href: '/client/calendar', icon: Calendar },
+    { label: t('portal.faq'), href: '/client/faq', icon: HelpCircle },
+    { label: t('portal.settings'), href: '/client/settings', icon: Settings },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex font-sans select-none overflow-hidden" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col md:flex-row font-sans select-none overflow-hidden" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+      {/* Mobile Header Bar */}
+      <header className="md:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-[#E2E8F0] shrink-0 z-30">
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+        >
+          <Menu className="size-5" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <div className="size-6 flex items-center justify-center overflow-hidden shrink-0">
+            <img src="/logo.png" alt="Sawaqly" className="size-full object-contain" />
+          </div>
+          <span className="text-sm font-extrabold text-[#1D61E7] tracking-tight lowercase">sawaqly</span>
+        </div>
+
+        <button
+          onClick={toggleLocale}
+          className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md"
+        >
+          {locale === 'en' ? 'AR' : 'EN'}
+        </button>
+      </header>
+
+      {/* Mobile Navigation Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Left/Right Sidebar based on locale */}
-      <aside className={`w-60 border-[#E2E8F0] bg-white text-slate-800 flex flex-col justify-between shrink-0 shadow-sm ${locale === 'ar' ? 'border-l' : 'border-r'}`}>
+      <aside
+        className={`fixed md:static inset-y-0 z-50 w-60 border-[#E2E8F0] bg-white text-slate-800 flex flex-col justify-between shrink-0 shadow-sm transition-transform duration-200 ${
+          locale === 'ar' ? 'right-0 border-l' : 'left-0 border-r'
+        } ${mobileMenuOpen ? 'translate-x-0' : (locale === 'ar' ? 'translate-x-full md:translate-x-0' : '-translate-x-full md:translate-x-0')}`}
+      >
         <div className="flex flex-col">
-          <div className="h-16 px-6 border-b border-[#E2E8F0] flex items-center gap-2.5">
-            <div className="size-8 flex items-center justify-center overflow-hidden shrink-0">
-              <img src="/logo.png" alt="Sawaqly Marketing Agency" className="size-full object-contain" />
+          <div className="h-16 px-6 border-b border-[#E2E8F0] flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 flex items-center justify-center overflow-hidden shrink-0">
+                <img src="/logo.png" alt="Sawaqly Marketing Agency" className="size-full object-contain" />
+              </div>
+              <div className="flex flex-col text-start">
+                <span className="text-base font-extrabold text-[#1D61E7] tracking-tight lowercase leading-none">sawaqly</span>
+                <span className="text-[8px] text-[#FFD200] uppercase tracking-widest font-mono mt-0.5 font-bold">{t('portal.marketingAgency')}</span>
+              </div>
             </div>
-            <div className="flex flex-col text-start">
-              <span className="text-base font-extrabold text-[#1D61E7] tracking-tight lowercase leading-none">sawaqly</span>
-              <span className="text-[8px] text-[#FFD200] uppercase tracking-widest font-mono mt-0.5 font-bold">{t('portal.marketingAgency')}</span>
-            </div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="md:hidden p-1 text-slate-400 hover:text-slate-700 rounded-md"
+            >
+              <LogOut className="size-4 rotate-180" />
+            </button>
           </div>
 
           {/* Navigation Links */}
           <nav className="flex flex-col gap-1.5 p-4">
-            {[
-              { label: t('portal.overview'), href: '/client-portal', icon: LayoutDashboard },
-              { label: t('portal.chat') || 'Chat', href: '/client-portal/chat', icon: MessageSquare },
-              { label: t('portal.contentPlan'), href: '/client-portal/content', icon: FileText },
-              { label: t('portal.calendar'), href: '/client-portal/calendar', icon: Calendar },
-              { label: t('nav.notes'), href: '/client-portal/notes', icon: FileText },
-              { label: t('portal.faq'), href: '/client-portal/faq', icon: HelpCircle },
-              { label: t('portal.settings'), href: '/client-portal/settings', icon: Settings },
-            ].map(link => {
-              const isActive = pathname === link.href || (link.href === '/client-portal' && pathname === '/');
+            {navLinks.map(link => {
+              const isActive = pathname === link.href || (link.href === '/client' && pathname === '/');
               const Icon = link.icon;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-2.5 px-4 py-2 transition-all text-[10px] uppercase font-mono tracking-wider font-extrabold ${
                     isActive 
                       ? 'bg-[#0F172A] text-white rounded-full shadow-xs' 
@@ -143,8 +190,8 @@ export default function ClientPortalLayout({ children }: { children: React.React
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
-        <main className="flex-1 px-8 py-8 flex flex-col min-h-0 text-start">
+      <div className="flex-1 flex flex-col min-w-0 h-[calc(100vh-3.5rem)] md:h-screen overflow-y-auto">
+        <main className="flex-1 px-4 py-4 md:px-8 md:py-8 flex flex-col min-h-0 text-start min-w-0">
           {children}
         </main>
       </div>

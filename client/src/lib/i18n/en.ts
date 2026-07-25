@@ -1077,7 +1077,7 @@ export const en: Record<string, string> = {
   'portal.marketingAgency': 'Marketing Agency',
   'portal.overviewDesc': 'Brand Performance & Deliverables Analytics',
   'portal.deliverables': 'Deliverables',
-  'portal.accountHealth': 'Account Health',
+  'portal.accountHealth': 'Plan Progress',
   'portal.views': 'Views',
   'portal.engagement': 'Engagement',
   'portal.messages': 'Messages',
@@ -1191,5 +1191,17 @@ export const en: Record<string, string> = {
   'contentHub.openDrive': 'Open Drive',
   'contentHub.mediaFiles': 'Attached Media Files',
   'contentHub.untitled': 'Untitled Content',
+  'contentHub.table.media': 'Media',
+  'contentHub.table.title': 'Content & Type',
+  'contentHub.table.client': 'Client',
+  'contentHub.table.platform': 'Platform',
+  'contentHub.table.scheduled': 'Scheduled Date',
+  'contentHub.table.caption': 'Caption & Notes',
+  'contentHub.table.links': 'Links & Audio',
+  'contentHub.table.status': 'Status',
+  'contentHub.table.actions': 'Actions',
+  'contentHub.viewMedia': 'View Media',
+  'contentHub.noMedia': 'No Media',
 };
+
 

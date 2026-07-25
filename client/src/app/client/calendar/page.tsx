@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { request } from '@/lib/api';
 import { Client, ClientContentPlan, ContentItem } from '@/types';
 import { useLanguage } from '@/lib/i18n';
+import { getCairoDateString } from '@/lib/dateUtils';
 import { ChevronLeft, ChevronRight, Loader2, ExternalLink, Calendar as CalendarIcon, Megaphone, X } from 'lucide-react';
 
 interface PortalData {
@@ -50,77 +51,11 @@ export default function ClientPortalCalendarPage() {
   const plans = useMemo(() => data?.contentPlans || [], [data]);
   const contents = useMemo(() => data?.contents || [], [data]);
 
-  const mockPlans: ClientContentPlan[] = [
-    {
-      id: 'mock-c-1',
-      client_id: '1',
-      title: 'How Sawaqly Optimizes Your Ads Campaign',
-      content_type: 'post',
-      status: 'published',
-      scheduled_date: '2026-07-06',
-      notes: 'Explaining our dynamic ads scaling and high CTR layouts.',
-      drive_link: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=400&q=80',
-      created_at: '2026-07-01T00:00:00.000Z',
-      updated_at: '2026-07-01T00:00:00.000Z'
-    },
-    {
-      id: 'mock-c-2',
-      client_id: '1',
-      title: '3 Growth Hacking Secrets for E-Commerce Brands',
-      content_type: 'reel',
-      status: 'approved',
-      scheduled_date: '2026-07-10',
-      notes: 'Quick hooks and transitions for TikTok and IG Reels.',
-      drive_link: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=80',
-      created_at: '2026-07-01T00:00:00.000Z',
-      updated_at: '2026-07-01T00:00:00.000Z'
-    },
-    {
-      id: 'mock-c-3',
-      client_id: '1',
-      title: 'Interactive Q&A Session - Join Us Live!',
-      content_type: 'story',
-      status: 'approved',
-      scheduled_date: '2026-07-15',
-      notes: 'Interactive stickers and QA box template.',
-      drive_link: '',
-      created_at: '2026-07-01T00:00:00.000Z',
-      updated_at: '2026-07-01T00:00:00.000Z'
-    },
-    {
-      id: 'mock-c-4',
-      client_id: '1',
-      title: 'Brand Aesthetics Showcase Design Portfolio',
-      content_type: 'photo',
-      status: 'published',
-      scheduled_date: '2026-07-20',
-      notes: 'Visual showcase of curated graphics and color palettes.',
-      drive_link: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=400&q=80',
-      created_at: '2026-07-01T00:00:00.000Z',
-      updated_at: '2026-07-01T00:00:00.000Z'
-    }
-  ];
-
-  const mockSchedule = {
-    posts: ['2026-07-06T00:00:00.000Z', '2026-07-20T00:00:00.000Z'],
-    reels: ['2026-07-10T00:00:00.000Z'],
-    stories: ['2026-07-15T00:00:00.000Z'],
-    photos: []
-  };
-
-  const clientToUse = client ? {
-    ...client,
-    deliverables_schedule: client.deliverables_schedule || JSON.stringify(mockSchedule)
-  } : {
-    id: 1,
-    name: 'Mock Brand',
-    deliverables_schedule: JSON.stringify(mockSchedule)
-  } as any;
+  const clientToUse = client || null;
 
   const plansToUse = useMemo(() => {
-    if (plans && plans.length > 0) return plans;
-    return mockPlans;
-  }, [plans]);
+    return [...(contents || []), ...(plans || [])];
+  }, [contents, plans]);
 
   const virtualSlots = useMemo(() => {
     const slots: any[] = [];
@@ -158,21 +93,21 @@ export default function ClientPortalCalendarPage() {
         if (!dateStr) return;
         
         const typeKey = typeKeyMap[tKey];
-        const targetDateStr = dateStr.substring(0, 10);
+        const targetDateStr = getCairoDateString(dateStr);
         
         const matchingContents = contents
           .filter(c => 
             c.scheduled_date && 
-            c.scheduled_date.substring(0, 10) === targetDateStr && 
-            c.content_type === typeKey
+            getCairoDateString(c.scheduled_date) === targetDateStr && 
+            (c.content_type || '').toLowerCase().includes(typeKey)
           )
           .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
 
         const matchingPlans = plansToUse
           .filter(p => 
             p.scheduled_date && 
-            p.scheduled_date.substring(0, 10) === targetDateStr && 
-            p.content_type === typeKey
+            getCairoDateString(p.scheduled_date) === targetDateStr && 
+            (p.content_type || '').toLowerCase().includes(typeKey)
           )
           .sort((a, b) => new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime());
 
@@ -182,7 +117,6 @@ export default function ClientPortalCalendarPage() {
             id: matchedContent.id,
             title: matchedContent.title || matchedContent.caption || `Slot • ${typeLabelMap[tKey]}`,
             content_type: typeKey,
-            status: matchedContent.status,
             scheduled_date: dateStr,
             isTargetSlot: true,
             isFilled: true,
@@ -194,7 +128,7 @@ export default function ClientPortalCalendarPage() {
             id: matchedPlan.id,
             title: matchedPlan.title,
             content_type: typeKey,
-            status: matchedPlan.status,
+            status: (matchedPlan as any).status,
             scheduled_date: dateStr,
             isTargetSlot: true,
             isFilled: true,
@@ -219,18 +153,14 @@ export default function ClientPortalCalendarPage() {
 
   const allCalendarItems = useMemo(() => {
     const filledPlanIds = virtualSlots
-      .filter(slot => slot.isFilled && slot.plan)
-      .map(slot => slot.plan.id);
-
-    const filledContentIds = virtualSlots
-      .filter(slot => slot.isFilled && slot.content)
-      .map(slot => slot.content.id);
+      .filter(slot => slot.isFilled && (slot.plan || slot.content))
+      .map(slot => slot.plan?.id || slot.content?.id);
 
     const unfilledPlans = plansToUse.filter(p => !filledPlanIds.includes(p.id));
-    const unfilledContents = contents.filter(c => !filledContentIds.includes(c.id));
+    const combined = [...unfilledPlans, ...virtualSlots];
 
-    return [...unfilledPlans, ...unfilledContents, ...virtualSlots];
-  }, [plansToUse, contents, virtualSlots]);
+    return Array.from(new Map(combined.map(item => [item.id, item])).values());
+  }, [plansToUse, virtualSlots]);
 
   const scheduledPlans = useMemo(() => {
     return allCalendarItems.filter(p => !!p.scheduled_date);
@@ -240,7 +170,7 @@ export default function ClientPortalCalendarPage() {
     const map = new Map<string, any[]>();
     scheduledPlans.forEach(plan => {
       if (plan.scheduled_date) {
-        const key = plan.scheduled_date.substring(0, 10);
+        const key = getCairoDateString(plan.scheduled_date);
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(plan);
       }
@@ -394,11 +324,11 @@ export default function ClientPortalCalendarPage() {
                 </div>
 
                 <div className="flex flex-col gap-1 overflow-hidden flex-1 pb-1">
-                  {displayPlans.map(plan => {
+                  {displayPlans.map((plan, pIdx) => {
                     const isUnfilledTarget = plan.status === 'target_outline';
                     return (
                       <div
-                        key={plan.id}
+                        key={`${plan.id}-${pIdx}`}
                         className={`text-[8px] font-extrabold px-1.5 py-0.5 border uppercase tracking-wider font-mono truncate flex items-center gap-1 rounded-md ${
                           isUnfilledTarget
                             ? 'bg-slate-50 border-dashed border-[#E2E8F0] text-slate-500'

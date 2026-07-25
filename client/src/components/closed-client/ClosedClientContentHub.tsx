@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { contentsApi } from '@/lib/api';
 import { ContentItem, Client } from '@/types';
+import { ContentTable } from '@/components/content-hub/ContentTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -37,7 +38,8 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Search,
-  BookOpen
+  BookOpen,
+  AlertCircle
 } from 'lucide-react';
 
 interface ClosedClientContentHubProps {
@@ -119,6 +121,8 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
   const { user } = useAuth();
   const { t, locale } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dialogContentRef = useRef<HTMLDivElement>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const canManage = user && ['owner', 'team_leader', 'account_manager', 'content_creator'].includes(user.role);
 
@@ -146,7 +150,6 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
     description: '',
     sound: '',
     drive_link: '',
-    status: 'draft' as 'draft' | 'published',
   });
 
   // Selected Media Upload State
@@ -201,7 +204,6 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
       description: '',
       sound: '',
       drive_link: '',
-      status: 'draft',
     });
     setSelectedFiles([]);
     setFilePreviews([]);
@@ -223,7 +225,6 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
       description: item.description || '',
       sound: item.sound || '',
       drive_link: item.drive_link || '',
-      status: item.status,
     });
     setSelectedFiles([]);
     setFilePreviews([]);
@@ -282,12 +283,13 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
       // Upload if any selected
       if (selectedFiles.length > 0) {
         setIsUploading(true);
+        setUploadProgress(0);
         const formPayload = new FormData();
         selectedFiles.forEach(file => {
           formPayload.append('files', file);
         });
 
-        const uploadRes = await contentsApi.upload(formPayload);
+        const uploadRes = await contentsApi.upload(formPayload, (pct) => setUploadProgress(pct));
         finalMediaUrls = [...finalMediaUrls, ...uploadRes.public_urls];
         setIsUploading(false);
       }
@@ -302,7 +304,6 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
         description: formData.description || undefined,
         sound: formData.sound || undefined,
         drive_link: formData.drive_link || undefined,
-        status: formData.status,
         media_urls: finalMediaUrls,
       };
 
@@ -339,7 +340,7 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
   });
 
   return (
-    <div className="flex flex-col gap-6 text-start fade-in pb-6">
+    <div className="flex flex-col gap-6 text-start fade-in pb-6 w-full max-w-full overflow-x-hidden">
       
       {/* Controls Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 border rounded-xl bg-card">
@@ -382,7 +383,6 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="instagram">Instagram</SelectItem>
               <SelectItem value="tiktok">TikTok</SelectItem>
-              <SelectItem value="snapchat">Snapchat</SelectItem>
             </SelectContent>
           </Select>
 
@@ -406,352 +406,304 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
           <p className="text-xs font-semibold">{t('contentHub.noContent') || 'No content pieces found.'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredContents.map(item => (
-            <div key={item.id} className="bg-card border border-slate-200 dark:border-slate-800/60 rounded-2xl shadow-xs overflow-hidden flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
-              
-              {/* Card Header */}
-              <div className="p-3 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/10">
-                <h3 className="font-bold text-xs text-slate-850 dark:text-slate-100 truncate max-w-[65%] text-start" title={item.title || ''}>
-                  {item.title || t('contentHub.untitled') || 'Untitled'}
-                </h3>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold shrink-0 flex items-center gap-1 bg-slate-150/80 dark:bg-slate-800/60 px-2 py-0.5 rounded-md">
-                  📅 {item.scheduled_date 
-                    ? formatCairoDateTime(item.scheduled_date, locale) 
-                    : (item.created_at ? new Date(item.created_at).toLocaleDateString(locale) : '')}
-                </span>
-              </div>
-
-              {/* Media Carousel */}
-              <MediaCarousel mediaUrls={item.media_urls} content_type={item.content_type} platform={item.platform} />
-
-              {/* Card Details */}
-              <div className="p-3 flex-1 flex flex-col gap-2.5">
-                {item.caption && (
-                  <p className="text-[11px] text-slate-650 dark:text-slate-400 leading-relaxed text-start line-clamp-3">
-                    {item.caption}
-                  </p>
-                )}
-
-                {item.description && (
-                  <div className="border-l-2 border-slate-350 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/10 py-1.5 px-2.5 rounded-r-lg text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed text-start italic">
-                    {item.description}
-                  </div>
-                )}
-
-                {/* Attachments & Actions */}
-                <div className="mt-auto pt-2 flex flex-col gap-2 border-t border-slate-100 dark:border-slate-800/60">
-                  {/* Tags */}
-                  {(item.sound || item.drive_link) && (
-                    <div className="flex flex-wrap gap-1.5 pb-1">
-                      {item.sound && (
-                        <div className="flex items-center gap-1 bg-slate-105 border border-slate-200/40 text-slate-600 dark:bg-slate-850 dark:border-slate-700/60 dark:text-slate-350 rounded-md py-0.5 px-2 text-[9px] font-bold">
-                          <Music className="size-2.5 shrink-0 text-slate-500" />
-                          <span className="truncate max-w-[120px]">{item.sound}</span>
-                        </div>
-                      )}
-                      {item.drive_link && (
-                        <a
-                          href={item.drive_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 bg-slate-105 border border-slate-200/40 text-slate-600 dark:bg-slate-850 dark:border-slate-700/60 dark:text-slate-350 rounded-md py-0.5 px-2 text-[9px] font-bold hover:bg-slate-200 transition-colors"
-                        >
-                          <ExternalLink className="size-2.5 shrink-0 text-slate-500" />
-                          <span>{t('contentHub.openDrive')}</span>
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Footer Row */}
-                  <div className="flex items-center justify-between gap-3 pt-1">
-                    <span className={cn(
-                      "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0",
-                      item.status === 'published'
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
-                    )}>
-                      {item.status === 'published' ? (locale === 'ar' ? 'تم النشر' : 'Published') : (locale === 'ar' ? 'مسودة' : 'Draft')}
-                    </span>
-
-                    {/* Actions */}
-                    {canManage && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEdit(item)}
-                          className="size-7 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="size-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-md transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          ))}
-        </div>
+        <ContentTable
+          items={filteredContents}
+          onEdit={handleOpenEdit}
+          onDelete={handleDeleteItem}
+          showClientColumn={false}
+          canManage={!!canManage}
+        />
       )}
 
       {/* CREATE / EDIT MODAL */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl text-start max-h-[90vh] overflow-y-auto">
+        <DialogContent ref={dialogContentRef} className="sm:max-w-2xl text-start max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">
-              {editingItem ? (locale === 'ar' ? 'تعديل قطعة المحتوى' : 'Edit Content Piece') : (locale === 'ar' ? 'إضافة قطعة محتوى جديدة' : 'Add Content Piece')}
+              {editingItem ? (t('contentHub.edit') || (locale === 'ar' ? 'تعديل قطعة المحتوى' : 'Edit Content Piece')) : (t('contentHub.create') || (locale === 'ar' ? 'إضافة قطعة محتوى جديدة' : 'Add Content Piece'))}
             </DialogTitle>
+            <DialogDescription className="text-xs">
+              {locale === 'ar' ? 'قم برفع الصور/الفيديوهات، وتحديد نوع المحتوى والمنشورات، وكتابة التعليق وإدارة النشر.' : 'Upload photos/videos, select content types/platforms, write captions/descriptions, and manage publishing states.'}
+            </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 mt-2">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
-              <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md font-semibold">
-                {formError}
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{formError}</span>
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="title" className="text-xs font-semibold">{locale === 'ar' ? 'العنوان' : 'Title'}</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder={locale === 'ar' ? 'أدخل عنوان المحتوى...' : 'e.g. Summer Promo Post'}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              {/* Title */}
+              <div className="flex flex-col gap-1.5 col-span-2">
+                <Label htmlFor="title" className="text-xs font-semibold">{t('contentHub.fields.title') || (locale === 'ar' ? 'العنوان' : 'Title')}</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder={t('contentHub.fields.titlePlaceholder') || (locale === 'ar' ? 'أدخل عنوان المحتوى...' : 'e.g. Summer Promo Post')}
+                  className="text-xs h-9"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Content Type */}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="content_type" className="text-xs font-semibold">{locale === 'ar' ? 'نوع المحتوى' : 'Content Type'}</Label>
+                <Label htmlFor="content_type" className="text-xs font-semibold">{t('contentHub.fields.contentType') || (locale === 'ar' ? 'نوع المحتوى' : 'Content Type')}</Label>
                 <Select
                   value={formData.content_type}
-                  onValueChange={(val) => setFormData({ ...formData, content_type: (val || 'post') as any })}
+                  onValueChange={(val) => setFormData(prev => ({ ...prev, content_type: (val || 'post') as any }))}
                 >
-                  <SelectTrigger id="content_type">
+                  <SelectTrigger id="content_type" className="text-xs h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="post">Post</SelectItem>
+                    <SelectItem value="photo">Photo</SelectItem>
                     <SelectItem value="reel">Reel</SelectItem>
                     <SelectItem value="story">Story</SelectItem>
-                    <SelectItem value="photo">Photo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="platform" className="text-xs font-semibold">{locale === 'ar' ? 'المنصة' : 'Platform'}</Label>
-                <Select
-                  value={formData.platform || 'facebook'}
-                  onValueChange={(val) => setFormData({ ...formData, platform: val || '' })}
-                >
-                  <SelectTrigger id="platform">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="facebook">Facebook</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
-                    <SelectItem value="snapchat">Snapchat</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Platform Selector */}
+              <div className="flex flex-col gap-1.5 col-span-2 sm:col-span-1">
+                <Label className="text-xs font-semibold">{t('contentHub.fields.platform') || (locale === 'ar' ? 'المنصة' : 'Platform')}</Label>
+                <div className="flex flex-wrap gap-1.5 p-1.5 bg-background border border-input rounded-lg min-h-[36px] items-center">
+                  {[
+                    { id: 'tiktok', label: t('contentHub.platform.tiktok') || 'TikTok' },
+                    { id: 'instagram', label: t('contentHub.platform.instagram') || 'Instagram' },
+                    { id: 'facebook', label: t('contentHub.platform.facebook') || 'Facebook' },
+                  ].map((p) => {
+                    const currentSelected = (formData.platform || '')
+                      .split(',')
+                      .map(s => s.trim())
+                      .filter(Boolean);
+                    const isSelected = currentSelected.includes(p.id);
+
+                    const toggle = () => {
+                      let nextList: string[];
+                      if (isSelected) {
+                        nextList = currentSelected.filter(id => id !== p.id);
+                      } else {
+                        nextList = [...currentSelected, p.id];
+                      }
+                      setFormData(prev => ({ ...prev, platform: nextList.join(',') }));
+                    };
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={toggle}
+                        className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer select-none",
+                          isSelected
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-2xs"
+                            : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
             {/* Scheduled Publish Date */}
             <div className="flex flex-col gap-1.5 text-start w-full">
-              <Label className="text-xs font-semibold">{locale === 'ar' ? 'تاريخ النشر المجدول' : 'Scheduled Date & Time'}</Label>
-              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                <PopoverTrigger
-                  className={cn(
-                    "flex items-center w-full text-xs h-9 justify-start text-left font-normal bg-background hover:bg-muted/50 border border-input rounded-lg px-3 shadow-2xs cursor-pointer select-none gap-2",
-                    !formData.scheduled_date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="size-4 text-slate-400 shrink-0" />
-                  {formData.scheduled_date ? (
-                    formatCairoDateTime(formData.scheduled_date, locale)
-                  ) : (
-                    <span>{locale === 'ar' ? 'اختر التاريخ والوقت (توقيت القاهرة)...' : 'Pick publish date & time (Cairo time)...'}</span>
-                  )}
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[200]" align="start">
-                  <div className="flex flex-col">
-                    <Calendar
-                      mode="single"
-                      selected={parsedDateTime.date}
-                      onSelect={(day) => {
-                        const updated = buildCairoDateTime(day, parsedDateTime.hour, parsedDateTime.minute, parsedDateTime.ampm);
-                        setTempScheduledDate(updated);
-                      }}
-                      locale={locale === 'ar' ? arLocale : undefined}
-                      className="rounded-t-xl"
-                    />
+              <Label className="text-xs font-semibold">{t('contentHub.fields.scheduledDate') || (locale === 'ar' ? 'تاريخ النشر المجدول' : 'Scheduled Date & Time')}</Label>
+              <button
+                type="button"
+                onClick={() => setIsDatePickerOpen(prev => !prev)}
+                className={cn(
+                  "flex items-center w-full text-xs h-9 justify-start text-left font-normal bg-background hover:bg-muted/50 border border-input rounded-lg px-3 shadow-2xs cursor-pointer select-none gap-2 transition-all",
+                  !formData.scheduled_date && "text-muted-foreground",
+                  isDatePickerOpen && "ring-2 ring-indigo-500/20 border-indigo-500"
+                )}
+              >
+                <CalendarIcon className="size-4 text-indigo-600 shrink-0" />
+                <span className="font-semibold text-foreground">
+                  {formData.scheduled_date ? formatCairoDateTime(formData.scheduled_date, locale) : (locale === 'ar' ? 'اختر التاريخ والوقت...' : 'Select date and time...')}
+                </span>
+                {formData.scheduled_date && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFormData(prev => ({ ...prev, scheduled_date: '' }));
+                    }}
+                    className="ml-auto text-[10px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded hover:bg-destructive/10 font-bold"
+                  >
+                    {locale === 'ar' ? 'مسح' : 'Clear'}
+                  </span>
+                )}
+              </button>
+
+              {isDatePickerOpen && (
+                <div className="mt-2 w-full max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in-50 duration-150">
+                  {/* Calendar Day Picker */}
+                  <Calendar
+                    mode="single"
+                    selected={parsedDateTime.date}
+                    onSelect={(newDate) => {
+                      const updated = buildCairoDateTime(newDate, parsedDateTime.hour, parsedDateTime.minute, parsedDateTime.ampm);
+                      setTempScheduledDate(updated);
+                    }}
+                    className="rounded-t-xl w-full"
+                    classNames={{
+                      root: "w-full p-3 flex flex-col items-center",
+                      months: "w-full",
+                      month: "w-full flex flex-col gap-4",
+                    }}
+                    locale={locale === 'ar' ? arLocale : undefined}
+                  />
+                  
+                  {/* Time Picker Controls */}
+                  <div className="p-3 border-t bg-slate-50/50 dark:bg-slate-850 flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                      {locale === 'ar' ? 'الوقت (القاهرة)' : 'Cairo Time'}
+                    </span>
                     
-                    {/* Time Pickers */}
-                    <div className="p-3 border-t flex items-center justify-between gap-4 bg-slate-50/50">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">{locale === 'ar' ? 'الوقت' : 'Cairo Time'}</span>
-                      <div className="flex items-center gap-1.5">
-                        {/* Hour */}
-                        <Select
-                          value={parsedDateTime.hour}
-                          onValueChange={(h) => {
-                            const updated = buildCairoDateTime(parsedDateTime.date, h || '12', parsedDateTime.minute, parsedDateTime.ampm);
+                    <div className="flex items-center gap-1.5">
+                      {/* Hour */}
+                      <Select
+                        value={parsedDateTime.hour}
+                        onValueChange={(h) => {
+                          const updated = buildCairoDateTime(parsedDateTime.date, h || '12', parsedDateTime.minute, parsedDateTime.ampm);
+                          setTempScheduledDate(updated);
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8 w-14 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48 z-[210]">
+                          {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => (
+                            <SelectItem key={h} value={h}>{h.padStart(2, '0')}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <span className="text-slate-400 font-bold">:</span>
+
+                      {/* Minute */}
+                      <Select
+                        value={parsedDateTime.minute}
+                        onValueChange={(m) => {
+                          const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, m || '00', parsedDateTime.ampm);
+                          setTempScheduledDate(updated);
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8 w-14 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48 z-[210]">
+                          {Array.from({ length: 60 }, (_, i) => String(i)).map(m => (
+                            <SelectItem key={m} value={m.padStart(2, '0')}>{m.padStart(2, '0')}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* AM/PM toggle buttons */}
+                      <div className="flex items-center border rounded-lg bg-background overflow-hidden p-0.5 h-8 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'AM');
                             setTempScheduledDate(updated);
                           }}
+                          className={cn(
+                            "text-[10px] font-bold h-full px-2.5 rounded-md transition-colors cursor-pointer",
+                            parsedDateTime.ampm === 'AM'
+                              ? "bg-indigo-600 text-white"
+                              : "text-slate-600 hover:bg-slate-100"
+                          )}
                         >
-                          <SelectTrigger className="text-xs h-8 w-14 bg-background">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48 z-[210]">
-                            {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(h => (
-                              <SelectItem key={h} value={h}>{h.padStart(2, '0')}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <span className="text-slate-400 font-bold">:</span>
-
-                        {/* Minute */}
-                        <Select
-                          value={parsedDateTime.minute}
-                          onValueChange={(m) => {
-                            const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, m || '00', parsedDateTime.ampm);
+                          AM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'PM');
                             setTempScheduledDate(updated);
                           }}
+                          className={cn(
+                            "text-[10px] font-bold h-full px-2.5 rounded-md transition-colors cursor-pointer",
+                            parsedDateTime.ampm === 'PM'
+                              ? "bg-indigo-600 text-white"
+                              : "text-slate-600 hover:bg-slate-100"
+                          )}
                         >
-                          <SelectTrigger className="text-xs h-8 w-14 bg-background">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48 z-[210]">
-                            {Array.from({ length: 60 }, (_, i) => String(i)).map(m => (
-                              <SelectItem key={m} value={m.padStart(2, '0')}>{m.padStart(2, '0')}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        {/* AM/PM toggle */}
-                        <div className="flex items-center border rounded-lg bg-background overflow-hidden p-0.5 h-8 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'AM');
-                              setTempScheduledDate(updated);
-                            }}
-                            className={cn(
-                              "text-[10px] font-bold h-full px-2 rounded-md cursor-pointer transition-colors",
-                              parsedDateTime.ampm === 'AM'
-                                ? "bg-indigo-600 text-white"
-                                : "text-slate-650 hover:bg-slate-100"
-                            )}
-                          >
-                            AM
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = buildCairoDateTime(parsedDateTime.date, parsedDateTime.hour, parsedDateTime.minute, 'PM');
-                              setTempScheduledDate(updated);
-                            }}
-                            className={cn(
-                              "text-[10px] font-bold h-full px-2 rounded-md cursor-pointer transition-colors",
-                              parsedDateTime.ampm === 'PM'
-                                ? "bg-indigo-600 text-white"
-                                : "text-slate-650 hover:bg-slate-100"
-                            )}
-                          >
-                            PM
-                          </button>
-                        </div>
+                          PM
+                        </button>
                       </div>
                     </div>
-
-                    {/* OK / Cancel actions */}
-                    <div className="p-2 border-t bg-slate-50 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsDatePickerOpen(false)}
-                        className="px-3 h-7 text-[10px] font-bold text-slate-650 hover:bg-slate-200 border rounded-md cursor-pointer"
-                      >
-                        {locale === 'ar' ? 'إلغاء' : 'Cancel'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, scheduled_date: tempScheduledDate }));
-                          setIsDatePickerOpen(false);
-                        }}
-                        className="px-3.5 h-7 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md cursor-pointer"
-                      >
-                        {locale === 'ar' ? 'موافق' : 'OK'}
-                      </button>
-                    </div>
-
                   </div>
-                </PopoverContent>
-              </Popover>
+
+                  {/* OK / Cancel Action Footer */}
+                  <div className="p-2 border-t bg-slate-50/80 dark:bg-slate-900 rounded-b-xl flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsDatePickerOpen(false)}
+                      className="px-3 h-7 text-[10px] font-bold text-slate-600 hover:bg-slate-200 border rounded-md cursor-pointer transition-colors"
+                    >
+                      {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, scheduled_date: tempScheduledDate || buildCairoDateTime(parsedDateTime.date || new Date(), parsedDateTime.hour, parsedDateTime.minute, parsedDateTime.ampm) }));
+                        setIsDatePickerOpen(false);
+                      }}
+                      className="px-3.5 h-7 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-md cursor-pointer transition-colors shadow-2xs"
+                    >
+                      {locale === 'ar' ? 'تأكيد التاريخ والوقت' : 'Confirm Date & Time'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Caption */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="caption" className="text-xs font-semibold">{locale === 'ar' ? 'التعليق (Caption)' : 'Caption'}</Label>
+              <Label htmlFor="caption" className="text-xs font-semibold">{t('contentHub.fields.caption') || (locale === 'ar' ? 'التعليق' : 'Caption')}</Label>
               <Textarea
                 id="caption"
-                rows={3}
                 value={formData.caption}
-                onChange={(e) => setFormData({ ...formData, caption: e.target.value })}
-                placeholder={locale === 'ar' ? 'أدخل تعليق المنشور هنا...' : 'Write post caption...'}
+                onChange={(e) => setFormData(prev => ({ ...prev, caption: e.target.value }))}
+                placeholder={t('contentHub.fields.captionPlaceholder') || (locale === 'ar' ? 'أدخل تعليق المنشور...' : 'Write post caption...')}
+                className="text-xs min-h-[80px]"
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="description" className="text-xs font-semibold">{locale === 'ar' ? 'ملاحظات فريق العمل' : 'Internal Staff Notes'}</Label>
-              <Textarea
-                id="description"
-                rows={2}
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder={locale === 'ar' ? 'ملاحظات وتوجيهات للمصمم أو كاتب المحتوى...' : 'Notes for design directions, content concepts...'}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sound */}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="sound" className="text-xs font-semibold">{locale === 'ar' ? 'الصوت المقترح' : 'Suggested Sound/Audio'}</Label>
+                <Label htmlFor="sound" className="text-xs font-semibold">{t('contentHub.fields.sound') || (locale === 'ar' ? 'الصوت' : 'Sound')}</Label>
                 <Input
                   id="sound"
                   value={formData.sound}
-                  onChange={(e) => setFormData({ ...formData, sound: e.target.value })}
-                  placeholder="e.g. Trending audio link/name"
+                  onChange={(e) => setFormData(prev => ({ ...prev, sound: e.target.value }))}
+                  placeholder={t('contentHub.fields.soundPlaceholder') || 'e.g. Trending audio link/name'}
+                  className="text-xs h-9"
                 />
               </div>
 
+              {/* Drive Link */}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="drive_link" className="text-xs font-semibold">{locale === 'ar' ? 'رابط جوجل درايف' : 'Google Drive Link'}</Label>
+                <Label htmlFor="driveLink" className="text-xs font-semibold">{t('contentHub.fields.driveLink') || (locale === 'ar' ? 'رابط جوجل درايف' : 'Drive Link')}</Label>
                 <Input
-                  id="drive_link"
-                  type="url"
+                  id="driveLink"
                   value={formData.drive_link}
-                  onChange={(e) => setFormData({ ...formData, drive_link: e.target.value })}
-                  placeholder="https://drive.google.com/..."
+                  onChange={(e) => setFormData(prev => ({ ...prev, drive_link: e.target.value }))}
+                  placeholder={t('contentHub.fields.driveLinkPlaceholder') || 'https://drive.google.com/...'}
+                  className="text-xs h-9"
                 />
               </div>
             </div>
-
-
 
             {/* Hidden file input */}
             <input
@@ -763,29 +715,63 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
               onChange={handleFileChange}
             />
 
-            {/* Media Upload Block */}
+            {/* Media Upload Box */}
             <div className="flex flex-col gap-2">
-              <Label className="text-xs font-semibold">{locale === 'ar' ? 'ملفات الوسائط' : 'Media Files'}</Label>
+              <Label className="text-xs font-semibold">{t('contentHub.mediaFiles') || (locale === 'ar' ? 'ملفات الوسائط' : 'Media Files')}</Label>
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed rounded-xl p-5 text-center cursor-pointer hover:bg-muted/10 transition-colors flex flex-col items-center justify-center gap-1.5"
+                className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:bg-muted/10 transition-colors flex flex-col items-center justify-center gap-2"
               >
-                <Upload className="size-5 text-slate-400" />
-                <span className="text-xs font-bold text-slate-700">{locale === 'ar' ? 'اضغط أو اسحب الملفات هنا لتحميلها' : 'Click or drag files here to upload'}</span>
-                <span className="text-[9px] text-muted-foreground">{locale === 'ar' ? 'الحد الأقصى لحجم الفيديو: 50 ميغابايت' : 'Images or videos (Max 50MB per video)'}</span>
+                <Upload className="size-6 text-slate-400" />
+                <span className="text-xs font-bold text-slate-700">{t('contentHub.upload.dragDrop') || (locale === 'ar' ? 'اضغط أو اسحب الملفات هنا لتحميلها' : 'Click or drag files here to upload')}</span>
               </div>
+
+              {/* Upload Progress Bar */}
+              {isUploading && (
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 rounded-xl space-y-2 text-start">
+                  <div className="flex items-center justify-between text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="size-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
+                      {uploadProgress < 100 ? (locale === 'ar' ? 'جاري رفع ملفات الفيديوهات والوسائط...' : 'Uploading video & media files...') : (locale === 'ar' ? 'جاري المعالجة والإكمال...' : 'Processing & finalizing...')}
+                    </span>
+                    <span className="font-mono text-indigo-600 dark:text-indigo-300">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-indigo-200/60 dark:bg-indigo-900/60 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-600 dark:bg-indigo-400 h-full transition-all duration-200 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Upload Previews */}
               {(uploadedUrls.length > 0 || filePreviews.length > 0) && (
-                <div className="grid grid-cols-4 gap-3 mt-2 max-h-[140px] overflow-y-auto p-2 bg-muted/20 border rounded-lg">
+                <div className="grid grid-cols-4 gap-3 mt-2 max-h-[160px] overflow-y-auto p-1 bg-muted/20 border rounded-lg">
+                  {/* Existing media links */}
                   {uploadedUrls.map((url, i) => {
-                    const isVideo = url.toLowerCase().endsWith('.mp4');
+                    const cleanUrl = url.split('?')[0].toLowerCase();
+                    const isVideo =
+                      cleanUrl.endsWith('.mp4') ||
+                      cleanUrl.endsWith('.webm') ||
+                      cleanUrl.endsWith('.mov') ||
+                      cleanUrl.endsWith('.m4v') ||
+                      cleanUrl.endsWith('.mkv') ||
+                      cleanUrl.endsWith('.avi') ||
+                      cleanUrl.includes('/video/') ||
+                      cleanUrl.includes('video');
                     return (
                       <div key={`existing-${i}`} className="relative group border rounded-md overflow-hidden bg-card aspect-video flex items-center justify-center">
                         {isVideo ? (
                           <div className="size-full bg-slate-900 flex items-center justify-center text-white relative">
-                            <video src={url} className="size-full object-cover opacity-80" />
-                            <Film className="absolute size-4 text-white" />
+                            <video
+                              src={url.includes('#t=') ? url : `${url}#t=0.001`}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="size-full object-cover opacity-90"
+                            />
+                            <Film className="absolute size-4 text-white drop-shadow-md" />
                           </div>
                         ) : (
                           <img src={url} className="size-full object-cover" alt="" />
@@ -793,7 +779,7 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
                         <button
                           type="button"
                           onClick={() => handleRemoveFile(i, true)}
-                          className="absolute top-1 right-1 size-5 bg-destructive rounded-full flex items-center justify-center text-white hover:bg-destructive/90"
+                          className="absolute top-1 right-1 size-5 bg-destructive rounded-full flex items-center justify-center text-white hover:bg-destructive/90 transition-opacity"
                         >
                           <X className="size-3" />
                         </button>
@@ -801,14 +787,21 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
                     );
                   })}
 
+                  {/* Pending file uploads */}
                   {filePreviews.map((preview, i) => {
-                    const isVideo = preview.type.startsWith('video/');
+                    const isVideo = preview.type.startsWith('video/') || preview.url.includes('video');
                     return (
                       <div key={`preview-${i}`} className="relative group border rounded-md overflow-hidden bg-card aspect-video flex items-center justify-center">
                         {isVideo ? (
                           <div className="size-full bg-slate-900 flex items-center justify-center text-white relative">
-                            <video src={preview.url} className="size-full object-cover opacity-80" />
-                            <Film className="absolute size-4 text-white" />
+                            <video
+                              src={preview.url}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              className="size-full object-cover opacity-90"
+                            />
+                            <Film className="absolute size-4 text-white drop-shadow-md" />
                           </div>
                         ) : (
                           <img src={preview.url} className="size-full object-cover" alt="" />
@@ -816,7 +809,7 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
                         <button
                           type="button"
                           onClick={() => handleRemoveFile(i, false)}
-                          className="absolute top-1 right-1 size-5 bg-destructive rounded-full flex items-center justify-center text-white hover:bg-destructive/90"
+                          className="absolute top-1 right-1 size-5 bg-destructive rounded-full flex items-center justify-center text-white hover:bg-destructive/90 transition-opacity"
                         >
                           <X className="size-3" />
                         </button>
@@ -827,7 +820,7 @@ export default function ClosedClientContentHub({ clientId, client }: ClosedClien
               )}
             </div>
 
-            <DialogFooter className="mt-4 pt-4 border-t gap-2 flex flex-row justify-end">
+            <DialogFooter className="pt-4 border-t gap-2 flex flex-row justify-end">
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSaving}>
                 {locale === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>

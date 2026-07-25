@@ -713,20 +713,15 @@ export default function CalendarPage() {
 
                     {/* Contents */}
                     {displayContents.map(item => {
-                      const published = item.status === 'published';
                       const platformLabel = item.platform ? ` (${item.platform.toUpperCase()})` : '';
                       return (
                         <div
                           key={`content-${item.id}`}
-                          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border ${
-                            published
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-700 dark:text-emerald-400'
-                              : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300'
-                          }`}
+                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded truncate flex items-center gap-0.5 border bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-300"
                           title={`Content: ${item.title || 'Untitled'}${platformLabel}`}
                         >
                           <span className="shrink-0">✨</span>
-                          <span className={published ? 'line-through opacity-70' : ''}>
+                          <span>
                             {item.title || 'Untitled Content'}
                           </span>
                         </div>
@@ -905,25 +900,19 @@ export default function CalendarPage() {
 
                     {/* 4. Contents */}
                     {dayEvents.contents?.map(item => {
-                      const published = item.status === 'published';
                       return (
                         <div
                           key={`content-${item.id}`}
-                          className={`p-3 border rounded-lg flex items-center justify-between text-xs transition-all cursor-pointer ${
-                            published ? 'bg-emerald-50/50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/40' : 'bg-amber-50/30 border-amber-200 text-amber-800 hover:bg-amber-100/40'
-                          }`}
+                          className="p-3 border rounded-lg flex items-center justify-between text-xs transition-all cursor-pointer bg-indigo-50/40 border-indigo-200 text-indigo-900 hover:bg-indigo-100/40"
                           onClick={() => handleDayClick(cell.date)}
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-base shrink-0">✨</span>
                             <div>
-                              <span className={`font-bold block ${published ? 'line-through opacity-70' : ''}`}>Content: {item.title || 'Untitled'}</span>
+                              <span className="font-bold block">Content: {item.title || 'Untitled'}</span>
                               <span className="text-[10px] text-muted-foreground block text-capitalize">{item.platform ? `${item.platform.toUpperCase()} - ${item.content_type}` : item.content_type}</span>
                             </div>
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {published ? 'Published' : 'Draft'}
-                          </span>
                         </div>
                       );
                     })}
@@ -1136,17 +1125,11 @@ export default function CalendarPage() {
                 </h3>
                 <div className="flex flex-col gap-2">
                   {selectedDayEvents.contents.map(item => {
-                    const published = item.status === 'published';
                     return (
-                      <div key={item.id} className={`p-3 rounded-lg border bg-card flex items-start justify-between gap-3 ${
-                        published ? 'border-l-4 border-l-emerald-500' : ''
-                      }`}>
+                      <div key={item.id} className="p-3 rounded-lg border bg-card flex items-start justify-between gap-3 border-l-4 border-l-indigo-500">
                         <div className="flex-1 overflow-hidden text-start">
                           <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             <h4 className="font-bold text-xs truncate max-w-[200px]">{item.title || 'Untitled Content'}</h4>
-                            <Badge className={published ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}>
-                              {published ? t('contentHub.status.published') : t('contentHub.status.draft')}
-                            </Badge>
                             {item.platform && (
                               <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 font-semibold uppercase">
                                 {item.platform}

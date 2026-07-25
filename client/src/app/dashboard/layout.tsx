@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!user) {
         router.replace('/login');
       } else if (user.role === 'client') {
-        router.replace('/client-portal');
+        router.replace('/client');
       }
     }
   }, [user, loading, router]);

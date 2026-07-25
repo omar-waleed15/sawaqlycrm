@@ -1077,7 +1077,7 @@ export const ar: Record<string, string> = {
   'portal.marketingAgency': 'وكالة تسويق',
   'portal.overviewDesc': 'أداء العلامة التجارية وتحليلات التسليمات',
   'portal.deliverables': 'التسليمات',
-  'portal.accountHealth': 'حالة الحساب',
+  'portal.accountHealth': 'تقدم الخطة',
   'portal.views': 'المشاهدات',
   'portal.engagement': 'التفاعل',
   'portal.messages': 'الرسائل',
@@ -1191,5 +1191,17 @@ export const ar: Record<string, string> = {
   'contentHub.openDrive': 'فتح درايف',
   'contentHub.mediaFiles': 'ملفات الميديا المرفقة',
   'contentHub.untitled': 'محتوى بدون عنوان',
+  'contentHub.table.media': 'الميديا',
+  'contentHub.table.title': 'المحتوى والنوع',
+  'contentHub.table.client': 'العميل',
+  'contentHub.table.platform': 'المنصة',
+  'contentHub.table.scheduled': 'تاريخ الجدولة',
+  'contentHub.table.caption': 'النص والملاحظات',
+  'contentHub.table.links': 'الروابط والصوت',
+  'contentHub.table.status': 'الحالة',
+  'contentHub.table.actions': 'إجراءات',
+  'contentHub.viewMedia': 'عرض الميديا',
+  'contentHub.noMedia': 'بدون ميديا',
 };
+
 

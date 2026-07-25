@@ -336,62 +336,7 @@ export default function CreateTaskPage() {
                 </Select>
               </div>
 
-              {/* Monthly Deliverables Config */}
-              {form.client_id && (
-                <div className="border border-[#1D61E7]/15 bg-[#1D61E7]/5 rounded-lg p-4 flex flex-col gap-4">
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="is_deliverable"
-                      name="is_deliverable"
-                      type="checkbox"
-                      checked={form.is_deliverable}
-                      onChange={e => setForm(prev => ({ ...prev, is_deliverable: e.target.checked }))}
-                      className="size-4 rounded border-gray-300 text-[#1D61E7] focus:ring-[#1D61E7]"
-                    />
-                    <div className="text-start">
-                      <Label htmlFor="is_deliverable" className="font-bold text-sm cursor-pointer">
-                        🎯 {t('tasks.isDeliverable')}
-                      </Label>
-                      <p className="text-[11px] text-muted-foreground leading-tight">
-                        {t('tasks.isDeliverableDesc')}
-                      </p>
-                    </div>
-                  </div>
 
-                  {form.is_deliverable && (
-                    <div className="grid grid-cols-2 gap-4 pt-1">
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="deliverable_type">{t('tasks.deliverableType')}</Label>
-                        <Select
-                          value={form.deliverable_type}
-                          onValueChange={v => handleSelectChange('deliverable_type', v || 'post')}
-                        >
-                          <SelectTrigger id="deliverable_type">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="post">📝 {t('closedClients.plan.post')}</SelectItem>
-                            <SelectItem value="reel">🎬 {t('closedClients.plan.reel')}</SelectItem>
-                            <SelectItem value="story">📸 {t('closedClients.plan.story')}</SelectItem>
-                            <SelectItem value="photo">🖼️ {t('closedClients.plan.photo')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="deliverable_month">{t('tasks.deliverableMonth')}</Label>
-                        <Input
-                          id="deliverable_month"
-                          name="deliverable_month"
-                          type="month"
-                          value={form.deliverable_month}
-                          onChange={handleChange}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Multi-Assignee Picker */}
               <div className="border-t border-border pt-4">

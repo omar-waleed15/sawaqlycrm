@@ -509,7 +509,6 @@ export interface ContentItem {
   content_type: 'post' | 'photo' | 'reel' | 'story';
   sound?: string;
   drive_link?: string;
-  status: 'draft' | 'published';
   media_urls?: string[];
   platform?: string;
   scheduled_date?: string;

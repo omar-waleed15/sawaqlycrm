@@ -84,20 +84,27 @@ router.get('/portal/data', authMiddleware, async (req: AuthRequest, res: Respons
       .eq('client_id', client.id)
       .order('sort_order', { ascending: true });
 
-    // 3. Fetch approved or published content plans (only basic fields, exclude drafts)
+    // 3. Fetch content plans
     const { data: contentPlans, error: plansErr } = await supabaseAdmin
       .from('client_content_plans')
-      .select('id, title, content_type, status, scheduled_date, drive_link')
+      .select('*')
       .eq('client_id', client.id)
-      .in('status', ['approved', 'published'])
-      .order('scheduled_date', { ascending: true });
+      .order('created_at', { ascending: false });
 
-    // Fetch new content items
+    if (plansErr) {
+      console.error('Error fetching client_content_plans:', plansErr);
+    }
+
+    // 4. Fetch content items from contents table
     const { data: contents, error: contentsErr } = await supabaseAdmin
       .from('contents')
-      .select('id, title, content_type, status, scheduled_date, drive_link, platform, media_urls, caption, sound, created_at, updated_at')
+      .select('*')
       .eq('client_id', client.id)
-      .order('scheduled_date', { ascending: true });
+      .order('created_at', { ascending: false });
+
+    if (contentsErr) {
+      console.error('Error fetching contents:', contentsErr);
+    }
 
     // 4. Fetch performance reports (Views, Engagement, etc.)
     const { data: reports, error: reportsErr } = await supabaseAdmin

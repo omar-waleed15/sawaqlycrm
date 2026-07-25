@@ -46,7 +46,7 @@ router.get('/', authMiddleware, dashboardUserOnly, async (req: AuthRequest, res:
 
 // POST /api/contents — Create a new content item
 router.post('/', authMiddleware, dashboardUserOnly, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { client_id, title, caption, description, content_type, sound, drive_link, status, media_urls, platform, scheduled_date } = req.body;
+  const { client_id, title, caption, description, content_type, sound, drive_link, media_urls, platform, scheduled_date } = req.body;
 
   if (!content_type) {
     res.status(400).json({ error: 'Content type is required' });
@@ -64,7 +64,6 @@ router.post('/', authMiddleware, dashboardUserOnly, async (req: AuthRequest, res
         content_type,
         sound: sound || null,
         drive_link: drive_link || null,
-        status: status || 'draft',
         media_urls: media_urls || [],
         platform: platform || null,
         scheduled_date: scheduled_date || null,
@@ -86,7 +85,7 @@ router.post('/', authMiddleware, dashboardUserOnly, async (req: AuthRequest, res
 // PUT /api/contents/:id — Update a content item
 router.put('/:id', authMiddleware, dashboardUserOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { client_id, title, caption, description, content_type, sound, drive_link, status, media_urls, platform, scheduled_date } = req.body;
+  const { client_id, title, caption, description, content_type, sound, drive_link, media_urls, platform, scheduled_date } = req.body;
 
   try {
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -97,7 +96,6 @@ router.put('/:id', authMiddleware, dashboardUserOnly, async (req: AuthRequest, r
     if (content_type !== undefined) updates.content_type = content_type;
     if (sound !== undefined) updates.sound = sound || null;
     if (drive_link !== undefined) updates.drive_link = drive_link || null;
-    if (status !== undefined) updates.status = status;
     if (media_urls !== undefined) updates.media_urls = media_urls;
     if (platform !== undefined) updates.platform = platform || null;
     if (scheduled_date !== undefined) updates.scheduled_date = scheduled_date || null;
@@ -153,12 +151,13 @@ router.post('/upload', authMiddleware, dashboardUserOnly, upload.array('files', 
     const publicUrls: string[] = [];
 
     for (const file of files) {
-      const storagePath = `contents/${Date.now()}_${file.originalname}`;
+      const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `contents/${Date.now()}_${sanitizedName}`;
 
       const { error: uploadError } = await supabaseAdmin.storage
         .from('attachments')
         .upload(storagePath, file.buffer, {
-          contentType: file.mimetype,
+          contentType: file.mimetype || 'application/octet-stream',
           upsert: false,
         });
 
