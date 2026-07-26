@@ -9,7 +9,8 @@ const SALARY_SELECT = `
   *,
   user:profiles!salaries_user_id_fkey(id, name, email, role, avatar_url),
   installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at),
-  penalties:salary_penalties(id, salary_id, amount, notes, created_at)
+  penalties:salary_penalties(id, salary_id, amount, notes, created_at),
+  advances:salary_advances(id, salary_id, amount, notes, date, created_at)
 `;
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
 router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
@@ -273,6 +274,53 @@ router.delete('/:id/penalties/:penaltyId', auth_1.authMiddleware, roleCheck_1.ow
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to delete penalty' });
+    }
+});
+// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Sales)
+router.post('/:id/advances', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+    const { id } = req.params;
+    const { amount, notes, date } = req.body;
+    if (amount === undefined || isNaN(Number(amount))) {
+        res.status(400).json({ error: 'Amount is required and must be a number' });
+        return;
+    }
+    try {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('salary_advances')
+            .insert({
+            salary_id: id,
+            amount: Number(amount),
+            notes: notes || null,
+            date: date || new Date().toISOString().split('T')[0]
+        })
+            .select('*')
+            .single();
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        res.status(201).json({ advance: data });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to create salary advance' });
+    }
+});
+// DELETE /api/salaries/:id/advances/:advanceId — Delete a salary advance
+router.delete('/:id/advances/:advanceId', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
+    const { advanceId } = req.params;
+    try {
+        const { error } = await supabase_1.supabaseAdmin
+            .from('salary_advances')
+            .delete()
+            .eq('id', advanceId);
+        if (error) {
+            res.status(500).json({ error: error.message });
+            return;
+        }
+        res.json({ message: 'Salary advance deleted successfully' });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to delete salary advance' });
     }
 });
 exports.default = router;

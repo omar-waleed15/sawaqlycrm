@@ -14,7 +14,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
         const [contractsRes, expensesRes, salariesRes, clientsRes] = await Promise.all([
             supabase_1.supabaseAdmin.from('contracts').select('*, installments:contract_installments(*), client:clients(*)'),
             supabase_1.supabaseAdmin.from('expenses').select('*'),
-            supabase_1.supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount)'),
+            supabase_1.supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount), advances:salary_advances(amount)'),
             supabase_1.supabaseAdmin.from('clients').select('*').eq('pipeline_stage', 'won'),
         ]);
         if (contractsRes.error || expensesRes.error || salariesRes.error || clientsRes.error) {
@@ -175,8 +175,10 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
             if (!salMonth)
                 return;
             const penaltyTotal = sal.penalties ? sal.penalties.reduce((sum, p) => sum + Number(p.amount), 0) : 0;
+            const advanceTotal = sal.advances ? sal.advances.reduce((sum, a) => sum + Number(a.amount), 0) : 0;
+            const netDeductions = penaltyTotal + advanceTotal;
             if (sal.is_recurring) {
-                const netAmt = Math.max(0, amt - penaltyTotal);
+                const netAmt = Math.max(0, amt - netDeductions);
                 if (monthlyData[salMonth]) {
                     monthlyData[salMonth].expenses += netAmt;
                     monthlyData[salMonth].salaries += netAmt;
@@ -194,14 +196,14 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
             }
             else {
                 // One-time salary: installments
-                // Subtract penalties from the month the one-time salary applies to
+                // Subtract penalties & advances from the month the one-time salary applies to
                 if (monthlyData[salMonth]) {
-                    monthlyData[salMonth].expenses -= penaltyTotal;
-                    monthlyData[salMonth].salaries -= penaltyTotal;
-                    allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) - penaltyTotal;
+                    monthlyData[salMonth].expenses -= netDeductions;
+                    monthlyData[salMonth].salaries -= netDeductions;
+                    allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) - netDeductions;
                 }
                 if (salMonth === currentMonth) {
-                    currentMonthSalaryTotal -= penaltyTotal;
+                    currentMonthSalaryTotal -= netDeductions;
                 }
                 const installments = salaryInstallmentsMap[sal.id] || [];
                 installments.forEach((inst) => {

@@ -40,6 +40,7 @@ router.post('/login', async (req, res) => {
                 email: profile.email,
                 role: profile.role,
                 avatar_url: profile.avatar_url,
+                phone: profile.phone,
             },
         });
     }

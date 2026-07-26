@@ -31,19 +31,31 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
       return;
     }
 
-    // Fetch salary installments separately to avoid schema cache issues
+    // Fetch salary installments & advances separately to avoid schema cache issues
     const allSalaries = salariesRes.data || [];
     const salaryIds = allSalaries.map((s: any) => s.id);
     let salaryInstallmentsMap: Record<string, any[]> = {};
     if (salaryIds.length > 0) {
-      const { data: instData, error: instError } = await supabaseAdmin
-        .from('salary_installments')
-        .select('*')
-        .in('salary_id', salaryIds);
-      if (!instError) {
-        (instData || []).forEach((inst: any) => {
+      const [{ data: instData }, { data: advData }] = await Promise.all([
+        supabaseAdmin.from('salary_installments').select('*').in('salary_id', salaryIds),
+        supabaseAdmin.from('salary_advances').select('salary_id, amount').in('salary_id', salaryIds),
+      ]);
+
+      if (instData) {
+        instData.forEach((inst: any) => {
           if (!salaryInstallmentsMap[inst.salary_id]) salaryInstallmentsMap[inst.salary_id] = [];
           salaryInstallmentsMap[inst.salary_id].push(inst);
+        });
+      }
+
+      if (advData) {
+        const advMap: Record<string, any[]> = {};
+        advData.forEach((adv: any) => {
+          if (!advMap[adv.salary_id]) advMap[adv.salary_id] = [];
+          advMap[adv.salary_id].push(adv);
+        });
+        allSalaries.forEach((s: any) => {
+          s.advances = advMap[s.id] || [];
         });
       }
     }
@@ -185,9 +197,11 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
       if (!salMonth) return;
 
       const penaltyTotal = sal.penalties ? sal.penalties.reduce((sum: number, p: any) => sum + Number(p.amount), 0) : 0;
+      const advanceTotal = sal.advances ? sal.advances.reduce((sum: number, a: any) => sum + Number(a.amount), 0) : 0;
+      const netDeductions = penaltyTotal + advanceTotal;
 
       if (sal.is_recurring) {
-        const netAmt = Math.max(0, amt - penaltyTotal);
+        const netAmt = Math.max(0, amt - netDeductions);
         if (monthlyData[salMonth]) {
           monthlyData[salMonth].expenses += netAmt;
           monthlyData[salMonth].salaries += netAmt;
@@ -206,14 +220,14 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
         });
       } else {
         // One-time salary: installments
-        // Subtract penalties from the month the one-time salary applies to
+        // Subtract penalties & advances from the month the one-time salary applies to
         if (monthlyData[salMonth]) {
-          monthlyData[salMonth].expenses -= penaltyTotal;
-          monthlyData[salMonth].salaries -= penaltyTotal;
-          allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) - penaltyTotal;
+          monthlyData[salMonth].expenses -= netDeductions;
+          monthlyData[salMonth].salaries -= netDeductions;
+          allCategoryTotals['salaries'] = (allCategoryTotals['salaries'] || 0) - netDeductions;
         }
         if (salMonth === currentMonth) {
-          currentMonthSalaryTotal -= penaltyTotal;
+          currentMonthSalaryTotal -= netDeductions;
         }
 
         const installments = salaryInstallmentsMap[sal.id] || [];

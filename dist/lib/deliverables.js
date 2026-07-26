@@ -6,25 +6,13 @@ async function populateDynamicDeliverables(clients) {
     if (!clients || clients.length === 0)
         return [];
     const clientIds = clients.map(c => c.id);
-    // Get start of the current month (YYYY-MM-01)
-    const now = new Date();
-    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    // Fetch all completed tasks for these clients in the current month
-    const { data: tasks, error } = await supabase_1.supabaseAdmin
-        .from('tasks')
-        .select(`
-      id,
-      client_id,
-      is_deliverable,
-      deliverable_type,
-      deliverable_month,
-      task_assignees(status)
-    `)
-        .in('client_id', clientIds)
-        .eq('is_deliverable', true)
-        .eq('deliverable_month', startOfMonth);
+    // Fetch all content items uploaded to Content Hub for these clients
+    const { data: contents, error } = await supabase_1.supabaseAdmin
+        .from('contents')
+        .select('id, client_id, content_type')
+        .in('client_id', clientIds);
     if (error) {
-        console.error('Error fetching dynamic deliverables:', error.message);
+        console.error('Error fetching contents for deliverables count:', error.message);
         return clients;
     }
     // Initialize counts map
@@ -32,25 +20,21 @@ async function populateDynamicDeliverables(clients) {
     clientIds.forEach(cid => {
         countsMap[cid] = { posts: 0, reels: 0, stories: 0, photos: 0, otherDone: false };
     });
-    // Calculate counts based on task assignee completions
-    (tasks || []).forEach((task) => {
-        const assignees = task.task_assignees || [];
-        const isCompleted = assignees.length > 0 && assignees.every((a) => a.status === 'completed');
-        if (isCompleted) {
-            const cid = task.client_id;
-            const type = task.deliverable_type;
-            if (countsMap[cid]) {
-                if (type === 'post')
-                    countsMap[cid].posts++;
-                else if (type === 'reel')
-                    countsMap[cid].reels++;
-                else if (type === 'story')
-                    countsMap[cid].stories++;
-                else if (type === 'photo')
-                    countsMap[cid].photos++;
-                else if (type === 'other')
-                    countsMap[cid].otherDone = true;
-            }
+    // Calculate counts based on uploaded Content Hub items
+    (contents || []).forEach((item) => {
+        const cid = item.client_id;
+        const type = item.content_type;
+        if (countsMap[cid]) {
+            if (type === 'post')
+                countsMap[cid].posts++;
+            else if (type === 'reel')
+                countsMap[cid].reels++;
+            else if (type === 'story')
+                countsMap[cid].stories++;
+            else if (type === 'photo' || type === 'photos')
+                countsMap[cid].photos++;
+            else if (type === 'other')
+                countsMap[cid].otherDone = true;
         }
     });
     // Map counts back to client objects

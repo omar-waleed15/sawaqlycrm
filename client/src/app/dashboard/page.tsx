@@ -46,7 +46,10 @@ export default function DashboardPage() {
   const isOwner = user?.role === 'owner';
   const isTeamLeader = user?.role === 'team_leader';
   const isSales = user?.role === 'sales';
-  const isMember = user?.role === 'member';
+  const isGraphicDesigner = user?.role === 'graphic_designer';
+  const isVideoEditor = user?.role === 'video_editor';
+  const isReelMaker = user?.role === 'reel_maker';
+  const isMember = user?.role === 'member' || isGraphicDesigner || isVideoEditor || isReelMaker;
   const isModerator = user?.role === 'moderation';
   const isAccountManager = user?.role === 'account_manager';
   const isContentCreator = user?.role === 'content_creator';

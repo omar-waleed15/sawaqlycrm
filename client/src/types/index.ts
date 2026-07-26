@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'team_leader' | 'sales' | 'member' | 'moderation' | 'account_manager' | 'client' | 'content_creator';
+export type UserRole = 'owner' | 'team_leader' | 'sales' | 'member' | 'graphic_designer' | 'video_editor' | 'reel_maker' | 'moderation' | 'account_manager' | 'client' | 'content_creator';
 
 export interface User {
   id: string;
@@ -215,6 +215,15 @@ export interface SalaryPenalty {
   created_at: string;
 }
 
+export interface SalaryAdvance {
+  id: string;
+  salary_id: string;
+  amount: number;
+  notes?: string;
+  date?: string;
+  created_at: string;
+}
+
 export interface Salary {
   id: string;
   user_id: string;
@@ -227,6 +236,7 @@ export interface Salary {
   recurrence?: 'monthly' | 'yearly';
   installments?: SalaryInstallment[];
   penalties?: SalaryPenalty[];
+  advances?: SalaryAdvance[];
   note?: string;
   created_by: string;
   created_at: string;

@@ -12,6 +12,37 @@ const SALARY_SELECT = `
   penalties:salary_penalties(id, salary_id, amount, notes, created_at)
 `;
 
+const attachAdvancesToSalaries = async (salaries: any[]) => {
+  if (!salaries || salaries.length === 0) return salaries;
+  const salaryIds = salaries.map(s => s.id).filter(Boolean);
+  if (salaryIds.length === 0) return salaries;
+
+  try {
+    const { data: advancesData, error } = await supabaseAdmin
+      .from('salary_advances')
+      .select('id, salary_id, amount, notes, date, created_at')
+      .in('salary_id', salaryIds);
+
+    if (!error && advancesData) {
+      const advancesMap: Record<string, any[]> = {};
+      advancesData.forEach(adv => {
+        if (!advancesMap[adv.salary_id]) advancesMap[adv.salary_id] = [];
+        advancesMap[adv.salary_id].push(adv);
+      });
+
+      salaries.forEach(s => {
+        s.advances = advancesMap[s.id] || [];
+      });
+    } else {
+      salaries.forEach(s => { s.advances = s.advances || []; });
+    }
+  } catch (err) {
+    salaries.forEach(s => { s.advances = s.advances || []; });
+  }
+
+  return salaries;
+};
+
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
 router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   let { month } = req.query;
@@ -38,9 +69,62 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
       return;
     }
 
-    res.json({ salaries: data || [] });
+    const enriched = await attachAdvancesToSalaries(data || []);
+    res.json({ salaries: enriched });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch salaries' });
+  }
+});
+
+// GET /api/salaries/my-salary — Get logged-in user's own salary statement & history
+router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  let { month } = req.query;
+
+  try {
+    const userId = req.user!.id;
+    if (!month || typeof month !== 'string') {
+      const now = new Date();
+      month = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    }
+
+    const firstDayOfMonth = `${month}-01`;
+
+    // Fetch salary record for current user & month
+    const { data: salary, error } = await supabaseAdmin
+      .from('salaries')
+      .select(SALARY_SELECT)
+      .eq('user_id', userId)
+      .eq('month', firstDayOfMonth)
+      .maybeSingle();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    if (salary) {
+      await attachAdvancesToSalaries([salary]);
+    }
+
+    // Fetch available historical months for this user
+    const { data: monthsData } = await supabaseAdmin
+      .from('salaries')
+      .select('month')
+      .eq('user_id', userId)
+      .order('month', { ascending: false });
+
+    const availableMonths = (monthsData || [])
+      .map((s: any) => s.month ? s.month.substring(0, 7) : null)
+      .filter((m: string | null): m is string => Boolean(m));
+
+    const uniqueMonths = Array.from(new Set(availableMonths));
+
+    res.json({
+      salary: salary || null,
+      availableMonths: uniqueMonths
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch personal salary statement' });
   }
 });
 
@@ -129,6 +213,7 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
       .single();
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+    if (result) { await attachAdvancesToSalaries([result]); }
 
     res.status(existing ? 200 : 201).json({ salary: result });
   } catch (err) {
@@ -185,6 +270,7 @@ router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: R
       .single();
 
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
+    if (data) { await attachAdvancesToSalaries([data]); }
     res.json({ salary: data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update salary' });
@@ -279,4 +365,59 @@ router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOnly, async (req
   }
 });
 
+// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Sales)
+router.post('/:id/advances', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { amount, notes, date } = req.body;
+
+  if (amount === undefined || isNaN(Number(amount))) {
+    res.status(400).json({ error: 'Amount is required and must be a number' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('salary_advances')
+      .insert({
+        salary_id: id,
+        amount: Number(amount),
+        notes: notes || null,
+        date: date || new Date().toISOString().split('T')[0]
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.status(201).json({ advance: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create salary advance' });
+  }
+});
+
+// DELETE /api/salaries/:id/advances/:advanceId — Delete a salary advance
+router.delete('/:id/advances/:advanceId', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { advanceId } = req.params;
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('salary_advances')
+      .delete()
+      .eq('id', advanceId);
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ message: 'Salary advance deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete salary advance' });
+  }
+});
+
 export default router;
+

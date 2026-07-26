@@ -13,16 +13,16 @@ const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit for avatars is plenty
 });
-// GET /api/users — List all team members (owner, team leader, sales)
+// GET /api/users — List all team members (owner, team leader, sales, moderation, account_manager, content_creator)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
-    if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager'].includes(req.user.role)) {
+    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied.' });
         return;
     }
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('profiles')
-            .select('id, name, email, role, avatar_url, created_at')
+            .select('id, name, email, role, avatar_url, phone, created_at')
             .order('created_at', { ascending: false });
         if (error) {
             res.status(500).json({ error: error.message });
@@ -44,7 +44,7 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         // 1. Fetch profiles
         const profilesPromise = supabase_1.supabaseAdmin
             .from('profiles')
-            .select('id, name, email, role, avatar_url, created_at')
+            .select('id, name, email, role, avatar_url, phone, created_at')
             .order('created_at', { ascending: false });
         // 2. Fetch task assignees within the date window
         let assigneesQuery = supabase_1.supabaseAdmin
@@ -174,13 +174,15 @@ router.put('/profile', auth_1.authMiddleware, async (req, res) => {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }
-    const { name, avatar_url } = req.body;
+    const { name, avatar_url, phone } = req.body;
     try {
         const updates = {};
         if (name !== undefined)
             updates.name = name;
         if (avatar_url !== undefined)
             updates.avatar_url = avatar_url;
+        if (phone !== undefined)
+            updates.phone = phone || null;
         if (Object.keys(updates).length === 0) {
             res.status(400).json({ error: 'No fields to update' });
             return;
@@ -238,12 +240,12 @@ router.post('/profile/avatar', auth_1.authMiddleware, upload.single('avatar'), a
 });
 // POST /api/users — Create a new team member (owner only)
 router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
     if (!name || !email || !password) {
         res.status(400).json({ error: 'Name, email, and password are required' });
         return;
     }
-    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'];
+    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'];
     const userRole = validRoles.includes(role) ? role : 'member';
     try {
         // Create user in Supabase Auth
@@ -264,6 +266,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
             name,
             email,
             role: userRole,
+            phone: phone || null,
         })
             .select()
             .single();
@@ -282,7 +285,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
 // PUT /api/users/:id — Update user (owner only)
 router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
     const id = req.params.id;
-    const { name, role, email, password } = req.body;
+    const { name, role, email, password, phone } = req.body;
     try {
         // 1. Update Supabase Auth if email or password is provided
         const authUpdates = {};
@@ -308,10 +311,12 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         const updates = {};
         if (name)
             updates.name = name;
-        if (role && ['owner', 'team_leader', 'sales', 'member', 'moderation', 'account_manager', 'client'].includes(role))
+        if (role && ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role))
             updates.role = role;
         if (email)
             updates.email = email;
+        if (phone !== undefined)
+            updates.phone = phone || null;
         if (Object.keys(updates).length > 0) {
             const { data, error } = await supabase_1.supabaseAdmin
                 .from('profiles')

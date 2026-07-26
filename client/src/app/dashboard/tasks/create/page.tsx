@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, clientsApi, attachmentsApi } from '@/lib/api';
+import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +64,7 @@ export default function CreateTaskPage() {
       return;
     }
     usersApi.list().then(data => setMembers((data.users || []).filter((u: any) => u.role !== 'client'))).catch(console.error);
-    clientsApi.list().then(data => setClients(data.clients)).catch(console.error);
+    closedClientsApi.list().then(data => setClients(data.clients)).catch(console.error);
   }, [user, router]);
 
   useEffect(() => {

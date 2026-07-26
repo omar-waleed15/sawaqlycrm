@@ -750,6 +750,9 @@ export default function TeamPage() {
                          member.role === 'moderation' ? t('role.moderation') :
                          member.role === 'account_manager' ? t('role.account_manager') :
                          member.role === 'content_creator' ? (t('role.content_creator') || 'Content Creator') :
+                         member.role === 'graphic_designer' ? (t('role.graphic_designer') || 'Graphic Designer') :
+                         member.role === 'video_editor' ? (t('role.video_editor') || 'Video Editor') :
+                         member.role === 'reel_maker' ? (t('role.reel_maker') || 'Reel Maker') :
                          member.role === 'client' ? t('role.client') :
                          t('role.member')}
                       </Badge>
@@ -882,6 +885,9 @@ export default function TeamPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="member">{t('role.teamMember')}</SelectItem>
+                <SelectItem value="graphic_designer">{t('role.graphic_designer') || 'Graphic Designer'}</SelectItem>
+                <SelectItem value="video_editor">{t('role.video_editor') || 'Video Editor'}</SelectItem>
+                <SelectItem value="reel_maker">{t('role.reel_maker') || 'Reel Maker'}</SelectItem>
                 <SelectItem value="team_leader">{t('role.team_leader')}</SelectItem>
                 <SelectItem value="sales">{t('role.sales')}</SelectItem>
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
@@ -963,6 +969,9 @@ export default function TeamPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="member">{t('role.teamMember')}</SelectItem>
+                <SelectItem value="graphic_designer">{t('role.graphic_designer') || 'Graphic Designer'}</SelectItem>
+                <SelectItem value="video_editor">{t('role.video_editor') || 'Video Editor'}</SelectItem>
+                <SelectItem value="reel_maker">{t('role.reel_maker') || 'Reel Maker'}</SelectItem>
                 <SelectItem value="team_leader">{t('role.team_leader')}</SelectItem>
                 <SelectItem value="sales">{t('role.sales')}</SelectItem>
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>

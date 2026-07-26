@@ -15,7 +15,7 @@ const upload = (0, multer_1.default)({
     limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
 });
 // ── List all won clients ─────────────────────────────────────────────────
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (_req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (_req, res) => {
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('clients')
@@ -34,7 +34,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAcc
     }
 });
 // ── Get single won client ────────────────────────────────────────────────
-router.get('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.get('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase_1.supabaseAdmin
@@ -57,7 +57,7 @@ router.get('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOr
 // ═══════════════════════════════════════════════════════════════════════════
 // FAQ CRUD
 // ═══════════════════════════════════════════════════════════════════════════
-router.get('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.get('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase_1.supabaseAdmin
@@ -142,7 +142,7 @@ router.delete('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSales
 // ═══════════════════════════════════════════════════════════════════════════
 // CONTENT PLANS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
-router.get('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.get('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase_1.supabaseAdmin
@@ -244,7 +244,7 @@ router.delete('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.o
 // ═══════════════════════════════════════════════════════════════════════════
 // IDEAS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
-router.get('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.get('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase_1.supabaseAdmin
@@ -380,7 +380,7 @@ router.delete('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSa
 // ═══════════════════════════════════════════════════════════════════════════
 // REPORTS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
-router.get('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.get('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { data, error } = await supabase_1.supabaseAdmin

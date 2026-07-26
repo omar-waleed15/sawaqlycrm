@@ -215,6 +215,15 @@ export default function FinanceDashboardPage() {
   const [submittingPenalty, setSubmittingPenalty] = useState(false);
   const [penaltyErrorMsg, setPenaltyErrorMsg] = useState('');
 
+  // Advances (سلفة) State variables
+  const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
+  const [selectedSalaryForAdvances, setSelectedSalaryForAdvances] = useState<Salary | null>(null);
+  const [submittingAdvance, setSubmittingAdvance] = useState(false);
+  const [advanceErrorMsg, setAdvanceErrorMsg] = useState('');
+  const [advanceFormDate, setAdvanceFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [advanceFormAmount, setAdvanceFormAmount] = useState('');
+  const [advanceFormNotes, setAdvanceFormNotes] = useState('');
+
   const handleDropdownClick = (e: React.MouseEvent<HTMLButtonElement>, salary: Salary) => {
     e.stopPropagation();
     if (activeSalaryActionId === salary.id) {
@@ -1461,6 +1470,66 @@ export default function FinanceDashboardPage() {
       setPenaltyErrorMsg(err.message || 'Failed to delete penalty');
     } finally {
       setSubmittingPenalty(false);
+    }
+  };
+
+  const handleAddAdvance = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedSalaryForAdvances) return;
+    if (!advanceFormAmount || isNaN(Number(advanceFormAmount))) {
+      setAdvanceErrorMsg('Please enter a valid amount.');
+      return;
+    }
+
+    try {
+      setSubmittingAdvance(true);
+      setAdvanceErrorMsg('');
+      const res = await salariesApi.createAdvance(selectedSalaryForAdvances.id, {
+        amount: Number(advanceFormAmount),
+        notes: advanceFormNotes || undefined,
+        date: advanceFormDate || undefined,
+      });
+
+      // Update local state reactively
+      const updatedAdvances = [...(selectedSalaryForAdvances.advances || []), res.advance];
+      const updatedSalary = { ...selectedSalaryForAdvances, advances: updatedAdvances };
+
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForAdvances.id ? updatedSalary : s));
+      setSelectedSalaryForAdvances(updatedSalary);
+      setAdvanceFormAmount('');
+      setAdvanceFormNotes('');
+
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setAdvanceErrorMsg(err.message || 'Failed to add salary advance');
+    } finally {
+      setSubmittingAdvance(false);
+    }
+  };
+
+  const handleDeleteAdvance = async (advanceId: string) => {
+    if (!selectedSalaryForAdvances) return;
+    if (!window.confirm('Are you sure you want to delete this advance?')) return;
+
+    try {
+      setSubmittingAdvance(true);
+      setAdvanceErrorMsg('');
+      await salariesApi.deleteAdvance(selectedSalaryForAdvances.id, advanceId);
+
+      // Update local state reactively
+      const updatedAdvances = (selectedSalaryForAdvances.advances || []).filter(a => a.id !== advanceId);
+      const updatedSalary = { ...selectedSalaryForAdvances, advances: updatedAdvances };
+
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForAdvances.id ? updatedSalary : s));
+      setSelectedSalaryForAdvances(updatedSalary);
+
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setAdvanceErrorMsg(err.message || 'Failed to delete advance');
+    } finally {
+      setSubmittingAdvance(false);
     }
   };
 
@@ -3085,11 +3154,11 @@ export default function FinanceDashboardPage() {
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 p-2.5 rounded-lg border">
-                  <div>Total Salary Cost: <span className="font-bold text-foreground">{formatCurrency(salaries.reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                  <div>Total Salary Cost: <span className="font-bold text-foreground">{formatCurrency(salaries.reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                   <div className="hidden sm:block">•</div>
-                  <div>Paid: <span className="font-bold text-emerald-600">{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                  <div>Paid: <span className="font-bold text-emerald-600">{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                   <div className="hidden sm:block">•</div>
-                  <div>Unpaid: <span className="font-bold text-orange-600">{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0), 0), locale)}</span></div>
+                  <div>Unpaid: <span className="font-bold text-orange-600">{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                 </div>
                 <div className="hidden sm:block flex-1" />
                 <button
@@ -3137,9 +3206,13 @@ export default function FinanceDashboardPage() {
                           </td>
                           <td style={{ padding: '16px 16px', fontWeight: 700, textAlign: 'start' }}>
                             <div>{formatCurrency(s.amount, locale)}</div>
-                            {user?.role === 'owner' && s.penalties && s.penalties.length > 0 && (
-                              <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#e11d48', marginTop: 2 }}>
-                                Net: {formatCurrency(s.amount - s.penalties.reduce((sum, p) => sum + Number(p.amount), 0), locale)}
+                            {((s.penalties && s.penalties.length > 0) || (s.advances && s.advances.length > 0)) && (
+                              <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                                {s.penalties && s.penalties.length > 0 && <span style={{ color: '#e11d48', display: 'block' }}>Penalties: -{formatCurrency(s.penalties.reduce((sum, p) => sum + Number(p.amount), 0), locale)}</span>}
+                                {s.advances && s.advances.length > 0 && <span style={{ color: '#0284c7', display: 'block' }}>Advances: -{formatCurrency(s.advances.reduce((sum, a) => sum + Number(a.amount), 0), locale)}</span>}
+                                <span style={{ fontWeight: 700, color: 'var(--color-primary)', display: 'block', marginTop: 1 }}>
+                                  Net: {formatCurrency(Math.max(0, s.amount - (s.penalties?.reduce((sum, p) => sum + Number(p.amount), 0) || 0) - (s.advances?.reduce((sum, a) => sum + Number(a.amount), 0) || 0)), locale)}
+                                </span>
                               </div>
                             )}
                           </td>
@@ -3236,7 +3309,9 @@ export default function FinanceDashboardPage() {
               {/* Mobile Cards List View */}
               <div className="flex flex-col gap-4 md:hidden">
                 {salaries.map(s => {
-                  const netAmount = s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0);
+                  const penaltySum = s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0;
+                  const advanceSum = s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0;
+                  const netAmount = Math.max(0, s.amount - penaltySum - advanceSum);
                   return (
                     <div key={s.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-3">
                       {/* Member Info Header */}
@@ -3270,9 +3345,11 @@ export default function FinanceDashboardPage() {
                           <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.amount')}</span>
                           <span className="font-bold text-foreground">
                             {formatCurrency(s.amount, locale)}
-                            {user?.role === 'owner' && s.penalties && s.penalties.length > 0 && (
-                              <span className="block text-[10px] text-rose-500 font-semibold mt-0.5">
-                                Net: {formatCurrency(netAmount, locale)}
+                            {(penaltySum > 0 || advanceSum > 0) && (
+                              <span className="block text-[10px] text-muted-foreground font-semibold mt-0.5">
+                                {penaltySum > 0 && <span className="block text-rose-500">Penalties: -{formatCurrency(penaltySum, locale)}</span>}
+                                {advanceSum > 0 && <span className="block text-sky-600">Advances: -{formatCurrency(advanceSum, locale)}</span>}
+                                <span className="block font-bold text-primary mt-0.5">Net: {formatCurrency(netAmount, locale)}</span>
                               </span>
                             )}
                           </span>
@@ -3988,6 +4065,137 @@ export default function FinanceDashboardPage() {
         </div>
       </Modal>
 
+      {/* ── ADVANCES (سلفة) MODAL ── */}
+      <Modal
+        isOpen={advanceModalOpen}
+        onClose={() => { setAdvanceModalOpen(false); setSelectedSalaryForAdvances(null); }}
+        title={`${t('finance.advances')} - ${selectedSalaryForAdvances?.user?.name || ''}`}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
+          {advanceErrorMsg && (
+            <div className="form-error" style={{ padding: 10, background: '#fff1f2', color: '#be123c', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>
+              {advanceErrorMsg}
+            </div>
+          )}
+
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.875rem', fontWeight: 700 }}>{t('finance.advances')}</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              {selectedSalaryForAdvances?.advances && selectedSalaryForAdvances.advances.map(a => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    background: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ textAlign: 'start' }}>
+                    <span style={{ fontWeight: 700, color: '#0284c7', marginRight: 8 }}>
+                      -{formatCurrency(a.amount, locale)}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginRight: 8 }}>
+                      ({a.date ? formatDate(a.date, locale) : (a.created_at ? formatDate(a.created_at.substring(0, 10), locale) : '')})
+                    </span>
+                    {a.notes && (
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        {a.notes}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      color: '#e11d48',
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      padding: '4px 8px'
+                    }}
+                    disabled={submittingAdvance}
+                    onClick={() => handleDeleteAdvance(a.id)}
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              ))}
+              {(!selectedSalaryForAdvances?.advances || selectedSalaryForAdvances.advances.length === 0) && (
+                <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                  No advances logged for this month.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+
+          <form onSubmit={handleAddAdvance} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>{t('finance.addAdvance')}</h4>
+            
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.advanceAmount')} *</label>
+              <input
+                type="number"
+                className="form-input"
+                placeholder="e.g. 500"
+                required
+                min="1"
+                value={advanceFormAmount}
+                onChange={e => setAdvanceFormAmount(e.target.value)}
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.date')}</label>
+              <input
+                type="date"
+                className="form-input"
+                value={advanceFormDate}
+                onChange={e => setAdvanceFormDate(e.target.value)}
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div className="form-group text-start">
+              <label className="form-label">{t('finance.note')} (Optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g. Medical emergency"
+                value={advanceFormNotes}
+                onChange={e => setAdvanceFormNotes(e.target.value)}
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={submittingAdvance}
+                onClick={() => { setAdvanceModalOpen(false); setSelectedSalaryForAdvances(null); }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={submittingAdvance}
+              >
+                {submittingAdvance ? t('clients.savingProgress') : t('finance.addAdvance')}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
       {activeSalaryActionId && menuPosition && activeSalaryForMenu && createPortal(
         <div className="dropdown-portal-menu" style={{
           position: 'absolute',
@@ -4029,30 +4237,61 @@ export default function FinanceDashboardPage() {
             ✏️ {t('common.edit')}
           </button>
           {user?.role === 'owner' && (
-            <button
-              type="button"
-              style={{
-                textAlign: 'start',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-sm)',
-                background: 'none',
-                border: 'none',
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                color: '#e11d48',
-                cursor: 'pointer',
-                width: '100%',
-                transition: 'background-color 0.2s',
-              }}
-              className="hover:bg-red-50 dark:hover:bg-red-950/20"
-              onClick={() => {
-                setActiveSalaryActionId(null);
-                setSelectedSalaryForPenalties(activeSalaryForMenu);
-                setPenaltyModalOpen(true);
-              }}
-            >
-              ⚠️ Penalties ({activeSalaryForMenu.penalties?.length || 0})
-            </button>
+            <>
+              <button
+                type="button"
+                style={{
+                  textAlign: 'start',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: '#e11d48',
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'background-color 0.2s',
+                }}
+                className="hover:bg-red-50 dark:hover:bg-red-950/20"
+                onClick={() => {
+                  setActiveSalaryActionId(null);
+                  setSelectedSalaryForPenalties(activeSalaryForMenu);
+                  setPenaltyModalOpen(true);
+                }}
+              >
+                ⚠️ Penalties ({activeSalaryForMenu.penalties?.length || 0})
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  textAlign: 'start',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: '#0284c7',
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'background-color 0.2s',
+                }}
+                className="hover:bg-sky-50 dark:hover:bg-sky-950/20"
+                onClick={() => {
+                  setActiveSalaryActionId(null);
+                  setSelectedSalaryForAdvances(activeSalaryForMenu);
+                  setAdvanceFormAmount('');
+                  setAdvanceFormNotes('');
+                  setAdvanceFormDate(new Date().toISOString().split('T')[0]);
+                  setAdvanceErrorMsg('');
+                  setAdvanceModalOpen(true);
+                }}
+              >
+                💸 {t('finance.advances')} ({activeSalaryForMenu.advances?.length || 0})
+              </button>
+            </>
           )}
           <button
             type="button"

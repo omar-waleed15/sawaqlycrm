@@ -24,9 +24,12 @@ const ROLE_EMOJIS: Record<string, string> = {
   team_leader: '👑',
   sales: '💼',
   member: '👤',
+  graphic_designer: '🎨',
+  video_editor: '🎬',
+  reel_maker: '📱',
   moderation: '🛡️',
   account_manager: '📋',
-  content_creator: '🎨',
+  content_creator: '🎥',
 };
 
 type SectionKey = 'general_roles' | 'job_description' | 'job_roles' | 'non_negotiables';

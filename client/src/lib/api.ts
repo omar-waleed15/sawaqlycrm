@@ -261,6 +261,10 @@ export const salariesApi = {
     const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return request<{ salaries: import('@/types').Salary[] }>(`/salaries${query}`);
   },
+  getMySalary: (params?: { month?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return request<{ salary: import('@/types').Salary | null; availableMonths: string[] }>(`/salaries/my-salary${query}`);
+  },
   create: (data: any) =>
     request<{ salary: import('@/types').Salary }>('/salaries', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: any) =>
@@ -272,6 +276,10 @@ export const salariesApi = {
     request<{ penalty: import('@/types').SalaryPenalty }>(`/salaries/${salaryId}/penalties`, { method: 'POST', body: JSON.stringify(data) }),
   deletePenalty: (salaryId: string, id: string) =>
     request(`/salaries/${salaryId}/penalties/${id}`, { method: 'DELETE' }),
+  createAdvance: (salaryId: string, data: { amount: number; notes?: string; date?: string }) =>
+    request<{ advance: import('@/types').SalaryAdvance }>(`/salaries/${salaryId}/advances`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteAdvance: (salaryId: string, id: string) =>
+    request(`/salaries/${salaryId}/advances/${id}`, { method: 'DELETE' }),
 };
 
 // Finance Analytics
@@ -284,6 +292,15 @@ export const financeAnalyticsApi = {
 // Sales API
 export const salesApi = {
   getDashboard: (userId?: string) => request<import('@/types').SalesDashboardData>(`/sales/dashboard${userId ? `?userId=${userId}` : ''}`),
+  getCalendarEvents: (params?: { userId?: string }) => {
+    const query = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return request<{
+      meetings: import('@/types').Client[];
+      callLogs: import('@/types').SalesCallLog[];
+      contracts: import('@/types').Contract[];
+      salesReps: import('@/types').User[];
+    }>(`/sales/calendar-events${query}`);
+  },
   getLead: (leadId: string) =>
     request<{ lead: import('@/types').Client; callLogs: import('@/types').SalesCallLog[] }>(`/sales/leads/${leadId}`),
   getTarget: (userId: string, month: string) =>

@@ -461,4 +461,75 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
   }
 });
 
+// GET /api/sales/calendar-events — Fetch meetings, call logs, contracts for Sales Calendar
+router.get('/calendar-events', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const isOwner = req.user!.role === 'owner' || req.user!.role === 'team_leader';
+    let targetUserId = req.user!.id;
+    if (isOwner && req.query.userId && typeof req.query.userId === 'string' && req.query.userId !== 'all') {
+      targetUserId = req.query.userId;
+    }
+
+    // 1. Fetch meetings (clients with meeting_date)
+    let meetingsQuery = supabaseAdmin
+      .from('clients')
+      .select('*')
+      .not('meeting_date', 'is', null);
+
+    if (!isOwner || (req.query.userId && req.query.userId !== 'all')) {
+      meetingsQuery = meetingsQuery.eq('sales_rep_id', targetUserId);
+    }
+
+    const { data: meetings, error: meetingsErr } = await meetingsQuery.order('meeting_date', { ascending: true });
+    if (meetingsErr) { res.status(500).json({ error: meetingsErr.message }); return; }
+
+    // 2. Fetch call logs
+    let callsQuery = supabaseAdmin
+      .from('sales_call_logs')
+      .select('*, client:clients(id, name, company, phone, pipeline_stage)')
+      .order('call_date', { ascending: false });
+
+    if (!isOwner || (req.query.userId && req.query.userId !== 'all')) {
+      callsQuery = callsQuery.eq('sales_rep_id', targetUserId);
+    }
+
+    const { data: callLogs, error: callsErr } = await callsQuery;
+    if (callsErr) { res.status(500).json({ error: callsErr.message }); return; }
+
+    // 3. Fetch contracts (Only for owner/team_leader; hidden for sales reps)
+    let contracts: any[] = [];
+    if (isOwner) {
+      let contractsQuery = supabaseAdmin
+        .from('contracts')
+        .select('*, client:clients(id, name, company)')
+        .order('created_at', { ascending: false });
+
+      if (req.query.userId && req.query.userId !== 'all') {
+        contractsQuery = contractsQuery.eq('sales_rep_id', targetUserId);
+      }
+      const { data: contractsData } = await contractsQuery;
+      contracts = contractsData || [];
+    }
+
+    // 4. Fetch sales reps list for owner/TL filter dropdown
+    let salesReps: any[] = [];
+    if (isOwner) {
+      const { data: reps } = await supabaseAdmin
+        .from('profiles')
+        .select('id, name, email, role, avatar_url')
+        .in('role', ['sales', 'owner', 'team_leader']);
+      salesReps = reps || [];
+    }
+
+    res.json({
+      meetings: meetings || [],
+      callLogs: callLogs || [],
+      contracts,
+      salesReps
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch sales calendar events' });
+  }
+});
+
 export default router;

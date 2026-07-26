@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ownerOrTeamLeaderOrSales = exports.ownerOrSalesOrTeamLeaderOrAccountManager = exports.ownerOrSales = exports.ownerOrTeamLeader = exports.ownerOnly = void 0;
+exports.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator = exports.ownerOrTeamLeaderOrContentCreator = exports.ownerOrTeamLeaderOrSales = exports.ownerOrSalesOrTeamLeaderOrAccountManager = exports.ownerOrSales = exports.ownerOrTeamLeader = exports.ownerOnly = void 0;
 const ownerOnly = (req, res, next) => {
     if (!req.user || req.user.role !== 'owner') {
         res.status(403).json({ error: 'Access denied. Owner only.' });
@@ -26,7 +26,7 @@ const ownerOrSales = (req, res, next) => {
 };
 exports.ownerOrSales = ownerOrSales;
 const ownerOrSalesOrTeamLeaderOrAccountManager = (req, res, next) => {
-    if (!req.user || !['owner', 'sales', 'team_leader', 'account_manager'].includes(req.user.role)) {
+    if (!req.user || !['owner', 'sales', 'team_leader', 'account_manager', 'moderation'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied. Authorized roles only.' });
         return;
     }
@@ -41,3 +41,19 @@ const ownerOrTeamLeaderOrSales = (req, res, next) => {
     next();
 };
 exports.ownerOrTeamLeaderOrSales = ownerOrTeamLeaderOrSales;
+const ownerOrTeamLeaderOrContentCreator = (req, res, next) => {
+    if (!req.user || !['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+        res.status(403).json({ error: 'Access denied. Authorized roles only.' });
+        return;
+    }
+    next();
+};
+exports.ownerOrTeamLeaderOrContentCreator = ownerOrTeamLeaderOrContentCreator;
+const ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator = (req, res, next) => {
+    if (!req.user || !['owner', 'sales', 'team_leader', 'account_manager', 'moderation', 'content_creator'].includes(req.user.role)) {
+        res.status(403).json({ error: 'Access denied. Authorized roles only.' });
+        return;
+    }
+    next();
+};
+exports.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator = ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator;

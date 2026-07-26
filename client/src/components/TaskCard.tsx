@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, clientsApi } from '@/lib/api';
+import { tasksApi, usersApi, closedClientsApi } from '@/lib/api';
 import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
 import {
   DropdownMenu,
@@ -160,7 +160,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
     setLoadingLists(true);
     Promise.all([
       usersApi.list(),
-      clientsApi.list(),
+      closedClientsApi.list(),
     ]).then(([usersData, clientsData]) => {
       setMembers(usersData.users);
       setClients(clientsData.clients);

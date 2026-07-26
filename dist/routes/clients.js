@@ -18,7 +18,7 @@ router.get('/reports/custom', auth_1.authMiddleware, roleCheck_1.ownerOnly, asyn
         const eDate = String(endDate);
         const { data: clients, error } = await supabase_1.supabaseAdmin
             .from('clients')
-            .select('*, sales_rep:profiles(name), contracts(*)');
+            .select('*, sales_rep:profiles!clients_sales_rep_id_fkey(name), contracts(*)');
         if (error) {
             res.status(500).json({ error: error.message });
             return;
@@ -69,13 +69,24 @@ router.get('/portal/data', auth_1.authMiddleware, async (req, res) => {
             .select('*')
             .eq('client_id', client.id)
             .order('sort_order', { ascending: true });
-        // 3. Fetch approved or published content plans (only basic fields, exclude drafts)
+        // 3. Fetch content plans
         const { data: contentPlans, error: plansErr } = await supabase_1.supabaseAdmin
             .from('client_content_plans')
-            .select('id, title, content_type, status, scheduled_date, drive_link')
+            .select('*')
             .eq('client_id', client.id)
-            .in('status', ['approved', 'published'])
-            .order('scheduled_date', { ascending: true });
+            .order('created_at', { ascending: false });
+        if (plansErr) {
+            console.error('Error fetching client_content_plans:', plansErr);
+        }
+        // 4. Fetch content items from contents table
+        const { data: contents, error: contentsErr } = await supabase_1.supabaseAdmin
+            .from('contents')
+            .select('*')
+            .eq('client_id', client.id)
+            .order('created_at', { ascending: false });
+        if (contentsErr) {
+            console.error('Error fetching contents:', contentsErr);
+        }
         // 4. Fetch performance reports (Views, Engagement, etc.)
         const { data: reports, error: reportsErr } = await supabase_1.supabaseAdmin
             .from('client_reports')
@@ -86,6 +97,7 @@ router.get('/portal/data', auth_1.authMiddleware, async (req, res) => {
             client: populatedClient,
             faq: faq || [],
             contentPlans: contentPlans || [],
+            contents: contents || [],
             reports: reports || [],
         });
     }
@@ -94,11 +106,11 @@ router.get('/portal/data', auth_1.authMiddleware, async (req, res) => {
     }
 });
 // GET /api/clients — List all clients
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (_req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (_req, res) => {
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('clients')
-            .select('*')
+            .select('*, sales_rep:profiles!clients_sales_rep_id_fkey(id, name)')
             .order('created_at', { ascending: false });
         if (error) {
             res.status(500).json({ error: error.message });
@@ -113,7 +125,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAcc
 });
 // POST /api/clients — Create a new client
 router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
-    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id } = req.body;
+    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
     if (!name) {
         res.status(400).json({ error: 'Client name is required' });
         return;
@@ -143,6 +155,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAc
             done_other: done_other ?? false,
             deliverables_schedule: deliverables_schedule || { posts: [], reels: [], stories: [], photos: [] },
             user_id: user_id || null,
+            sales_rep_id: sales_rep_id || null,
         })
             .select()
             .single();
@@ -157,9 +170,9 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAc
     }
 });
 // PUT /api/clients/:id — Update a client
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
-    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id } = req.body;
+    const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
     try {
         const updates = {};
         if (name !== undefined)
@@ -204,6 +217,8 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOr
             updates.deliverables_schedule = deliverables_schedule;
         if (user_id !== undefined)
             updates.user_id = user_id || null;
+        if (sales_rep_id !== undefined)
+            updates.sales_rep_id = sales_rep_id || null;
         const { data, error } = await supabase_1.supabaseAdmin
             .from('clients')
             .update(updates)

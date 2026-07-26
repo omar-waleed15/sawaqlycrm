@@ -6,7 +6,7 @@ const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const router = (0, express_1.Router)();
 // GET /api/ideas — List all content ideas (owner only)
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (_req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrContentCreator, async (_req, res) => {
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('content_ideas')
@@ -23,7 +23,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (_re
     }
 });
 // POST /api/ideas — Create a new content idea (owner only)
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrContentCreator, async (req, res) => {
     const { title, description, content_type, drive_link, content_description, rating } = req.body;
     if (!title) {
         res.status(400).json({ error: 'Title is required' });
@@ -59,7 +59,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (re
     }
 });
 // PUT /api/ideas/:id — Update a content idea (owner only)
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrContentCreator, async (req, res) => {
     const { id } = req.params;
     const { title, description, content_type, drive_link, content_description, rating } = req.body;
     const validRatings = ['good', 'medium', 'bad'];
@@ -98,7 +98,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (
     }
 });
 // DELETE /api/ideas/:id — Delete a content idea (owner only)
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin

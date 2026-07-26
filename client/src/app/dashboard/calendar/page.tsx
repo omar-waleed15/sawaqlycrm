@@ -91,6 +91,12 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<'calendar' | 'agenda'>('calendar');
 
   useEffect(() => {
+    if (user?.role === 'sales') {
+      router.replace('/dashboard/sales-calendar');
+    }
+  }, [user, router]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setViewMode('agenda');
     }

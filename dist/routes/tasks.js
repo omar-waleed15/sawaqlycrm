@@ -4,11 +4,12 @@ const express_1 = require("express");
 const supabase_1 = require("../lib/supabase");
 const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
+const webhook_1 = require("../lib/webhook");
 const router = (0, express_1.Router)();
 // Helper: build task select query with assignees joined
 const TASK_SELECT = `
   *,
-  creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url),
+  creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url, phone),
   client:clients(id, name, company),
   task_assignees(
     id,
@@ -22,7 +23,7 @@ const TASK_SELECT = `
     updated_at,
     total_time_spent,
     timer_started_at,
-    user:profiles(id, name, email, avatar_url)
+    user:profiles(id, name, email, avatar_url, phone)
   ),
   attachments(id),
   comments(id)
@@ -31,30 +32,51 @@ const TASK_SELECT = `
 function isTaskAdmin(role) {
     return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
-// Helper: check if user is allowed to administer a specific task (must NOT be assigned to it if they are team_leader, moderation, or account_manager)
-async function canAdministerTask(userId, role, taskId) {
-    if (role === 'owner')
-        return true;
-    if (!['team_leader', 'moderation', 'account_manager'].includes(role))
-        return false;
-    // Check if they are in the assignees list
-    const { data, error } = await supabase_1.supabaseAdmin
-        .from('task_assignees')
-        .select('id')
-        .eq('task_id', taskId)
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (error) {
-        console.error('Error checking task assignment for administration check:', error);
-        return false;
+// Helper: check if user is allowed to administer a specific task (owner, team_leader, moderation, account_manager)
+async function canAdministerTask(_userId, role, _taskId) {
+    return ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
+}
+// Helper: get computed task status based on assignees status
+function getTaskStatus(task, userId, role) {
+    const assignees = task.task_assignees || [];
+    if (isTaskAdmin(role)) {
+        // Admin/TL/Manager/Moderator sees the aggregate status of the task
+        if (assignees.length === 0) {
+            return 'todo';
+        }
+        const allCompleted = assignees.every((a) => a.status === 'completed');
+        if (allCompleted) {
+            return 'completed';
+        }
+        const anyInProgress = assignees.some((a) => a.status === 'in_progress' || a.status === 'revision');
+        if (anyInProgress) {
+            return 'in_progress';
+        }
+        const anySubmitted = assignees.some((a) => a.status === 'submitted');
+        if (anySubmitted) {
+            return 'submitted';
+        }
+        return 'todo';
     }
-    // They can administer only if they are NOT in the assignees list
-    return !data;
+    else {
+        // Regular member sees their own assignment status
+        const myAssignee = assignees.find((a) => a.user_id === userId);
+        return myAssignee ? myAssignee.status : 'todo';
+    }
+}
+// Helper: enrich task with computed status
+function enrichTask(task, userId, role) {
+    if (!task)
+        return task;
+    return {
+        ...task,
+        status: getTaskStatus(task, userId, role)
+    };
 }
 // GET /api/tasks — Get tasks (owner: all, member: assigned only)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     try {
-        const { status, priority, assignee_id, archived } = req.query;
+        const { status, priority, assignee_id, archived, client_id } = req.query;
         const userRole = req.user.role;
         const showArchived = archived === 'true' && userRole !== 'moderation';
         if (isTaskAdmin(userRole)) {
@@ -66,6 +88,8 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 .order('created_at', { ascending: false });
             if (priority)
                 query = query.eq('priority', priority);
+            if (client_id)
+                query = query.eq('client_id', client_id);
             const { data, error } = await query;
             if (error) {
                 res.status(500).json({ error: error.message });
@@ -76,9 +100,11 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             if (assignee_id) {
                 tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.user_id === assignee_id));
             }
-            // Filter by status if provided (check if any assignee matches)
+            // Enrich tasks with computed status
+            tasks = tasks.map((t) => enrichTask(t, req.user.id, userRole));
+            // Filter by status if provided (check the computed status)
             if (status) {
-                tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.status === status));
+                tasks = tasks.filter((t) => t.status === status);
             }
             res.json({ tasks });
         }
@@ -105,15 +131,19 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 .order('created_at', { ascending: false });
             if (priority)
                 query = query.eq('priority', priority);
+            if (client_id)
+                query = query.eq('client_id', client_id);
             const { data, error } = await query;
             if (error) {
                 res.status(500).json({ error: error.message });
                 return;
             }
             let tasks = data || [];
-            // Filter by status (only the member's own assignment status)
+            // Enrich tasks with computed status
+            tasks = tasks.map((t) => enrichTask(t, req.user.id, userRole));
+            // Filter by status (which is the member's own status)
             if (status) {
-                tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.user_id === req.user.id && a.status === status));
+                tasks = tasks.filter((t) => t.status === status);
             }
             res.json({ tasks });
         }
@@ -142,6 +172,8 @@ router.get('/daily', auth_1.authMiddleware, async (req, res) => {
         if (!isTaskAdmin(req.user.role)) {
             tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.user_id === req.user.id));
         }
+        // Enrich tasks
+        tasks = tasks.map((t) => enrichTask(t, req.user.id, req.user.role));
         res.json({ tasks });
     }
     catch (err) {
@@ -233,7 +265,7 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
 });
 // POST /api/tasks — Create a new task (owner, team leader or sales)
 router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSales, async (req, res) => {
-    const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, publish_date, client_id, project_id, is_deliverable, deliverable_type, deliverable_month } = req.body;
+    const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, project_id, is_deliverable, deliverable_type, deliverable_month } = req.body;
     if (!title) {
         res.status(400).json({ error: 'Title is required' });
         return;
@@ -253,7 +285,6 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSales, as
             drive_link: drive_link || null,
             content_type: content_type || null,
             content_description: content_description || null,
-            publish_date: publish_date || null,
             client_id: client_id || null,
             project_id: project_id || null,
             is_deliverable: is_deliverable ?? false,
@@ -291,7 +322,37 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSales, as
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.status(201).json({ task: fullTask });
+        // Dispatch webhook notifications in the background
+        if (fullTask && fullTask.task_assignees && fullTask.task_assignees.length > 0) {
+            const sender = {
+                id: req.user.id,
+                name: req.user.name,
+                email: req.user.email,
+            };
+            for (const a of fullTask.task_assignees) {
+                if (a.user) {
+                    (0, webhook_1.sendWebhookNotification)({
+                        type: 'task',
+                        action: 'assigned',
+                        task: {
+                            id: fullTask.id,
+                            title: fullTask.title,
+                            description: fullTask.description || undefined,
+                            priority: fullTask.priority,
+                            due_date: fullTask.due_date || undefined,
+                        },
+                        sender,
+                        receiver: {
+                            id: a.user.id,
+                            name: a.user.name,
+                            email: a.user.email,
+                            phone: a.user.phone,
+                        },
+                    }).catch(err => console.error('Failed to dispatch webhook:', err));
+                }
+            }
+        }
+        res.status(201).json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to create task' });
@@ -354,7 +415,7 @@ router.get('/:id', auth_1.authMiddleware, async (req, res) => {
             // Only return non-expired comments
             data.comments = data.comments.filter((c) => c.created_at >= twentyFourHoursAgo);
         }
-        res.json({ task: data });
+        res.json({ task: enrichTask(data, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch task' });
@@ -365,6 +426,7 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
     const { id } = req.params;
     const admin = await canAdministerTask(req.user.id, req.user.role, id);
     try {
+        let toAdd = [];
         // Verify task exists
         const { data: existing, error: fetchError } = await supabase_1.supabaseAdmin
             .from('tasks')
@@ -377,7 +439,7 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
         }
         if (admin) {
             // Admin: update shared task fields
-            const { title, description, priority, due_date, drive_link, content_type, content_description, publish_date, publish_notes, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month } = req.body;
+            const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month } = req.body;
             const updates = {};
             if (title !== undefined)
                 updates.title = title;
@@ -393,10 +455,6 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
                 updates.content_type = content_type;
             if (content_description !== undefined)
                 updates.content_description = content_description;
-            if (publish_date !== undefined)
-                updates.publish_date = publish_date;
-            if (publish_notes !== undefined)
-                updates.publish_notes = publish_notes;
             if (client_id !== undefined)
                 updates.client_id = client_id || null;
             if (project_id !== undefined)
@@ -432,7 +490,7 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
                     .select('user_id')
                     .eq('task_id', id);
                 const currentIds = (currentAssignees || []).map((a) => a.user_id);
-                const toAdd = newIds.filter(uid => !currentIds.includes(uid));
+                toAdd = newIds.filter(uid => !currentIds.includes(uid));
                 const toRemove = currentIds.filter((uid) => !newIds.includes(uid));
                 if (toRemove.length > 0) {
                     await supabase_1.supabaseAdmin
@@ -530,7 +588,38 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
             res.status(500).json({ error: reFetchError.message });
             return;
         }
-        res.json({ task: fullTask });
+        // Dispatch webhook notifications for newly added assignees
+        if (toAdd.length > 0 && fullTask && fullTask.task_assignees) {
+            const sender = {
+                id: req.user.id,
+                name: req.user.name,
+                email: req.user.email,
+            };
+            const newlyAddedAssignees = fullTask.task_assignees.filter((a) => toAdd.includes(a.user_id));
+            for (const a of newlyAddedAssignees) {
+                if (a.user) {
+                    (0, webhook_1.sendWebhookNotification)({
+                        type: 'task',
+                        action: 'assigned',
+                        task: {
+                            id: fullTask.id,
+                            title: fullTask.title,
+                            description: fullTask.description || undefined,
+                            priority: fullTask.priority,
+                            due_date: fullTask.due_date || undefined,
+                        },
+                        sender,
+                        receiver: {
+                            id: a.user.id,
+                            name: a.user.name,
+                            email: a.user.email,
+                            phone: a.user.phone,
+                        },
+                    }).catch(err => console.error('Failed to dispatch webhook:', err));
+                }
+            }
+        }
+        res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to update task' });
@@ -571,7 +660,36 @@ router.post('/:id/assignees', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLead
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.status(201).json({ task: fullTask });
+        // Dispatch webhook notification
+        if (fullTask && fullTask.task_assignees) {
+            const sender = {
+                id: req.user.id,
+                name: req.user.name,
+                email: req.user.email,
+            };
+            const newlyAdded = fullTask.task_assignees.find((a) => a.user_id === user_id);
+            if (newlyAdded && newlyAdded.user) {
+                (0, webhook_1.sendWebhookNotification)({
+                    type: 'task',
+                    action: 'assigned',
+                    task: {
+                        id: fullTask.id,
+                        title: fullTask.title,
+                        description: fullTask.description || undefined,
+                        priority: fullTask.priority,
+                        due_date: fullTask.due_date || undefined,
+                    },
+                    sender,
+                    receiver: {
+                        id: newlyAdded.user.id,
+                        name: newlyAdded.user.name,
+                        email: newlyAdded.user.email,
+                        phone: newlyAdded.user.phone,
+                    },
+                }).catch(err => console.error('Failed to dispatch webhook:', err));
+            }
+        }
+        res.status(201).json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to add assignee' });
@@ -604,7 +722,7 @@ router.delete('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.owner
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.json({ task: fullTask });
+        res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to remove assignee' });
@@ -664,7 +782,7 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, roleCheck_1.ownerOrT
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.json({ task: fullTask });
+        res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to update assignee' });
@@ -824,7 +942,7 @@ router.post('/:id/timer/start', auth_1.authMiddleware, async (req, res) => {
                 res.status(500).json({ error: fetchError.message });
                 return;
             }
-            res.json({ task: fullTask });
+            res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
             return;
         }
         const { error: updateError } = await supabase_1.supabaseAdmin
@@ -847,7 +965,7 @@ router.post('/:id/timer/start', auth_1.authMiddleware, async (req, res) => {
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.json({ task: fullTask });
+        res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to start timer' });
@@ -878,7 +996,7 @@ router.post('/:id/timer/stop', auth_1.authMiddleware, async (req, res) => {
                 res.status(500).json({ error: fetchError.message });
                 return;
             }
-            res.json({ task: fullTask });
+            res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
             return;
         }
         const startTime = new Date(assignment.timer_started_at).getTime();
@@ -906,7 +1024,7 @@ router.post('/:id/timer/stop', auth_1.authMiddleware, async (req, res) => {
             res.status(500).json({ error: fetchError.message });
             return;
         }
-        res.json({ task: fullTask });
+        res.json({ task: enrichTask(fullTask, req.user.id, req.user.role) });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to stop timer' });

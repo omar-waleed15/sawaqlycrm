@@ -4,6 +4,18 @@ import { authMiddleware, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+const ALL_SYSTEM_ROLES = [
+  'team_leader',
+  'sales',
+  'member',
+  'graphic_designer',
+  'video_editor',
+  'reel_maker',
+  'moderation',
+  'account_manager',
+  'content_creator',
+];
+
 // GET /api/roles — List role descriptions
 // Owner sees all roles; other members see only their own role
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -31,20 +43,37 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
         res.status(500).json({ error: error.message });
         return;
       }
-      res.json({ roles: data || [] });
+
+      let existing = data || [];
+      const existingKeys = existing.map((r: any) => r.role_key);
+      const missingKeys = ALL_SYSTEM_ROLES.filter(k => !existingKeys.includes(k));
+
+      if (missingKeys.length > 0) {
+        const rowsToInsert = missingKeys.map(k => ({ role_key: k }));
+        const { data: insertedData } = await supabaseAdmin
+          .from('role_descriptions')
+          .insert(rowsToInsert)
+          .select();
+        if (insertedData) {
+          existing = [...existing, ...insertedData];
+        } else {
+          missingKeys.forEach(k => existing.push({ role_key: k }));
+        }
+      }
+
+      res.json({ roles: existing });
     } else {
       // Non-owner sees only their own role
-      const { data, error } = await supabaseAdmin
+      let { data, error } = await supabaseAdmin
         .from('role_descriptions')
         .select('*')
         .eq('role_key', user.role)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        res.status(500).json({ error: error.message });
-        return;
+      if (!data) {
+        data = { role_key: user.role } as any;
       }
-      res.json({ roles: data ? [data] : [] });
+      res.json({ roles: [data] });
     }
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch role descriptions' });
@@ -75,6 +104,7 @@ router.put('/:roleKey', authMiddleware, async (req: AuthRequest, res: Response):
     } = req.body;
 
     const updatePayload: Record<string, any> = {
+      role_key: roleKey,
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };
@@ -87,8 +117,7 @@ router.put('/:roleKey', authMiddleware, async (req: AuthRequest, res: Response):
 
     const { data, error } = await supabaseAdmin
       .from('role_descriptions')
-      .update(updatePayload)
-      .eq('role_key', roleKey)
+      .upsert(updatePayload, { onConflict: 'role_key' })
       .select()
       .single();
 

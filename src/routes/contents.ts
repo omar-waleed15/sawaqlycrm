@@ -6,7 +6,7 @@ import multer from 'multer';
 const router = Router();
 
 const dashboardUserOnly = (req: AuthRequest, res: Response, next: any) => {
-  if (!req.user || req.user.role === 'client' || req.user.role === 'sales' || req.user.role === 'member') {
+  if (!req.user || req.user.role === 'client' || req.user.role === 'sales' || req.user.role === 'member' || req.user.role === 'graphic_designer' || req.user.role === 'video_editor' || req.user.role === 'reel_maker') {
     res.status(403).json({ error: 'Access denied. Authorized roles only.' });
     return;
   }

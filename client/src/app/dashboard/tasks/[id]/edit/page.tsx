@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi, clientsApi, attachmentsApi } from '@/lib/api';
+import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client, Attachment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,7 +67,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     Promise.all([
       tasksApi.get(id),
       usersApi.list(),
-      clientsApi.list(),
+      closedClientsApi.list(),
     ]).then(([taskData, usersData, clientsData]) => {
       const tData = taskData.task;
       const myA = tData.task_assignees?.find((a: any) => a.user_id === user?.id);
