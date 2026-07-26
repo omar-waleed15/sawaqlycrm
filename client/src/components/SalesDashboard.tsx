@@ -38,6 +38,7 @@ import {
   Building2,
   Clock,
   Mail,
+  MapPin,
   ExternalLink
 } from 'lucide-react';
 
@@ -110,8 +111,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   const [errorMsg, setErrorMsg] = useState('');
 
   // Forms state: list of dynamic lead rows (starts with 1)
-  const [leadRows, setLeadRows] = useState<{ name: string; phone: string; company: string; email: string; pipeline_stage: string }[]>([
-    { name: '', phone: '', company: '', email: '', pipeline_stage: 'new_lead' }
+  const [leadRows, setLeadRows] = useState<{ name: string; phone: string; company: string; address: string; pipeline_stage: string }[]>([
+    { name: '', phone: '', company: '', address: '', pipeline_stage: 'new_lead' }
   ]);
 
   const [selectedLead, setSelectedLead] = useState<Client | null>(null);
@@ -342,13 +343,13 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   };
 
   const handleOpenAddLead = () => {
-    setLeadRows([{ name: '', phone: '', company: '', email: '', pipeline_stage: 'new_lead' }]);
+    setLeadRows([{ name: '', phone: '', company: '', address: '', pipeline_stage: 'new_lead' }]);
     setErrorMsg('');
     setLeadModalOpen(true);
   };
 
   const handleAddLeadRow = () => {
-    setLeadRows(prev => [...prev, { name: '', phone: '', company: '', email: '', pipeline_stage: 'new_lead' }]);
+    setLeadRows(prev => [...prev, { name: '', phone: '', company: '', address: '', pipeline_stage: 'new_lead' }]);
   };
 
   const handleRemoveLeadRow = (index: number) => {
@@ -371,7 +372,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     setErrorMsg('');
 
     // Filter out rows that are completely empty to be lenient
-    const activeRows = leadRows.filter(row => row.name.trim() || row.phone.trim() || row.company.trim() || row.email.trim());
+    const activeRows = leadRows.filter(row => row.name.trim() || row.phone.trim() || row.company.trim() || row.address.trim());
     
     // If all are empty, default to the first row (which will fail validation if incomplete)
     const rowsToValidate = activeRows.length > 0 ? activeRows : leadRows;
@@ -389,7 +390,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     try {
       await salesApi.createLead(rowsToValidate);
       setLeadModalOpen(false);
-      setLeadRows([{ name: '', phone: '', company: '', email: '', pipeline_stage: 'new_lead' }]);
+      setLeadRows([{ name: '', phone: '', company: '', address: '', pipeline_stage: 'new_lead' }]);
       fetchDashboard(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to add prospective deal(s)');
@@ -443,40 +444,42 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   const handleCloseWonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLead) return;
-    if (!closeWonForm.contractName || !closeWonForm.amount) {
-      setErrorMsg('Contract Name and Amount are required');
+
+    if (closeWonForm.amount && Number(closeWonForm.amount) <= 0) {
+      setErrorMsg('Valid contract amount is required');
       return;
     }
 
     setSubmitting(true);
     setErrorMsg('');
     try {
-      // 1. Fire close won logic to update lead and build project/contract/tasks
-      const payload: any = {
-        name: closeWonForm.contractName,
+      const payload: any = closeWonForm.amount ? {
+        name: closeWonForm.contractName || `${selectedLead.company || selectedLead.name} - Contract`,
         amount: Number(closeWonForm.amount),
         is_recurring: closeWonForm.is_recurring,
         billing_cycle: closeWonForm.billing_cycle,
         start_date: closeWonForm.start_date,
         renewal_date: closeWonForm.is_recurring ? closeWonForm.renewal_date || undefined : undefined,
-      };
-
-      if (closeWonForm.taskTitle) {
-        payload.tasks = [{
-          title: closeWonForm.taskTitle,
-          description: closeWonForm.taskDescription || undefined,
-          priority: closeWonForm.taskPriority,
-          dueDate: closeWonForm.taskDueDate || undefined,
-          contentType: closeWonForm.taskContentType || undefined,
-          contentDescription: closeWonForm.taskContentDescription || undefined,
-          driveLink: closeWonForm.taskDriveLink || undefined,
-          projectId: closeWonForm.taskProjectId === 'new' ? undefined : closeWonForm.taskProjectId || undefined,
-          assigneeIds: closeWonForm.taskAssigneeIds.length > 0 ? closeWonForm.taskAssigneeIds : undefined,
-        }];
-      }
+      } : undefined;
 
       await salesApi.closeWon(selectedLead.id, payload);
 
+      setCloseWonModalOpen(false);
+      setSelectedLead(null);
+      fetchDashboard(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to complete won deal flow');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSkipCloseWon = async () => {
+    if (!selectedLead) return;
+    setSubmitting(true);
+    setErrorMsg('');
+    try {
+      await salesApi.closeWon(selectedLead.id);
       setCloseWonModalOpen(false);
       setSelectedLead(null);
       fetchDashboard(true);
@@ -724,7 +727,11 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           <span className="flex items-center gap-1 font-semibold">
                             <Phone className="size-3" /> {lead.phone}
                           </span>
-                          {lead.email && <span>• {lead.email}</span>}
+                          {(lead.address || lead.email) && (
+                            <span className="flex items-center gap-1">
+                              • <MapPin className="size-3" /> {lead.address || lead.email}
+                            </span>
+                          )}
                           {lead.meeting_date && (
                             <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/20 px-2 py-0.5 rounded text-[10px]">
                               {t('sales.meeting')} {formatCairoDateTime(lead.meeting_date, locale, { dateStyle: 'short', timeStyle: 'short' })}
@@ -753,6 +760,15 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                              <Phone className="size-3.5 animate-pulse" /> {t('sales.logCallOutcome')}
                            </Button>
                          )}
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDeal(lead.id, lead.name); }}
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          title={locale === 'ar' ? 'حذف العميل المحتمل' : 'Delete Prospect'}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </div>
                     </div>
 
@@ -844,7 +860,11 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           <span className="flex items-center gap-1">
                             <Phone className="size-3" /> {lead.phone}
                           </span>
-                          {lead.email && <span>• {lead.email}</span>}
+                          {(lead.address || lead.email) && (
+                            <span className="flex items-center gap-1">
+                              • <MapPin className="size-3" /> {lead.address || lead.email}
+                            </span>
+                          )}
                           <span>
                             • {locale === 'ar' ? 'تم الإغلاق في ' : 'Closed on '}{formatCairoDate(lead.created_at, locale, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
@@ -860,6 +880,15 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                         <Badge variant="secondary" className={`text-xs py-1 px-3 ${lead.pipeline_stage === 'won' ? 'bg-green-50 text-green-700 font-extrabold border-green-200' : 'bg-rose-50 text-rose-700 font-extrabold border-rose-200'}`}>
                           {lead.pipeline_stage === 'won' ? `✅ ${t('sales.won')}` : `❌ ${t('sales.lost')}`}
                         </Badge>
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDeal(lead.id, lead.name); }}
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          title={locale === 'ar' ? 'حذف الصفقة' : 'Delete Deal'}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                         <div className="size-8 rounded-lg bg-muted/60 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                           <Eye className="size-4" />
                         </div>
@@ -938,7 +967,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                   </div>
                 </div>
 
-                {/* Grid 2: Company and Email */}
+                {/* Grid 2: Company and Address */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor={`company-${index}`} className="text-[11px] font-semibold">{t('sales.companyLabel')}</Label>
@@ -950,13 +979,13 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <Label htmlFor={`email-${index}`} className="text-[11px] font-semibold">{t('sales.emailLabel')}</Label>
+                    <Label htmlFor={`address-${index}`} className="text-[11px] font-semibold">{t('sales.addressLabel')}</Label>
                     <Input
-                      id={`email-${index}`}
-                      type="email"
-                      placeholder="e.g. john@acme.com"
-                      value={row.email}
-                      onChange={e => handleLeadRowChange(index, 'email', e.target.value)}
+                      id={`address-${index}`}
+                      type="text"
+                      placeholder={t('sales.addressPlaceholder')}
+                      value={row.address}
+                      onChange={e => handleLeadRowChange(index, 'address', e.target.value)}
                     />
                   </div>
                 </div>
@@ -1066,7 +1095,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         </form>
       </Modal>
 
-      {/* ── Modal: Close Won Deal Wizard ───────────────────────────────────── */}
+      {/* ── Modal: Close Won Deal (Optional Contract) ────────────────────── */}
       <Modal isOpen={closeWonModalOpen} onClose={() => setCloseWonModalOpen(false)} title={t('sales.closeWon')}>
         <form onSubmit={handleCloseWonSubmit} className="flex flex-col gap-4">
           {errorMsg && (
@@ -1075,299 +1104,95 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
             </div>
           )}
 
-          {/* Stepper Header */}
-          <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase border-b pb-2">
-            <span className={closeWonStep === 1 ? 'text-indigo-600' : ''}>{locale === 'ar' ? '1. تفاصيل العقد' : '1. Contract Details'}</span>
-            <ArrowRight className="size-3" />
-            <span className={closeWonStep === 2 ? 'text-indigo-600' : ''}>{locale === 'ar' ? '2. إعداد المهمة' : '2. Setup Task'}</span>
+
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="won-contract-name">{t('sales.contractName')}</Label>
+              <span className="text-[10px] text-muted-foreground uppercase font-bold">{locale === 'ar' ? '(اختياري)' : '(Optional)'}</span>
+            </div>
+            <Input
+              id="won-contract-name"
+              placeholder="e.g. Monthly Content Marketing Contract"
+              value={closeWonForm.contractName}
+              onChange={e => setCloseWonForm(p => ({ ...p, contractName: e.target.value }))}
+            />
           </div>
 
-          {/* STEP 1: Contract details */}
-          {closeWonStep === 1 && (
-            <div className="flex flex-col gap-4 py-1">
-              <div className="max-h-[50vh] overflow-y-auto pr-1.5 flex flex-col gap-4 py-1">
-                <div className="bg-green-50/50 border border-green-100 p-3 rounded-lg text-xs font-medium text-green-950">
-                  {locale === 'ar' 
-                    ? '🎉 تهانينا! لنقم بإنهاء تفاصيل العقد. سيتم تسجيل العميل في مدير العملاء تلقائياً.' 
-                    : "🎉 Congratulations! Let's finalize the contract details. The client will be logged in the client manager automatically."}
-                </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="won-amount">{t('sales.contractAmount')}</Label>
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">{locale === 'ar' ? '(اختياري)' : '(Optional)'}</span>
+              </div>
+              <Input
+                id="won-amount"
+                type="number"
+                min="0"
+                placeholder="e.g. 5000"
+                value={closeWonForm.amount}
+                onChange={e => setCloseWonForm(p => ({ ...p, amount: e.target.value }))}
+              />
+            </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="won-contract-name">{t('sales.contractName')} *</Label>
-                  <Input
-                    id="won-contract-name"
-                    placeholder="e.g. Monthly Content Marketing Contract"
-                    value={closeWonForm.contractName}
-                    onChange={e => setCloseWonForm(p => ({ ...p, contractName: e.target.value }))}
-                    required
-                  />
-                </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="won-billing">{locale === 'ar' ? 'نوع الفوترة' : 'Billing Type'}</Label>
+              <Select
+                value={closeWonForm.is_recurring ? 'recurring' : 'one_time'}
+                onValueChange={v => setCloseWonForm(p => ({ ...p, is_recurring: v === 'recurring' }))}
+              >
+                <SelectTrigger id="won-billing">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recurring">{t('finance.recurring')}</SelectItem>
+                  <SelectItem value="one_time">{t('finance.oneTime')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="won-amount">{t('sales.contractAmount')} *</Label>
-                    <Input
-                      id="won-amount"
-                      type="number"
-                      placeholder="e.g. 5000"
-                      value={closeWonForm.amount}
-                      onChange={e => setCloseWonForm(p => ({ ...p, amount: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="won-billing">{locale === 'ar' ? 'نوع الفوترة' : 'Billing Type'}</Label>
-                    <Select
-                      value={closeWonForm.is_recurring ? 'recurring' : 'one_time'}
-                      onValueChange={v => setCloseWonForm(p => ({ ...p, is_recurring: v === 'recurring' }))}
-                    >
-                      <SelectTrigger id="won-billing">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="recurring">{t('finance.recurring')}</SelectItem>
-                        <SelectItem value="one_time">{t('finance.oneTime')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {closeWonForm.is_recurring && (
-                  <div className="grid grid-cols-2 gap-4 animate-fade-in">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="won-cycle">{t('sales.billingCycle')}</Label>
-                      <Select
-                        value={closeWonForm.billing_cycle}
-                        onValueChange={v => setCloseWonForm(p => ({ ...p, billing_cycle: v || 'monthly' }))}
-                      >
-                        <SelectTrigger id="won-cycle">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">{t('finance.monthly')}</SelectItem>
-                          <SelectItem value="quarterly">{t('finance.quarterly')}</SelectItem>
-                          <SelectItem value="yearly">{t('finance.yearly')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="won-renewal">{t('sales.renewalDate')}</Label>
-                      <Input
-                        id="won-renewal"
-                        type="date"
-                        value={closeWonForm.renewal_date}
-                        onChange={e => setCloseWonForm(p => ({ ...p, renewal_date: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                )}
+          {closeWonForm.is_recurring && (
+            <div className="grid grid-cols-2 gap-4 animate-fade-in">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="won-cycle">{t('sales.billingCycle')}</Label>
+                <Select
+                  value={closeWonForm.billing_cycle}
+                  onValueChange={v => setCloseWonForm(p => ({ ...p, billing_cycle: v || 'monthly' }))}
+                >
+                  <SelectTrigger id="won-cycle">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">{t('finance.monthly')}</SelectItem>
+                    <SelectItem value="quarterly">{t('finance.quarterly')}</SelectItem>
+                    <SelectItem value="yearly">{t('finance.yearly')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="flex justify-end pt-3 border-t">
-                <Button type="button" onClick={() => setCloseWonStep(2)} className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-                  {t('sales.nextStep')} <ArrowRight className="size-4" />
-                </Button>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="won-renewal">{t('sales.renewalDate')}</Label>
+                <Input
+                  id="won-renewal"
+                  type="date"
+                  value={closeWonForm.renewal_date}
+                  onChange={e => setCloseWonForm(p => ({ ...p, renewal_date: e.target.value }))}
+                />
               </div>
             </div>
           )}
 
-          {/* STEP 2: Kickoff Task specs */}
-          {closeWonStep === 2 && (
-            <div className="flex flex-col gap-4 py-1">
-              <div className="max-h-[50vh] overflow-y-auto pr-1.5 flex flex-col gap-4 py-1">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-title">{t('sales.taskTitle')} *</Label>
-                  <Input
-                    id="task-title"
-                    placeholder="e.g. Kickoff Content Reel"
-                    value={closeWonForm.taskTitle}
-                    onChange={e => setCloseWonForm(p => ({ ...p, taskTitle: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-description">{t('sales.taskDescription')}</Label>
-                  <Textarea
-                    id="task-description"
-                    placeholder="Add content outline or instructions for the creative team to begin production..."
-                    value={closeWonForm.taskDescription}
-                    onChange={e => setCloseWonForm(p => ({ ...p, taskDescription: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="task-priority">{t('sales.taskPriority')}</Label>
-                    <Select
-                      value={closeWonForm.taskPriority}
-                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskPriority: v || 'medium' }))}
-                    >
-                      <SelectTrigger id="task-priority">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">{t('priority.low')}</SelectItem>
-                        <SelectItem value="medium">{t('priority.medium')}</SelectItem>
-                        <SelectItem value="high">{t('priority.high')}</SelectItem>
-                        <SelectItem value="urgent">{t('priority.urgent')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="task-due">{t('sales.taskDeadline')} *</Label>
-                    <Input
-                      id="task-due"
-                      type="date"
-                      value={closeWonForm.taskDueDate}
-                      onChange={e => setCloseWonForm(p => ({ ...p, taskDueDate: e.target.value }))}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Content Assets */}
-                <div className="border-t border-border pt-4">
-                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">{t('createTask.contentAssets')}</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="task-content-type">{t('createTask.contentType')}</Label>
-                      <Select
-                        value={closeWonForm.taskContentType}
-                        onValueChange={v => setCloseWonForm(p => ({ ...p, taskContentType: v || 'other' }))}
-                      >
-                        <SelectTrigger id="task-content-type">
-                          <SelectValue placeholder={t('createTask.selectContentType')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="post">{t('contentType.post')}</SelectItem>
-                          <SelectItem value="story">{t('contentType.story')}</SelectItem>
-                          <SelectItem value="reel">{t('contentType.reel')}</SelectItem>
-                          <SelectItem value="photos">{t('contentType.photos')}</SelectItem>
-                          <SelectItem value="other">{t('contentType.other')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="task-drive-link">{t('createTask.driveLink')}</Label>
-                      <Input
-                        id="task-drive-link"
-                        type="url"
-                        placeholder="https://drive.google.com/..."
-                        value={closeWonForm.taskDriveLink}
-                        onChange={e => setCloseWonForm(p => ({ ...p, taskDriveLink: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 mt-3">
-                    <Label htmlFor="task-content-desc">{t('createTask.contentDetails')}</Label>
-                    <Textarea
-                      id="task-content-desc"
-                      placeholder={t('createTask.contentDetailsPlaceholder')}
-                      value={closeWonForm.taskContentDescription}
-                      onChange={e => setCloseWonForm(p => ({ ...p, taskContentDescription: e.target.value }))}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-
-                {/* Project & Assignees */}
-                <div className="border-t border-border pt-4 flex flex-col gap-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'ربط المشروع والمكلفين' : 'Project Link & Assignees'}</h4>
-                  
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="task-project-id">{t('createTask.linkToProject')}</Label>
-                    <Select
-                      value={closeWonForm.taskProjectId || 'new'}
-                      onValueChange={v => setCloseWonForm(p => ({ ...p, taskProjectId: v || 'new' }))}
-                    >
-                      <SelectTrigger id="task-project-id">
-                        <SelectValue placeholder={t('sales.autoProject')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">{t('sales.autoProject')}</SelectItem>
-                        {projects.filter(p => p.client_id === selectedLead?.id).map(p => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="mb-1 block">{t('createTask.assignTo')}</Label>
-                    {closeWonForm.taskAssigneeIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {closeWonForm.taskAssigneeIds.map(uid => {
-                          const m = members.find(u => u.id === uid);
-                          if (!m) return null;
-                          return (
-                            <Badge
-                              key={uid}
-                              variant="secondary"
-                              className="flex items-center gap-1.5 py-1 px-2.5 text-xs font-semibold"
-                            >
-                              <div className="size-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[8px] font-bold text-white shrink-0">
-                                {getInitials(m.name)}
-                              </div>
-                              {m.name}
-                              <button
-                                type="button"
-                                onClick={() => removeAssignee(uid)}
-                                className="ml-1 hover:text-destructive transition-colors"
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </Badge>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Select
-                        value=""
-                        onValueChange={val => {
-                          if (val) {
-                            setCloseWonForm(p => {
-                              if (p.taskAssigneeIds.includes(val)) return p;
-                              return { ...p, taskAssigneeIds: [...p.taskAssigneeIds, val] };
-                            });
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder={t('createTask.selectMember')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {unassignedMembers.map(m => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.name} ({m.role})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between pt-3 border-t mt-2">
-                <Button type="button" variant="outline" onClick={() => setCloseWonStep(1)} disabled={submitting}>{t('common.back')}</Button>
-                <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-                  {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                  🚀 {t('sales.completeClosing')}
-                </Button>
-              </div>
-            </div>
-          )}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t mt-2">
+            <Button type="button" variant="outline" onClick={handleSkipCloseWon} disabled={submitting} className="w-full sm:w-auto text-xs">
+              {submitting ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
+              {locale === 'ar' ? 'إغلاق الصفقة بدون عقد' : 'Close Deal without Contract'}
+            </Button>
+            <Button type="submit" disabled={submitting || !closeWonForm.amount} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full sm:w-auto text-xs">
+              {submitting ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
+              {locale === 'ar' ? 'حفظ العقد وإغلاق الصفقة' : 'Save Contract & Close Deal'}
+            </Button>
+          </div>
         </form>
       </Modal>
 
@@ -1411,11 +1236,11 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
               </div>
               <div className="flex items-center gap-2.5 text-sm">
                 <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
-                  <Mail className="size-4" />
+                  <MapPin className="size-4" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('sales.emailLabel')}</div>
-                  <span className="text-xs font-semibold text-foreground">{detailDeal.email || '—'}</span>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('sales.addressLabel')}</div>
+                  <span className="text-xs font-semibold text-foreground">{detailDeal.address || detailDeal.email || '—'}</span>
                 </div>
               </div>
               {detailDeal.meeting_date && (

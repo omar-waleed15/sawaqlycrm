@@ -699,6 +699,8 @@ export const en: Record<string, string> = {
   'sales.phoneNumber': 'Phone Number',
   'sales.companyLabel': 'Company',
   'sales.emailLabel': 'Email',
+  'sales.addressLabel': 'Address / Location',
+  'sales.addressPlaceholder': 'e.g. Cairo, Egypt or Branch #2',
   'sales.stage': 'Stage',
   'sales.addRow': 'Add Another Prospect Row',
   'sales.addProspectsBtn': 'Add Prospects',

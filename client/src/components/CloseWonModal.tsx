@@ -52,17 +52,12 @@ export default function CloseWonModal({
     }
   }, [client, isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleConfirmWithContract = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!client) return;
 
-    if (!contractName) {
-      setErrorMsg('Contract name is required');
-      return;
-    }
-
-    if (!amount || Number(amount) <= 0) {
-      setErrorMsg('Valid contract amount is required');
+    if (amount && Number(amount) <= 0) {
+      setErrorMsg('Please enter a valid contract amount');
       return;
     }
 
@@ -70,13 +65,28 @@ export default function CloseWonModal({
       setSubmitting(true);
       setErrorMsg('');
       await salesApi.closeWon(client.id, {
-        name: contractName,
-        amount: Number(amount),
+        name: contractName || `${client.company || client.name} - Contract`,
+        amount: Number(amount) || 0,
         is_recurring: isRecurring === 'recurring',
         billing_cycle: isRecurring === 'recurring' ? billingCycle : 'one_time',
         start_date: startDate || undefined,
-      } as any);
+      });
 
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to close won');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSkipContract = async () => {
+    if (!client) return;
+    try {
+      setSubmitting(true);
+      setErrorMsg('');
+      await salesApi.closeWon(client.id);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -93,35 +103,41 @@ export default function CloseWonModal({
       title={`${t('sales.closeWon') || 'Close Won Deal'}: ${client?.name}`}
       maxWidth={520}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-start">
+      <form onSubmit={handleConfirmWithContract} className="flex flex-col gap-4 text-start">
         {errorMsg && (
           <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md">
             {errorMsg}
           </div>
         )}
 
+
+
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="contract_name">{t('clients.contractName') || 'Contract / Deal Name'} *</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="contract_name">{t('clients.contractName') || 'Contract / Deal Name'}</Label>
+            <span className="text-[10px] text-muted-foreground uppercase font-bold">{locale === 'ar' ? '(اختياري)' : '(Optional)'}</span>
+          </div>
           <Input
             id="contract_name"
             placeholder="e.g. Annual Marketing Package"
             value={contractName}
             onChange={e => setContractName(e.target.value)}
-            required
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="contract_amount">{t('clients.valueCol') || 'Contract Value ($)'} *</Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="contract_amount">{t('clients.valueCol') || 'Contract Value ($)'}</Label>
+              <span className="text-[10px] text-muted-foreground uppercase font-bold">{locale === 'ar' ? '(اختياري)' : '(Optional)'}</span>
+            </div>
             <Input
               id="contract_amount"
               type="number"
-              min="1"
+              min="0"
               placeholder="e.g. 1500"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              required
             />
           </div>
 
@@ -132,7 +148,6 @@ export default function CloseWonModal({
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              required
             />
           </div>
         </div>
@@ -168,15 +183,16 @@ export default function CloseWonModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-3 border-t mt-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-            {t('common.cancel')}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t mt-2">
+          <Button type="button" variant="outline" onClick={handleSkipContract} disabled={submitting} className="w-full sm:w-auto text-xs">
+            {submitting ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
+            {locale === 'ar' ? 'إغلاق الصفقة بدون عقد' : 'Close Deal without Contract'}
           </Button>
-          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold" disabled={submitting}>
+          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full sm:w-auto text-xs" disabled={submitting || !amount}>
             {submitting ? (
-              <><Loader2 className="size-4 animate-spin mr-1.5" /> {t('common.loading')}</>
+              <><Loader2 className="size-3.5 animate-spin mr-1.5" /> {t('common.loading')}</>
             ) : (
-              t('common.confirm') || 'Confirm & Close Won'
+              locale === 'ar' ? 'حفظ العقد وإغلاق الصفقة' : 'Save Contract & Close Deal'
             )}
           </Button>
         </div>

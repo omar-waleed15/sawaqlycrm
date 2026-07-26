@@ -310,7 +310,7 @@ export const salesApi = {
       method: 'POST',
       body: JSON.stringify({ user_id: userId, month, target_amount: targetAmount }),
     }),
-  createLead: (data: { name: string; company?: string; email?: string; phone: string; pipeline_stage?: string } | { name: string; company?: string; email?: string; phone: string; pipeline_stage?: string }[]) =>
+  createLead: (data: { name: string; company?: string; email?: string; address?: string; phone: string; pipeline_stage?: string } | { name: string; company?: string; email?: string; address?: string; phone: string; pipeline_stage?: string }[]) =>
     request<{ lead?: import('@/types').Client; leads?: import('@/types').Client[] }>('/sales/leads', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -320,11 +320,11 @@ export const salesApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  closeWon: (leadId: string, data: {
-    name: string;
-    amount: number;
-    is_recurring: boolean;
-    billing_cycle: string;
+  closeWon: (leadId: string, data?: {
+    name?: string;
+    amount?: number;
+    is_recurring?: boolean;
+    billing_cycle?: string;
     start_date?: string;
     renewal_date?: string;
     tasks?: {
@@ -338,12 +338,11 @@ export const salesApi = {
   }) =>
     request<{
       message: string;
-      project: import('@/types').Project;
-      contract: import('@/types').Contract;
-      tasks: import('@/types').Task[];
+      contract?: import('@/types').Contract;
+      tasks?: import('@/types').Task[];
     }>(`/sales/leads/${leadId}/close-won`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(data || {}),
     }),
 };
 

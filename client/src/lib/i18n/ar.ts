@@ -699,6 +699,8 @@ export const ar: Record<string, string> = {
   'sales.phoneNumber': 'رقم الهاتف',
   'sales.companyLabel': 'الشركة',
   'sales.emailLabel': 'البريد الإلكتروني',
+  'sales.addressLabel': 'العنوان / الموقع',
+  'sales.addressPlaceholder': 'مثال: القاهرة، مصر',
   'sales.stage': 'المرحلة',
   'sales.addRow': 'إضافة صف عميل محتمل آخر',
   'sales.addProspectsBtn': 'إضافة عملاء محتملين',

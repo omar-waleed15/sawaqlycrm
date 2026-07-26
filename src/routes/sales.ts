@@ -181,6 +181,7 @@ router.post('/leads', authMiddleware, ownerOrSales, async (req: AuthRequest, res
         name: item.name,
         company: item.company || null,
         email: item.email || null,
+        address: item.address || null,
         phone: item.phone,
         status: 'active',
         pipeline_stage: item.pipeline_stage || 'new_lead',
@@ -201,7 +202,7 @@ router.post('/leads', authMiddleware, ownerOrSales, async (req: AuthRequest, res
       return;
     }
 
-    const { name, company, email, phone, pipeline_stage } = body;
+    const { name, company, email, address, phone, pipeline_stage } = body;
 
     if (!name || !phone) {
       res.status(400).json({ error: 'Lead name and phone number are required' });
@@ -214,6 +215,7 @@ router.post('/leads', authMiddleware, ownerOrSales, async (req: AuthRequest, res
         name,
         company: company || null,
         email: email || null,
+        address: address || null,
         phone,
         status: 'active',
         pipeline_stage: pipeline_stage || 'new_lead',
@@ -336,16 +338,11 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
   }
 });
 
-// POST /api/sales/leads/:leadId/close-won — Close a deal, create contract/project & kickoff tasks (owner or sales)
+// POST /api/sales/leads/:leadId/close-won — Close a deal (contract creation is optional)
 router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { leadId } = req.params;
   const { name, amount, is_recurring, billing_cycle, start_date, renewal_date, tasks } = req.body;
   const salesRepId = req.user!.id;
-
-  if (!name || !amount) {
-    res.status(400).json({ error: 'Contract name and amount are required to close won' });
-    return;
-  }
 
   try {
     // 1. Fetch lead & verify ownership
@@ -365,54 +362,46 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
       return;
     }
 
-    // 2. Update client pipeline_stage to 'won' and sales_rep_id if not set
-    await supabaseAdmin
+    // 2. Update client pipeline_stage to 'won', status to 'active', and sales_rep_id if not set
+    const { error: updateErr } = await supabaseAdmin
       .from('clients')
-      .update({ pipeline_stage: 'won', sales_rep_id: lead.sales_rep_id || salesRepId })
+      .update({
+        pipeline_stage: 'won',
+        status: 'active',
+        sales_rep_id: lead.sales_rep_id || salesRepId,
+      })
       .eq('id', leadId);
 
-    // 3. Create Project
-    const { data: project, error: projErr } = await supabaseAdmin
-      .from('projects')
-      .insert({
-        client_id: leadId,
-        name: `${lead.company || lead.name} - Project`,
-        status: 'active',
-        budget: Number(amount),
-        start_date: start_date || new Date().toISOString().split('T')[0],
-      })
-      .select()
-      .single();
-
-    if (projErr) {
-      res.status(500).json({ error: projErr.message });
+    if (updateErr) {
+      res.status(500).json({ error: updateErr.message });
       return;
     }
 
-    // 4. Create Contract
-    const { data: contract, error: contractErr } = await supabaseAdmin
-      .from('contracts')
-      .insert({
-        client_id: leadId,
-        project_id: project.id,
-        name,
-        amount: Number(amount),
-        is_recurring: is_recurring !== false,
-        billing_cycle: is_recurring ? (billing_cycle || 'monthly') : 'one_time',
-        status: 'active',
-        start_date: start_date || new Date().toISOString().split('T')[0],
-        renewal_date: is_recurring ? (renewal_date || null) : null,
-        sales_rep_id: salesRepId,
-      })
-      .select()
-      .single();
+    // 3. Create Contract (OPTIONAL: only if contract name and amount are provided)
+    let contract: any = null;
+    if (name && amount && Number(amount) > 0) {
+      const { data: contractData, error: contractErr } = await supabaseAdmin
+        .from('contracts')
+        .insert({
+          client_id: leadId,
+          name,
+          amount: Number(amount),
+          is_recurring: is_recurring !== false,
+          billing_cycle: is_recurring !== false ? (billing_cycle || 'monthly') : 'one_time',
+          status: 'active',
+          start_date: start_date || new Date().toISOString().split('T')[0],
+          renewal_date: is_recurring !== false ? (renewal_date || null) : null,
+          sales_rep_id: salesRepId,
+        })
+        .select()
+        .single();
 
-    if (contractErr) {
-      res.status(500).json({ error: contractErr.message });
-      return;
+      if (!contractErr) {
+        contract = contractData;
+      }
     }
 
-    // 5. Create kickoff tasks if requested
+    // 4. Create tasks (OPTIONAL: only if tasks are provided)
     const createdTasks: any[] = [];
     if (Array.isArray(tasks) && tasks.length > 0) {
       for (const t of tasks) {
@@ -427,7 +416,6 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
             content_type: t.contentType || null,
             content_description: t.contentDescription || null,
             drive_link: t.driveLink || null,
-            project_id: t.projectId || project.id,
             creator_id: salesRepId,
             client_id: leadId,
           })
@@ -452,7 +440,6 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
 
     res.status(201).json({
       message: 'Deal closed successfully!',
-      project,
       contract,
       tasks: createdTasks,
     });
