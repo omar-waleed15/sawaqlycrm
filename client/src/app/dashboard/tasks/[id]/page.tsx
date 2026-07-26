@@ -132,12 +132,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const loadTask = async () => {
     try {
-      const [taskData, commentsData] = await Promise.all([
-        tasksApi.get(id),
-        commentsApi.list(id),
-      ]);
+      const taskData = await tasksApi.get(id);
       setTask(taskData.task);
-      setComments(commentsData.comments);
 
       // Load member's submission data
       const myA = taskData.task.task_assignees?.find(a => a.user_id === user?.id);
@@ -146,7 +142,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         setCompletionNote(myA.completion_note || '');
       }
 
-    } catch {
+      // Safely fetch comments
+      try {
+        const commentsData = await commentsApi.list(id);
+        setComments(commentsData.comments || []);
+      } catch (err) {
+        console.error('Failed to fetch task comments:', err);
+        setComments([]);
+      }
+    } catch (err) {
+      console.error('Failed to load task:', err);
       router.replace('/dashboard/tasks');
     } finally {
       setLoading(false);
