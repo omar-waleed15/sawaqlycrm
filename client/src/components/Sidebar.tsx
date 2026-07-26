@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/closed-clients', labelKey: 'nav.closedClients', icon: Archive, allowedRoles: ['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'] },
   { href: '/dashboard/ideas',    labelKey: 'nav.contentIdeas',  icon: Lightbulb,       allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/calendar', labelKey: 'nav.calendar',      icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
-  { href: '/dashboard/sales-calendar', labelKey: 'nav.salesCalendar', icon: CalendarDays, allowedRoles: ['sales', 'team_leader'] },
+  { href: '/dashboard/sales-calendar', labelKey: 'nav.salesCalendar', icon: CalendarDays, allowedRoles: ['sales'] },
   { href: '/dashboard/campaigns', labelKey: 'nav.campaigns',   icon: Megaphone,       allowedRoles: ['owner'] },
   { href: '/dashboard/notes',    labelKey: 'nav.notes',         icon: FileText,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/roles',   labelKey: 'nav.roles',         icon: Shield,          allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },

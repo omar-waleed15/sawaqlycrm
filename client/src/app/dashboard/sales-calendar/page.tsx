@@ -49,7 +49,13 @@ export default function SalesCalendarPage() {
   const router = useRouter();
   const { t, locale } = useLanguage();
 
-  const isOwnerOrTL = user?.role === 'owner' || user?.role === 'team_leader';
+  useEffect(() => {
+    if (user && user.role !== 'sales' && user.role !== 'owner') {
+      router.replace('/dashboard/calendar');
+    }
+  }, [user, router]);
+
+  const isOwnerOrTL = user?.role === 'owner';
 
   // Calendar State
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());

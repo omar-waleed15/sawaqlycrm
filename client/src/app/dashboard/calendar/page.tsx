@@ -161,7 +161,7 @@ export default function CalendarPage() {
     const fetchContracts = (user.role === 'owner' || user.role === 'sales')
       ? contractsApi.list() 
       : Promise.resolve({ contracts: [] as Contract[] });
-    const fetchClients = (user.role === 'owner' || user.role === 'sales' || user.role === 'team_leader' || user.role === 'account_manager')
+    const fetchClients = (user.role !== 'client')
       ? clientsApi.list()
       : Promise.resolve({ clients: [] as Client[] });
     const fetchContents = contentsApi.list();
