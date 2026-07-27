@@ -281,7 +281,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
 
 // POST /api/tasks — Create a new task (owner, team leader or sales)
 router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, project_id, is_deliverable, deliverable_type, deliverable_month } = req.body;
+  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, project_id, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
@@ -290,27 +290,41 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
 
   try {
     // Create the task (shared fields only)
-    const { data: task, error: taskError } = await supabaseAdmin
+    const insertData: Record<string, unknown> = {
+      title,
+      description: description || null,
+      priority: priority || 'medium',
+      status: 'todo', // kept for backward compat, not used by app
+      due_date: due_date || null,
+      assignee_id: null, // deprecated
+      creator_id: req.user!.id,
+      drive_link: drive_link || null,
+      content_type: content_type || null,
+      content_description: content_description || null,
+      client_id: client_id || null,
+      project_id: project_id || null,
+      is_deliverable: is_deliverable ?? false,
+      deliverable_type: deliverable_type || null,
+      deliverable_month: deliverable_month || null,
+      estimated_time_minutes: estimated_time_minutes !== undefined && estimated_time_minutes !== null && !isNaN(Number(estimated_time_minutes)) ? Number(estimated_time_minutes) : null,
+    };
+
+    let { data: task, error: taskError } = await supabaseAdmin
       .from('tasks')
-      .insert({
-        title,
-        description: description || null,
-        priority: priority || 'medium',
-        status: 'todo', // kept for backward compat, not used by app
-        due_date: due_date || null,
-        assignee_id: null, // deprecated
-        creator_id: req.user!.id,
-        drive_link: drive_link || null,
-        content_type: content_type || null,
-        content_description: content_description || null,
-        client_id: client_id || null,
-        project_id: project_id || null,
-        is_deliverable: is_deliverable ?? false,
-        deliverable_type: deliverable_type || null,
-        deliverable_month: deliverable_month || null,
-      })
+      .insert(insertData)
       .select('*')
       .single();
+
+    if (taskError && taskError.message?.includes('estimated_time_minutes')) {
+      delete insertData.estimated_time_minutes;
+      const fallback = await supabaseAdmin
+        .from('tasks')
+        .insert(insertData)
+        .select('*')
+        .single();
+      task = fallback.data;
+      taskError = fallback.error;
+    }
 
     if (taskError) { res.status(500).json({ error: taskError.message }); return; }
 
@@ -470,7 +484,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (admin) {
       // Admin: update shared task fields
-      const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month } = req.body;
+      const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
       const updates: Record<string, unknown> = {};
       if (title !== undefined) updates.title = title;
@@ -485,6 +499,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (is_deliverable !== undefined) updates.is_deliverable = is_deliverable;
       if (deliverable_type !== undefined) updates.deliverable_type = deliverable_type;
       if (deliverable_month !== undefined) updates.deliverable_month = deliverable_month;
+      if (estimated_time_minutes !== undefined) updates.estimated_time_minutes = estimated_time_minutes !== null && !isNaN(Number(estimated_time_minutes)) ? Number(estimated_time_minutes) : null;
       if (is_archived !== undefined) {
         if (req.user!.role === 'moderation') {
           res.status(403).json({ error: 'Access denied. Moderators cannot archive or unarchive tasks.' });
@@ -494,10 +509,19 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       }
       updates.updated_at = new Date().toISOString();
 
-      const { error: updateError } = await supabaseAdmin
+      let { error: updateError } = await supabaseAdmin
         .from('tasks')
         .update(updates)
         .eq('id', id);
+
+      if (updateError && updateError.message?.includes('estimated_time_minutes')) {
+        delete updates.estimated_time_minutes;
+        const fallback = await supabaseAdmin
+          .from('tasks')
+          .update(updates)
+          .eq('id', id);
+        updateError = fallback.error;
+      }
 
       if (updateError) { res.status(500).json({ error: updateError.message }); return; }
 

@@ -546,42 +546,71 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 <CardContent className="p-5 flex flex-col gap-5 text-start">
                   
                   {/* Timer Section (Only shown if task is in progress) */}
-                  {myAssignment.status === 'in_progress' && (
-                    <div className="bg-muted/30 border border-border/60 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex flex-col text-center sm:text-start">
-                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{t('taskDetail.totalLoggedTime')}</span>
-                        <span className="text-3xl font-black font-mono tracking-tight text-foreground select-all mt-1">
-                          {formatDuration(getAssigneeTime(myAssignment))}
-                        </span>
-                      </div>
+                  {myAssignment.status === 'in_progress' && (() => {
+                    const currentSec = getAssigneeTime(myAssignment);
+                    const estimatedSec = (task.estimated_time_minutes || 0) * 60;
+                    const isOvertime = estimatedSec > 0 && currentSec > estimatedSec;
+                    const overrunMins = isOvertime ? Math.round((currentSec - estimatedSec) / 60) : 0;
 
-                      <div className="flex items-center gap-2">
-                        {myAssignment.timer_started_at ? (
-                          <>
-                            <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold bg-emerald-50 border border-emerald-200/50 px-2.5 py-1 rounded-full uppercase tracking-wider select-none animate-pulse shrink-0">
-                              <span className="size-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                              {t('taskDetail.timerRunning')}
+                    return (
+                      <div className={`rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all ${
+                        isOvertime
+                          ? 'bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-400 dark:border-rose-800 shadow-sm'
+                          : 'bg-muted/30 border border-border/60'
+                      }`}>
+                        <div className="flex flex-col text-center sm:text-start">
+                          <div className="flex items-center gap-2 justify-center sm:justify-start">
+                            <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{t('taskDetail.totalLoggedTime')}</span>
+                            {estimatedSec > 0 && (
+                              <span className="text-[10px] font-bold text-muted-foreground">
+                                / {formatDuration(estimatedSec)}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-3xl font-black font-mono tracking-tight select-all mt-1 ${
+                            isOvertime ? 'text-rose-600 dark:text-rose-400 animate-pulse' : 'text-foreground'
+                          }`}>
+                            {formatDuration(currentSec)}
+                          </span>
+                          {isOvertime && (
+                            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-0.5 flex items-center gap-1 justify-center sm:justify-start">
+                              ⚠️ {t('taskDetail.overtimeExceeded')} (+{overrunMins}m)
                             </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {myAssignment.timer_started_at ? (
+                            <>
+                              <span className={`flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider select-none animate-pulse shrink-0 border ${
+                                isOvertime
+                                  ? 'text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/50 border-rose-300'
+                                  : 'text-emerald-600 bg-emerald-50 border-emerald-200/50'
+                              }`}>
+                                <span className={`size-1.5 rounded-full animate-ping shrink-0 ${isOvertime ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                                {t('taskDetail.timerRunning')}
+                              </span>
+                              <Button
+                                onClick={handleStopTimer}
+                                disabled={timerLoading}
+                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 size-9 sm:w-auto sm:px-4 rounded-lg shadow-xs"
+                              >
+                                ⏸️ <span className="hidden sm:inline">{t('taskDetail.pauseTimer')}</span>
+                              </Button>
+                            </>
+                          ) : (
                             <Button
-                              onClick={handleStopTimer}
+                              onClick={handleStartTimer}
                               disabled={timerLoading}
-                              className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 size-9 sm:w-auto sm:px-4 rounded-lg shadow-xs"
+                              className="bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
                             >
-                              ⏸️ <span className="hidden sm:inline">{t('taskDetail.pauseTimer')}</span>
+                              ▶️ {t('taskDetail.startTimer')}
                             </Button>
-                          </>
-                        ) : (
-                          <Button
-                            onClick={handleStartTimer}
-                            disabled={timerLoading}
-                            className="bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
-                          >
-                            ▶️ {t('taskDetail.startTimer')}
-                          </Button>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Todo Status CTA */}
                   {myAssignment.status === 'todo' && (
@@ -742,10 +771,28 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5 uppercase mt-0.5">
+                              <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5 uppercase mt-0.5 flex-wrap">
                                 <span>{a.user?.role}</span>
                                 <span>·</span>
-                                <span className="text-[#1D61E7]">⏱️ {formatDuration(getAssigneeTime(a))}</span>
+                                {(() => {
+                                  const assigneeSec = getAssigneeTime(a);
+                                  const estimatedSec = (task.estimated_time_minutes || 0) * 60;
+                                  const isAssigneeOvertime = estimatedSec > 0 && assigneeSec > estimatedSec;
+
+                                  if (estimatedSec > 0) {
+                                    return (
+                                      <span className={isAssigneeOvertime ? "text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1" : "text-[#1D61E7]"}>
+                                        <span>⏱️ {formatDuration(assigneeSec)} / {formatDuration(estimatedSec)}</span>
+                                        {isAssigneeOvertime && (
+                                          <span className="text-[9px] bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 px-1 py-0.2 rounded font-extrabold normal-case">
+                                            ⚠️ {t('taskDetail.overtimeExceeded')}
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  }
+                                  return <span className="text-[#1D61E7]">⏱️ {formatDuration(assigneeSec)}</span>;
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -1049,6 +1096,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   📅 {formatDetailDateTime(task.created_at, t, locale)}
                 </span>
               </div>
+
+              {/* Estimated Time Limit */}
+              {task.estimated_time_minutes && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{t('createTask.estimatedTime')}</span>
+                  <span className="font-semibold text-foreground text-xs flex items-center gap-1.5 tabular-nums">
+                    ⏱️ {formatDuration(task.estimated_time_minutes * 60)}
+                  </span>
+                </div>
+              )}
 
               {/* Priority */}
               <div className="flex flex-col gap-1">

@@ -359,7 +359,9 @@ export default function TeamPage() {
                           <th className="py-3 px-4 text-start font-semibold">{t('team.targetColumn')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.progressColumn')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.completionRate')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.onTimeRate')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.avgCompletionTime')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('team.timeVariance')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.avgRating')}</th>
                         </tr>
                       </thead>
@@ -440,11 +442,45 @@ export default function TeamPage() {
                                 </div>
                               </td>
                               <td className="py-3 px-4 text-start">
+                                {p.taskStats.onTimeRate !== null ? (
+                                  <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded ${
+                                    p.taskStats.onTimeRate >= 80 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' :
+                                    p.taskStats.onTimeRate >= 60 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' :
+                                    'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400'
+                                  }`}>
+                                    {p.taskStats.onTimeRate}%
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground italic">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-start">
                                 {p.taskStats.averageCompletionTime !== null ? (
                                   <span className="text-xs font-semibold text-foreground tabular-nums">
                                     ⏱️ {formatDuration(p.taskStats.averageCompletionTime)}
                                   </span>
                                 ) : (
+                                  <span className="text-xs text-muted-foreground italic">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-start">
+                                {p.taskStats.netTimeVarianceSeconds !== null ? (() => {
+                                  const vSec = p.taskStats.netTimeVarianceSeconds;
+                                  const isSaved = vSec > 0;
+                                  const isWasted = vSec < 0;
+                                  const absSec = Math.abs(vSec);
+                                  return (
+                                    <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded flex items-center gap-1 w-fit ${
+                                      isSaved ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-200/60' :
+                                      isWasted ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200/60' :
+                                      'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {isSaved ? `+${formatDuration(absSec)} (${t('team.timeSaved')})` :
+                                       isWasted ? `-${formatDuration(absSec)} (${t('team.timeWasted')})` :
+                                       '00:00:00'}
+                                    </span>
+                                  );
+                                })() : (
                                   <span className="text-xs text-muted-foreground italic">—</span>
                                 )}
                               </td>

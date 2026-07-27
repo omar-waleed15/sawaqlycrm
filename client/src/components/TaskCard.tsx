@@ -67,6 +67,18 @@ function formatDuration(totalSeconds: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
+export function formatDatetimeLocal(isoStr?: string): string {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCardProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -78,14 +90,9 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
   // canAdminister checks: owner, team_leader, moderation, account_manager
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
-  // Determine logged time text
+  // Determine logged time text (only for members, hidden on cards for managers/team leaders)
   let loggedTimeText = '';
-  const totalLoggedSeconds = task.task_assignees?.reduce((sum, a) => sum + (a.total_time_spent || 0), 0) || 0;
-  if (isOwner) {
-    if (totalLoggedSeconds > 0) {
-      loggedTimeText = `${formatDuration(totalLoggedSeconds)} (${locale === 'ar' ? 'الإجمالي' : 'total'})`;
-    }
-  } else if (myAssignment) {
+  if (!isOwner && myAssignment) {
     const mySeconds = myAssignment.total_time_spent || 0;
     if (mySeconds > 0 || myAssignment.timer_started_at) {
       loggedTimeText = formatDuration(mySeconds);
@@ -113,7 +120,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
     title: task.title,
     description: task.description || '',
     priority: task.priority,
-    due_date: task.due_date ? task.due_date.split('T')[0] : '',
+    due_date: formatDatetimeLocal(task.due_date),
     drive_link: task.drive_link || '',
     content_type: task.content_type || '',
     content_description: task.content_description || '',
@@ -124,6 +131,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     })(),
+    estimated_hours: task.estimated_time_minutes ? Math.floor(task.estimated_time_minutes / 60).toString() : '',
+    estimated_minutes: task.estimated_time_minutes ? (task.estimated_time_minutes % 60).toString() : '',
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>(
@@ -137,7 +146,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
         title: task.title,
         description: task.description || '',
         priority: task.priority,
-        due_date: task.due_date ? task.due_date.split('T')[0] : '',
+        due_date: formatDatetimeLocal(task.due_date),
         drive_link: task.drive_link || '',
         content_type: task.content_type || '',
         content_description: task.content_description || '',
@@ -148,6 +157,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
           const now = new Date();
           return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         })(),
+        estimated_hours: task.estimated_time_minutes ? Math.floor(task.estimated_time_minutes / 60).toString() : '',
+        estimated_minutes: task.estimated_time_minutes ? (task.estimated_time_minutes % 60).toString() : '',
       });
       setAssigneeIds((task.task_assignees || []).map(a => a.user_id));
       setError('');
@@ -225,11 +236,14 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
     setSaving(true);
 
     try {
+      const totalEstMins = (Number(form.estimated_hours || 0) * 60) + Number(form.estimated_minutes || 0);
+
       const data = await tasksApi.update(task.id, {
         title: form.title,
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
-        due_date: form.due_date || undefined,
+        due_date: form.due_date ? new Date(form.due_date).toISOString() : undefined,
+        estimated_time_minutes: totalEstMins > 0 ? totalEstMins : null,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
@@ -346,13 +360,36 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                 </div>
               )}
 
-              {/* Logged Time */}
-              {loggedTimeText && (
-                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
-                  <span>⏱️</span>
-                  <span>{loggedTimeText}</span>
-                </div>
-              )}
+              {/* Logged Time & Overtime Indicator (Only for assigned team members, hidden for managers) */}
+              {!isOwner && myAssignment && (() => {
+                const mySeconds = myAssignment.total_time_spent || 0;
+                const estimatedSec = (task.estimated_time_minutes || 0) * 60;
+                const isOvertime = estimatedSec > 0 && mySeconds > estimatedSec;
+                
+                if (isOvertime) {
+                  return (
+                    <div className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold px-2 py-1 rounded border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 select-none text-start">
+                      <span>⚠️</span>
+                      <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
+                    </div>
+                  );
+                } else if (estimatedSec > 0) {
+                  return (
+                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
+                      <span>⏱️</span>
+                      <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
+                    </div>
+                  );
+                } else if (loggedTimeText) {
+                  return (
+                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
+                      <span>⏱️</span>
+                      <span>{loggedTimeText}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ) : null}
 
@@ -597,7 +634,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                     <Input 
                       id="edit-due_date" 
                       name="due_date" 
-                      type="date" 
+                      type="datetime-local" 
                       value={form.due_date} 
                       onChange={handleChange} 
                     />

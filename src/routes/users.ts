@@ -52,7 +52,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     // 2. Fetch task assignees within the date window
     let assigneesQuery = supabaseAdmin
       .from('task_assignees')
-      .select('user_id, status, rating, assigned_at, total_time_spent');
+      .select('user_id, status, rating, assigned_at, total_time_spent, task:tasks(estimated_time_minutes)');
     if (sDate) assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
     if (eDate) assigneesQuery = assigneesQuery.lte('assigned_at', eDate);
 
@@ -91,7 +91,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
 
     const [
       { data: profiles, error: profilesErr },
-      { data: assignees, error: assigneesErr },
+      { data: assigneesRes, error: assigneesErr },
       { data: clients, error: clientsErr },
       { data: calls, error: callsErr },
       { data: contracts, error: contractsErr },
@@ -108,7 +108,22 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     ]);
 
     if (profilesErr) throw profilesErr;
-    if (assigneesErr) throw assigneesErr;
+
+    let assignees: any[] = [];
+    if (assigneesErr) {
+      console.warn('Assignees query with estimated_time_minutes failed, falling back:', assigneesErr.message);
+      let fallbackQuery = supabaseAdmin
+        .from('task_assignees')
+        .select('user_id, status, rating, assigned_at, total_time_spent');
+      if (sDate) fallbackQuery = fallbackQuery.gte('assigned_at', sDate);
+      if (eDate) fallbackQuery = fallbackQuery.lte('assigned_at', eDate);
+      const { data: fbData, error: fbErr } = await fallbackQuery;
+      if (fbErr) throw fbErr;
+      assignees = fbData || [];
+    } else {
+      assignees = assigneesRes || [];
+    }
+
     if (clientsErr) throw clientsErr;
     if (callsErr) throw callsErr;
     if (contractsErr) throw contractsErr;
@@ -137,6 +152,33 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
         ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
         : null;
 
+      // Time variance & on-time stats for completed tasks with an estimated time limit
+      const completedWithEstimate = completedAssignments.filter((a: any) => a.task && a.task.estimated_time_minutes != null);
+      let onTimeCount = 0;
+      let overtimeTasksCount = 0;
+      let netTimeVarianceSeconds: number | null = null;
+
+      if (completedWithEstimate.length > 0) {
+        let totalVariance = 0;
+        completedWithEstimate.forEach((a: any) => {
+          const estimatedSec = (a.task.estimated_time_minutes || 0) * 60;
+          const actualSec = a.total_time_spent || 0;
+          const diffSec = estimatedSec - actualSec; // >0 means time saved, <0 means time wasted
+          totalVariance += diffSec;
+
+          if (actualSec <= estimatedSec) {
+            onTimeCount++;
+          } else {
+            overtimeTasksCount++;
+          }
+        });
+        netTimeVarianceSeconds = totalVariance;
+      }
+
+      const onTimeRate = completedWithEstimate.length > 0
+        ? Math.round((onTimeCount / completedWithEstimate.length) * 100)
+        : null;
+
       // Aggregate sales stats
       const userLeads = (clients || []).filter(c => c.sales_rep_id === user.id);
       const leadsManaged = userLeads.length;
@@ -160,6 +202,9 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
           completionRate,
           averageRating,
           averageCompletionTime,
+          onTimeRate,
+          netTimeVarianceSeconds,
+          overtimeTasksCount,
           taskTarget: targetMap.get(user.id) || null
         },
         salesStats: {

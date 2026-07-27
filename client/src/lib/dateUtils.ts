@@ -98,9 +98,17 @@ export function formatCairoDateTime(
   return date.toLocaleString(resolvedLocale, formatOptions);
 }
 
-// Determine if a YYYY-MM-DD date is overdue based on Cairo today
+// Determine if a date/timestamp is overdue
 export function isDateOverdue(dateStr?: string): boolean {
   if (!dateStr) return false;
+  
+  // If exact time is present (ISO format with T), check exact timestamp against now
+  if (dateStr.includes('T') && dateStr.length > 10) {
+    const time = new Date(dateStr).getTime();
+    if (!isNaN(time)) {
+      return time < Date.now();
+    }
+  }
   
   const formattedDueDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
   const todayStr = getCairoTodayString();

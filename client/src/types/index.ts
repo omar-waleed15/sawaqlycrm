@@ -48,6 +48,7 @@ export interface Task {
   client_id?: string;
   project_id?: string;
   is_deliverable?: boolean;
+  estimated_time_minutes?: number | null;
   deliverable_type?: 'post' | 'reel' | 'story' | 'photo';
   deliverable_month?: string;
   creator?: User;
@@ -424,6 +425,9 @@ export interface UserTaskPerformanceStats {
   averageRating: number | null;
   taskTarget: number | null;
   averageCompletionTime: number | null;
+  onTimeRate: number | null;
+  netTimeVarianceSeconds: number | null;
+  overtimeTasksCount: number;
 }
 
 export interface UserSalesPerformanceStats {

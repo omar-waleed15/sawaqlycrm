@@ -54,6 +54,8 @@ export default function CreateTaskPage() {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     })(),
+    estimated_hours: '',
+    estimated_minutes: '',
   });
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -116,11 +118,14 @@ export default function CreateTaskPage() {
     setLoading(true);
 
     try {
+      const totalEstMins = (Number(form.estimated_hours || 0) * 60) + Number(form.estimated_minutes || 0);
+
       const data = await tasksApi.create({
         title: form.title,
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
-        due_date: form.due_date || undefined,
+        due_date: form.due_date ? new Date(form.due_date).toISOString() : undefined,
+        estimated_time_minutes: totalEstMins > 0 ? totalEstMins : undefined,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,
@@ -312,11 +317,47 @@ export default function CreateTaskPage() {
                   <Input
                     id="due_date"
                     name="due_date"
-                    type="date"
+                    type="datetime-local"
                     value={form.due_date}
                     onChange={handleChange}
-                    min={new Date().toISOString().split('T')[0]}
                   />
+                </div>
+              </div>
+
+              {/* Time Limit Section */}
+              <div className="flex flex-col gap-1.5 p-3 rounded-lg border border-border bg-muted/30">
+                <Label className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                  ⏱️ {t('createTask.estimatedTime')}
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="estimated_hours"
+                      name="estimated_hours"
+                      type="number"
+                      min="0"
+                      max="500"
+                      placeholder="0"
+                      value={form.estimated_hours}
+                      onChange={handleChange}
+                      className="bg-background"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{t('createTask.estimatedHours')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="estimated_minutes"
+                      name="estimated_minutes"
+                      type="number"
+                      min="0"
+                      max="59"
+                      placeholder="0"
+                      value={form.estimated_minutes}
+                      onChange={handleChange}
+                      className="bg-background"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{t('createTask.estimatedMinutes')}</span>
+                  </div>
                 </div>
               </div>
 
