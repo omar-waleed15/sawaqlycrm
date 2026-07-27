@@ -21,6 +21,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Save, Plus, X, Paperclip, FileImage, FileText, Trash2 } from 'lucide-react';
 
+import { useFormDraft } from '@/lib/useFormDraft';
+
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -37,6 +39,23 @@ function formatDatetimeLocal(isoStr?: string): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+const INITIAL_EDIT_FORM = {
+  title: '',
+  description: '',
+  priority: 'medium',
+  due_date: '',
+  drive_link: '',
+  content_type: '',
+  content_description: '',
+  client_id: '',
+  is_deliverable: false,
+  deliverable_type: 'post' as 'post' | 'reel' | 'story' | 'photo',
+  deliverable_month: (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })(),
+};
+
 export default function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -51,22 +70,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState('');
 
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    due_date: '',
-    drive_link: '',
-    content_type: '',
-    content_description: '',
-    client_id: '',
-    is_deliverable: false,
-    deliverable_type: 'post' as 'post' | 'reel' | 'story' | 'photo',
-    deliverable_month: (() => {
-      const now = new Date();
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    })(),
-  });
+  const { formState: form, setFormState: setForm, clearDraft, resetForm, hasDraft } = useFormDraft(`task_edit_${id}`, INITIAL_EDIT_FORM);
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
 
@@ -199,6 +203,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         }
       }
 
+      clearDraft();
       router.push(`/dashboard/tasks/${id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t('editTask.savingFailed') || 'Failed to save task');
@@ -222,6 +227,15 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
           {t('common.back')}
         </Button>
       </div>
+
+      {hasDraft && (
+        <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs p-3 rounded-xl flex items-center justify-between gap-2 shadow-xs">
+          <span>✏️ {locale === 'ar' ? 'تم استرجاع التعديلات غير المحفوظة تلقائياً' : 'Restored unsaved edits automatically from your previous session'}</span>
+          <button type="button" onClick={() => resetForm()} className="font-bold underline hover:text-indigo-900 dark:hover:text-indigo-100 shrink-0">
+            {locale === 'ar' ? 'مسح التعديلات' : 'Discard Draft'}
+          </button>
+        </div>
+      )}
 
       <div className="max-w-2xl">
         <Card>

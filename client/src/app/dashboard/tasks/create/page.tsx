@@ -21,13 +21,34 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Plus, X, Paperclip, FileImage, FileText, Trash2 } from 'lucide-react';
 
+import { useFormDraft } from '@/lib/useFormDraft';
+
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
+const INITIAL_TASK_FORM = {
+  title: '',
+  description: '',
+  priority: 'medium',
+  due_date: '',
+  drive_link: '',
+  content_type: '',
+  content_description: '',
+  client_id: '',
+  is_deliverable: false,
+  deliverable_type: 'post' as 'post' | 'reel' | 'story' | 'photo',
+  deliverable_month: (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })(),
+  estimated_hours: '',
+  estimated_minutes: '',
+};
+
 export default function CreateTaskPage() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClientId = searchParams ? searchParams.get('client_id') : null;
@@ -39,24 +60,7 @@ export default function CreateTaskPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState('');
 
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    due_date: '',
-    drive_link: '',
-    content_type: '',
-    content_description: '',
-    client_id: '',
-    is_deliverable: false,
-    deliverable_type: 'post' as 'post' | 'reel' | 'story' | 'photo',
-    deliverable_month: (() => {
-      const now = new Date();
-      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    })(),
-    estimated_hours: '',
-    estimated_minutes: '',
-  });
+  const { formState: form, setFormState: setForm, clearDraft, resetForm, hasDraft } = useFormDraft('task_create', INITIAL_TASK_FORM);
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
 
@@ -148,6 +152,7 @@ export default function CreateTaskPage() {
         }
       }
 
+      clearDraft();
       router.push(`/dashboard/tasks/${data.task.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
@@ -169,6 +174,15 @@ export default function CreateTaskPage() {
           {t('common.back')}
         </Button>
       </div>
+
+      {hasDraft && (form.title || form.description) && (
+        <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs p-3 rounded-xl flex items-center justify-between gap-2 shadow-xs">
+          <span>✏️ {locale === 'ar' ? 'تم استرجاع المسودة غير المحفوظة تلقائياً' : 'Restored unsaved draft automatically from your previous session'}</span>
+          <button type="button" onClick={() => resetForm()} className="font-bold underline hover:text-indigo-900 dark:hover:text-indigo-100 shrink-0">
+            {locale === 'ar' ? 'مسح المسودة' : 'Clear Draft'}
+          </button>
+        </div>
+      )}
 
       <div className="max-w-2xl">
         <Card>

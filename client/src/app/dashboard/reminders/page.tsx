@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { remindersApi, usersApi } from '@/lib/api';
 import { Reminder, User, ReminderAttachment } from '@/types';
+import { useFormDraft } from '@/lib/useFormDraft';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -60,11 +61,27 @@ export default function RemindersPage() {
   const [activeTab, setActiveTab] = useState<'inbox' | 'outbox'>('inbox');
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // New reminder form state
-  const [selectedReceiverIds, setSelectedReceiverIds] = useState<string[]>([]);
-  const [content, setContent] = useState('');
-  const [reviewLink, setReviewLink] = useState('');
-  const [attachments, setAttachments] = useState<ReminderAttachment[]>([]);
+  // New reminder form state with auto-save draft protection
+  const INITIAL_REMINDER_FORM = {
+    selectedReceiverIds: [] as string[],
+    content: '',
+    reviewLink: '',
+    attachments: [] as ReminderAttachment[],
+  };
+
+  const { formState: reminderForm, setFormState: setReminderForm, clearDraft: clearReminderDraft, resetForm: resetReminderForm, hasDraft: hasReminderDraft } = useFormDraft('reminder_create', INITIAL_REMINDER_FORM);
+  const { selectedReceiverIds, content, reviewLink, attachments } = reminderForm;
+
+  const setSelectedReceiverIds = (ids: string[]) => setReminderForm(p => ({ ...p, selectedReceiverIds: ids }));
+  const setContent = (val: string) => setReminderForm(p => ({ ...p, content: val }));
+  const setReviewLink = (val: string) => setReminderForm(p => ({ ...p, reviewLink: val }));
+  const setAttachments = (updater: ReminderAttachment[] | ((prev: ReminderAttachment[]) => ReminderAttachment[])) => {
+    setReminderForm(p => ({
+      ...p,
+      attachments: typeof updater === 'function' ? updater(p.attachments) : updater,
+    }));
+  };
+
   const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -79,7 +96,7 @@ export default function RemindersPage() {
       const formData = new FormData();
       formData.append('file', file);
       const res = await remindersApi.uploadAttachment(formData);
-      setAttachments(prev => [...prev, res]);
+      setAttachments((prev: ReminderAttachment[]) => [...prev, res]);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to upload attachment');
     } finally {
@@ -131,10 +148,7 @@ export default function RemindersPage() {
         attachments,
       });
       setReminders([...(res.reminders || []), ...reminders]);
-      setContent('');
-      setReviewLink('');
-      setAttachments([]);
-      setSelectedReceiverIds([]);
+      resetReminderForm();
       setCreateModalOpen(false);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to send reminder');
@@ -409,10 +423,12 @@ export default function RemindersPage() {
         maxWidth={520}
       >
         <form onSubmit={handleSendReminder} className="flex flex-col gap-4 text-start">
-          {errorMsg && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-xs p-2.5 rounded-md flex items-center gap-1.5">
-              <AlertCircle className="size-4 shrink-0" />
-              <span>{errorMsg}</span>
+          {hasReminderDraft && (content || reviewLink || attachments.length > 0) && (
+            <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs p-2.5 rounded-lg flex items-center justify-between gap-2">
+              <span>✏️ {locale === 'ar' ? 'تم استرجاع المسودة تلقائياً' : 'Restored draft from previous session'}</span>
+              <button type="button" onClick={() => resetReminderForm()} className="font-bold underline hover:text-indigo-900 dark:hover:text-indigo-100 shrink-0">
+                {locale === 'ar' ? 'مسح المسودة' : 'Discard Draft'}
+              </button>
             </div>
           )}
 
