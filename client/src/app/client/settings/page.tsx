@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { request } from '@/lib/api';
+import { request, usersApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { Client } from '@/types';
 import { useLanguage } from '@/lib/i18n';
-import { Loader2, Settings, ShieldAlert, Globe } from 'lucide-react';
+import { Loader2, Settings, ShieldAlert, Globe, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface PortalData {
   client: Client;
@@ -12,9 +13,25 @@ interface PortalData {
 
 export default function ClientPortalSettingsPage() {
   const { t, locale } = useLanguage();
+  const { user, setUser } = useAuth();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Security Credentials state
+  const [securityEmail, setSecurityEmail] = useState(user?.email || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [securitySaving, setSecuritySaving] = useState(false);
+  const [securitySuccess, setSecuritySuccess] = useState(false);
+  const [securityError, setSecurityError] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setSecurityEmail(user.email || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     request<PortalData>('/clients/portal/data')
@@ -22,6 +39,50 @@ export default function ClientPortalSettingsPage() {
       .catch((err: any) => setError(err.message || 'Failed to load brand settings'))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityError('');
+    setSecuritySuccess(false);
+
+    const emailChanged = securityEmail.trim().toLowerCase() !== (user?.email || '').toLowerCase();
+    const passwordChanged = Boolean(newPassword);
+
+    if (!emailChanged && !passwordChanged) {
+      setSecurityError(t('settings.noSecurityChanges') || 'No changes made to credentials');
+      return;
+    }
+
+    if (passwordChanged) {
+      if (newPassword.length < 6) {
+        setSecurityError(t('settings.passwordTooShort') || 'Password must be at least 6 characters');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setSecurityError(t('settings.passwordsDoNotMatch') || 'New password and confirmation do not match');
+        return;
+      }
+    }
+
+    setSecuritySaving(true);
+    try {
+      const response = await usersApi.updateProfile({
+        email: emailChanged ? securityEmail.trim() : undefined,
+        password: passwordChanged ? newPassword : undefined,
+        currentPassword: currentPassword.trim() || undefined,
+      });
+      setUser(response.user);
+      setSecuritySuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setSecuritySuccess(false), 4000);
+    } catch (err: any) {
+      setSecurityError(err.message || 'Failed to update credentials');
+    } finally {
+      setSecuritySaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -46,6 +107,104 @@ export default function ClientPortalSettingsPage() {
       <div className="border-b border-[#E2E8F0] pb-6">
         <h1 className="text-xl font-extrabold uppercase tracking-widest text-[#0F172A] font-mono">{t('portal.brandSettings')}</h1>
         <p className="text-[10px] text-[#64748B] uppercase tracking-wider font-semibold mt-1 text-start">{t('portal.brandSettingsDesc')}</p>
+      </div>
+
+      {/* Security Credentials Change Panel */}
+      <div className="border border-[#E2E8F0] bg-white p-6 flex flex-col gap-6 rounded-2xl shadow-xs text-start">
+        <div className="border-b border-[#E2E8F0] pb-3 flex items-center gap-2">
+          <ShieldCheck className="size-4 text-[#1D61E7]" />
+          <span className="text-xs font-bold uppercase tracking-widest text-[#0F172A] font-mono">{t('settings.security')}</span>
+        </div>
+
+        <form onSubmit={handleSaveCredentials} className="flex flex-col gap-5">
+          {securitySuccess && (
+            <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-2.5 rounded-xl text-xs font-semibold">
+              <CheckCircle2 className="size-4 shrink-0" />
+              {t('settings.credentialsUpdated')}
+            </div>
+          )}
+          {securityError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3 py-2.5 rounded-xl font-semibold">
+              {securityError}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label htmlFor="client-security-email" className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest font-mono">
+              {t('settings.emailAddress')}
+            </label>
+            <input
+              id="client-security-email"
+              type="email"
+              value={securityEmail}
+              onChange={e => setSecurityEmail(e.target.value)}
+              required
+              disabled={securitySaving}
+              className="w-full text-[#0F172A] font-medium text-sm bg-[#F8FAFC] border border-[#E2E8F0] h-10 px-3 rounded-lg focus:outline-none focus:border-[#1D61E7]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="client-current-password" className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest font-mono">
+              {t('settings.currentPassword')}
+            </label>
+            <input
+              id="client-current-password"
+              type="password"
+              placeholder={t('settings.currentPasswordPlaceholder')}
+              value={currentPassword}
+              onChange={e => setCurrentPassword(e.target.value)}
+              disabled={securitySaving}
+              className="w-full text-[#0F172A] font-medium text-sm bg-[#F8FAFC] border border-[#E2E8F0] h-10 px-3 rounded-lg focus:outline-none focus:border-[#1D61E7]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label htmlFor="client-new-password" className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest font-mono">
+                {t('settings.newPassword')}
+              </label>
+              <input
+                id="client-new-password"
+                type="password"
+                placeholder={t('settings.confirmPasswordPlaceholder')}
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                disabled={securitySaving}
+                className="w-full text-[#0F172A] font-medium text-sm bg-[#F8FAFC] border border-[#E2E8F0] h-10 px-3 rounded-lg focus:outline-none focus:border-[#1D61E7]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="client-confirm-password" className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest font-mono">
+                {t('settings.confirmPassword')}
+              </label>
+              <input
+                id="client-confirm-password"
+                type="password"
+                placeholder={t('settings.confirmPasswordPlaceholder')}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                disabled={securitySaving}
+                className="w-full text-[#0F172A] font-medium text-sm bg-[#F8FAFC] border border-[#E2E8F0] h-10 px-3 rounded-lg focus:outline-none focus:border-[#1D61E7]"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={securitySaving}
+              className="bg-[#1D61E7] hover:bg-[#1553C7] text-white text-xs font-bold font-mono uppercase tracking-wider h-10 px-5 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+            >
+              {securitySaving ? (
+                <><Loader2 className="size-3.5 animate-spin" /> {t('settings.saving')}</>
+              ) : (
+                t('settings.saveCredentials')
+              )}
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Brand Profile Details Panel */}

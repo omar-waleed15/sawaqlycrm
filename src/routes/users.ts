@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { supabaseAdmin } from '../lib/supabase';
+import { supabaseAdmin, createTempClient } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { ownerOnly } from '../middleware/roleCheck';
 import multer from 'multer';
@@ -226,39 +226,97 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
   }
 });
 
-// PUT /api/users/profile — Update currently authenticated user's profile
+// PUT /api/users/profile — Update currently authenticated user's profile & security credentials
 router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
   
-  const { name, avatar_url, phone } = req.body;
+  const { name, avatar_url, phone, email, password, currentPassword } = req.body;
   
   try {
+    // Fetch current user from Supabase Auth Admin
+    const { data: authUserData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(req.user.id);
+    if (getUserError || !authUserData?.user) {
+      res.status(404).json({ error: 'User account not found in Auth system' });
+      return;
+    }
+    const currentAuthEmail = authUserData.user.email || '';
+
+    // 1. If changing credentials, verify current password if provided
+    if (currentPassword) {
+      const tempClient = createTempClient();
+      const { error: verifyError } = await tempClient.auth.signInWithPassword({
+        email: currentAuthEmail,
+        password: currentPassword,
+      });
+      if (verifyError) {
+        res.status(400).json({ error: 'Current password is incorrect' });
+        return;
+      }
+    }
+
+    // 2. Update Supabase Auth if email or password is being changed
+    const authUpdates: Record<string, any> = {};
+    if (email && email.trim() !== '') {
+      const targetEmail = email.trim();
+      if (targetEmail.toLowerCase() !== currentAuthEmail.toLowerCase()) {
+        authUpdates.email = targetEmail;
+        authUpdates.email_confirm = true;
+      }
+    }
+    if (password) {
+      if (password.length < 6) {
+        res.status(400).json({ error: 'Password must be at least 6 characters' });
+        return;
+      }
+      authUpdates.password = password;
+    }
+
+    if (Object.keys(authUpdates).length > 0) {
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(req.user.id, authUpdates);
+      if (authError) {
+        res.status(400).json({ error: authError.message });
+        return;
+      }
+    }
+
+    // 3. Update profiles table
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;
     if (phone !== undefined) updates.phone = phone || null;
+    if (email && email.trim() !== '') updates.email = email.trim();
 
-    if (Object.keys(updates).length === 0) {
-      res.status(400).json({ error: 'No fields to update' });
-      return;
+    if (Object.keys(updates).length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update(updates)
+        .eq('id', req.user.id)
+        .select()
+        .single();
+
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      res.json({ user: data });
+    } else {
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', req.user.id)
+        .single();
+
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      res.json({ user: data });
     }
-
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update(updates)
-      .eq('id', req.user.id)
-      .select()
-      .single();
-
-    if (error) {
-      res.status(500).json({ error: error.message });
-      return;
-    }
-
-    res.json({ user: data });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to update profile' });
   }

@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
-import { Loader2, CheckCircle2, Search, Key } from 'lucide-react';
+import { Loader2, CheckCircle2, Search, Key, ShieldCheck, Lock, Mail } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 import { usersApi } from '@/lib/api';
 import { User } from '@/types';
@@ -39,12 +39,22 @@ export default function SettingsPage() {
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileError, setProfileError] = useState('');
 
+  // Security credentials state
+  const [securityEmail, setSecurityEmail] = useState(user?.email || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [securitySaving, setSecuritySaving] = useState(false);
+  const [securitySuccess, setSecuritySuccess] = useState(false);
+  const [securityError, setSecurityError] = useState('');
+
   // Sync profile state when user is loaded or modified
   useEffect(() => {
     if (user) {
       setProfileName(user.name);
       setProfileAvatarUrl(user.avatar_url || '');
       setProfilePhone(user.phone || '');
+      setSecurityEmail(user.email || '');
     }
   }, [user]);
 
@@ -116,6 +126,50 @@ export default function SettingsPage() {
       setProfileError(err.message || 'Failed to save profile');
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const handleSaveSecurityCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityError('');
+    setSecuritySuccess(false);
+
+    const emailChanged = securityEmail.trim().toLowerCase() !== (user?.email || '').toLowerCase();
+    const passwordChanged = Boolean(newPassword);
+
+    if (!emailChanged && !passwordChanged) {
+      setSecurityError(t('settings.noSecurityChanges') || 'No changes made to credentials');
+      return;
+    }
+
+    if (passwordChanged) {
+      if (newPassword.length < 6) {
+        setSecurityError(t('settings.passwordTooShort') || 'Password must be at least 6 characters');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setSecurityError(t('settings.passwordsDoNotMatch') || 'New password and confirmation do not match');
+        return;
+      }
+    }
+
+    setSecuritySaving(true);
+    try {
+      const response = await usersApi.updateProfile({
+        email: emailChanged ? securityEmail.trim() : undefined,
+        password: passwordChanged ? newPassword : undefined,
+        currentPassword: currentPassword.trim() || undefined,
+      });
+      setUser(response.user);
+      setSecuritySuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setSecuritySuccess(false), 4000);
+    } catch (err: any) {
+      setSecurityError(err.message || 'Failed to update credentials');
+    } finally {
+      setSecuritySaving(false);
     }
   };
 
@@ -308,129 +362,230 @@ export default function SettingsPage() {
   const renderProfileView = () => {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 animate-fade-in">
-        <Card>
-          <CardHeader className="border-b">
-            <CardTitle className="text-base text-start">{t('settings.myProfile')}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
-              {profileSuccess && (
-                <div className="flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium">
-                  <CheckCircle2 className="size-4" />
-                  {t('settings.profileUpdated')}
-                </div>
-              )}
-              {profileError && (
-                <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md font-medium">
-                  {profileError}
-                </div>
-              )}
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle className="text-base text-start">{t('settings.myProfile')}</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-5">
+              <form onSubmit={handleSaveProfile} className="flex flex-col gap-6">
+                {profileSuccess && (
+                  <div className="flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium">
+                    <CheckCircle2 className="size-4" />
+                    {t('settings.profileUpdated')}
+                  </div>
+                )}
+                {profileError && (
+                  <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md font-medium">
+                    {profileError}
+                  </div>
+                )}
 
-              {/* Profile Photo Upload Section */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl border border-dashed bg-muted/20">
-                <Avatar className="size-20 shrink-0 border shadow-sm">
-                  {profileAvatarUrl && (
-                    <AvatarImage src={profileAvatarUrl} alt={profileName} className="object-cover" />
-                  )}
-                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
-                    {profileName ? getInitials(profileName) : '?'}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="flex flex-col gap-2 text-center sm:text-start">
-                  <Label className="text-sm font-semibold">{t('settings.profilePhoto')}</Label>
-                  <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={uploadingAvatar || profileSaving}
-                      className="relative h-9 text-xs font-medium"
-                      onClick={() => document.getElementById('avatar-upload-input')?.click()}
-                    >
-                      {uploadingAvatar ? (
-                        <><Loader2 className="size-3 animate-spin mr-1.5" /> {t('settings.uploading')}</>
-                      ) : (
-                        t('settings.uploadNew')
-                      )}
-                    </Button>
-                    <input
-                      id="avatar-upload-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleAvatarChange}
-                    />
+                {/* Profile Photo Upload Section */}
+                <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl border border-dashed bg-muted/20">
+                  <Avatar className="size-20 shrink-0 border shadow-sm">
                     {profileAvatarUrl && (
+                      <AvatarImage src={profileAvatarUrl} alt={profileName} className="object-cover" />
+                    )}
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
+                      {profileName ? getInitials(profileName) : '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex flex-col gap-2 text-center sm:text-start">
+                    <Label className="text-sm font-semibold">{t('settings.profilePhoto')}</Label>
+                    <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         disabled={uploadingAvatar || profileSaving}
-                        onClick={handleRemoveAvatar}
-                        className="h-9 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        className="relative h-9 text-xs font-medium"
+                        onClick={() => document.getElementById('avatar-upload-input')?.click()}
                       >
-                        {t('settings.removePhoto')}
+                        {uploadingAvatar ? (
+                          <><Loader2 className="size-3 animate-spin mr-1.5" /> {t('settings.uploading')}</>
+                        ) : (
+                          t('settings.uploadNew')
+                        )}
                       </Button>
-                    )}
+                      <input
+                        id="avatar-upload-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                      />
+                      {profileAvatarUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={uploadingAvatar || profileSaving}
+                          onClick={handleRemoveAvatar}
+                          className="h-9 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        >
+                          {t('settings.removePhoto')}
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      PNG, JPG or JPEG. Max size 5MB.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    PNG, JPG or JPEG. Max size 5MB.
+                </div>
+
+                {/* Name Field */}
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="profile-name">{t('settings.profileName')}</Label>
+                  <Input
+                    id="profile-name"
+                    type="text"
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    required
+                    disabled={profileSaving}
+                  />
+                </div>
+                
+                {/* Phone Field */}
+                <div className="flex flex-col gap-1.5 text-start font-sans">
+                  <Label htmlFor="profile-phone">{t('settings.phone') || 'WhatsApp Phone Number'}</Label>
+                  <Input
+                    id="profile-phone"
+                    type="tel"
+                    placeholder="+201234567890"
+                    value={profilePhone}
+                    onChange={e => setProfilePhone(e.target.value)}
+                    disabled={profileSaving}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Include country code (e.g. +201012345678) to receive WhatsApp notifications.
                   </p>
                 </div>
-              </div>
 
-              {/* Name Field */}
-              <div className="flex flex-col gap-1.5 text-start">
-                <Label htmlFor="profile-name">{t('settings.profileName')}</Label>
-                <Input
-                  id="profile-name"
-                  type="text"
-                  value={profileName}
-                  onChange={e => setProfileName(e.target.value)}
-                  required
-                  disabled={profileSaving}
-                />
+                {/* Email Field (ReadOnly - managed via Security Card below) */}
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="profile-email-readonly" className="text-muted-foreground">{t('settings.emailAddress')}</Label>
+                  <Input
+                    id="profile-email-readonly"
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-muted/50 cursor-not-allowed border-dashed"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t('settings.emailEditNote')}
+                  </p>
+                </div>
+
+                <div className="flex justify-end mt-2">
+                  <Button type="submit" disabled={profileSaving || uploadingAvatar}>
+                    {profileSaving ? (
+                      <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('settings.saving')}</>
+                    ) : t('settings.saveProfile')}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Security & Credentials Card */}
+          <Card>
+            <CardHeader className="border-b flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-5 text-[#1D61E7]" />
+                <CardTitle className="text-base text-start">{t('settings.security')}</CardTitle>
               </div>
-              
-              {/* Phone Field */}
-              <div className="flex flex-col gap-1.5 text-start font-sans">
-                <Label htmlFor="profile-phone">{t('settings.phone') || 'WhatsApp Phone Number'}</Label>
-                <Input
-                  id="profile-phone"
-                  type="tel"
-                  placeholder="+201234567890"
-                  value={profilePhone}
-                  onChange={e => setProfilePhone(e.target.value)}
-                  disabled={profileSaving}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Include country code (e.g. +201012345678) to receive WhatsApp notifications.
+            </CardHeader>
+            <CardContent className="pt-5">
+              <form onSubmit={handleSaveSecurityCredentials} className="flex flex-col gap-5">
+                {securitySuccess && (
+                  <div className="flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md text-sm font-medium">
+                    <CheckCircle2 className="size-4" />
+                    {t('settings.credentialsUpdated')}
+                  </div>
+                )}
+                {securityError && (
+                  <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md font-medium">
+                    {securityError}
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground text-start">
+                  {t('settings.securityDesc')}
                 </p>
-              </div>
 
-              {/* Email Field (ReadOnly) */}
-              <div className="flex flex-col gap-1.5 text-start">
-                <Label htmlFor="profile-email" className="text-muted-foreground">{t('settings.emailAddress')}</Label>
-                <Input
-                  id="profile-email"
-                  type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="bg-muted/50 cursor-not-allowed border-dashed"
-                />
-              </div>
+                {/* Email Field */}
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="security-email">{t('settings.emailAddress')}</Label>
+                  <Input
+                    id="security-email"
+                    type="email"
+                    value={securityEmail}
+                    onChange={e => setSecurityEmail(e.target.value)}
+                    required
+                    disabled={securitySaving}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t('settings.emailEditNote')}
+                  </p>
+                </div>
 
-              <div className="flex justify-end mt-2">
-                <Button type="submit" disabled={profileSaving || uploadingAvatar}>
-                  {profileSaving ? (
-                    <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('settings.saving')}</>
-                  ) : t('settings.saveProfile')}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                <Separator />
+
+                {/* Current Password Field */}
+                <div className="flex flex-col gap-1.5 text-start">
+                  <Label htmlFor="current-password">{t('settings.currentPassword')}</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    placeholder={t('settings.currentPasswordPlaceholder')}
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    disabled={securitySaving}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* New Password Field */}
+                  <div className="flex flex-col gap-1.5 text-start">
+                    <Label htmlFor="security-new-password">{t('settings.newPassword')}</Label>
+                    <Input
+                      id="security-new-password"
+                      type="password"
+                      placeholder={t('settings.passwordPlaceholder')}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      disabled={securitySaving}
+                    />
+                  </div>
+
+                  {/* Confirm Password Field */}
+                  <div className="flex flex-col gap-1.5 text-start">
+                    <Label htmlFor="security-confirm-password">{t('settings.confirmPassword')}</Label>
+                    <Input
+                      id="security-confirm-password"
+                      type="password"
+                      placeholder={t('settings.confirmPasswordPlaceholder')}
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      disabled={securitySaving}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end mt-2">
+                  <Button type="submit" disabled={securitySaving}>
+                    {securitySaving ? (
+                      <><Loader2 className="size-4 animate-spin mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('settings.saving')}</>
+                    ) : t('settings.saveCredentials')}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* User Info / Role Info Sidebar */}
         <div className="text-start">

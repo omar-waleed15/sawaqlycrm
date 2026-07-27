@@ -116,7 +116,7 @@ export const usersApi = {
   update: (id: string, data: Partial<{ name: string; role: string; email?: string; password?: string; phone?: string | null }>) =>
     request<{ user: import('@/types').User }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
-  updateProfile: (data: Partial<{ name: string; avatar_url: string | null; phone: string | null }>) =>
+  updateProfile: (data: Partial<{ name: string; avatar_url: string | null; phone: string | null; email: string; password: string; currentPassword: string }>) =>
     request<{ user: import('@/types').User }>('/users/profile', { method: 'PUT', body: JSON.stringify(data) }),
   uploadAvatar: (file: File) => {
     const formData = new FormData();
