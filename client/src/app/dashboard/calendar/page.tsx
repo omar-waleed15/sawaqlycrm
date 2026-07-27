@@ -36,12 +36,7 @@ import {
   MessageSquare,
   Sparkles,
 } from 'lucide-react';
-const getLocalDateString = (d: Date) => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+const getLocalDateString = (d: Date | string | number) => getCairoDateString(d);
 const getLocalMonthString = (d: Date) => {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -157,19 +152,23 @@ export default function CalendarPage() {
     if (!user) return;
     setLoading(true);
 
+    const isExecutionMember = ['developer', 'member', 'graphic_designer', 'video_editor', 'reel_maker'].includes(user.role);
+
     const fetchTasks = tasksApi.list();
     const fetchContracts = (user.role === 'owner' || user.role === 'sales')
       ? contractsApi.list() 
       : Promise.resolve({ contracts: [] as Contract[] });
-    const fetchClients = (user.role !== 'client')
+    const fetchClients = (user.role !== 'client' && !isExecutionMember)
       ? clientsApi.list()
       : Promise.resolve({ clients: [] as Client[] });
-    const fetchContents = contentsApi.list();
+    const fetchContents = (!isExecutionMember)
+      ? contentsApi.list()
+      : Promise.resolve({ contents: [] as ContentItem[] });
 
     Promise.all([fetchTasks, fetchContracts, fetchClients, fetchContents])
       .then(([tasksData, contractsData, clientsData, contentsData]) => {
-        setTasks(tasksData.tasks);
-        setContracts(contractsData.contracts);
+        setTasks(tasksData.tasks || []);
+        setContracts(contractsData.contracts || []);
         setClients(clientsData.clients || []);
         setContents(contentsData.contents || []);
         setError(null);
@@ -292,13 +291,13 @@ export default function CalendarPage() {
     const map: Record<string, { tasks: Task[]; payments: { contract: Contract; amount: number }[]; meetings: Client[]; targetSlots: any[]; contents: ContentItem[] }> = {};
     
     calendarCells.forEach(cell => {
-      const dateStr = getLocalDateString(cell.date);
+      const dateStr = getCairoDateString(cell.date);
       map[dateStr] = { tasks: [], payments: [], meetings: [], targetSlots: [], contents: [] };
     });
 
     tasks.forEach(task => {
       if (task.due_date) {
-        const dateStr = task.due_date;
+        const dateStr = getCairoDateString(task.due_date);
         if (map[dateStr]) {
           map[dateStr].tasks.push(task);
         }
@@ -321,7 +320,7 @@ export default function CalendarPage() {
       contracts.forEach(contract => {
         const paymentDates = getContractPaymentDates(contract, gridStart, gridEnd);
         paymentDates.forEach(pDate => {
-          const dateStr = getLocalDateString(pDate);
+          const dateStr = getCairoDateString(pDate);
           if (map[dateStr]) {
             map[dateStr].payments.push({
               contract,
@@ -438,7 +437,7 @@ export default function CalendarPage() {
 
     // Filter out matched tasks/contents from general lists so they do not show up twice
     calendarCells.forEach(cell => {
-      const dateStr = getLocalDateString(cell.date);
+      const dateStr = getCairoDateString(cell.date);
       const dayData = map[dateStr];
       if (dayData) {
         const filledTaskIds = dayData.targetSlots

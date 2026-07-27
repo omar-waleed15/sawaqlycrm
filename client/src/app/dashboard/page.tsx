@@ -46,10 +46,11 @@ export default function DashboardPage() {
   const isOwner = user?.role === 'owner';
   const isTeamLeader = user?.role === 'team_leader';
   const isSales = user?.role === 'sales';
+  const isDeveloper = user?.role === 'developer';
   const isGraphicDesigner = user?.role === 'graphic_designer';
   const isVideoEditor = user?.role === 'video_editor';
   const isReelMaker = user?.role === 'reel_maker';
-  const isMember = user?.role === 'member' || isGraphicDesigner || isVideoEditor || isReelMaker;
+  const isMember = user?.role === 'member' || isDeveloper || isGraphicDesigner || isVideoEditor || isReelMaker;
   const isModerator = user?.role === 'moderation';
   const isAccountManager = user?.role === 'account_manager';
   const isContentCreator = user?.role === 'content_creator';
@@ -117,6 +118,39 @@ export default function DashboardPage() {
     const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
     return task.due_date && task.due_date < todayStr && myAssignee?.status !== 'completed';
   }).length;
+
+  // Time performance statistics for all employees
+  const myCompletedTasksWithEstimate = myTasks.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return myAssignee?.status === 'completed' && task.estimated_time_minutes != null && task.estimated_time_minutes > 0;
+  });
+
+  const myOnTimeCount = myCompletedTasksWithEstimate.filter(task => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    const estimatedSec = (task.estimated_time_minutes || 0) * 60;
+    const actualSec = myAssignee?.total_time_spent || 0;
+    return actualSec <= estimatedSec;
+  }).length;
+
+  const myOnTimeRate = myCompletedTasksWithEstimate.length > 0
+    ? Math.round((myOnTimeCount / myCompletedTasksWithEstimate.length) * 100)
+    : null;
+
+  const myTotalEstimatedSec = myCompletedTasksWithEstimate.reduce((sum, task) => sum + ((task.estimated_time_minutes || 0) * 60), 0);
+  const myTotalActualSec = myCompletedTasksWithEstimate.reduce((sum, task) => {
+    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+    return sum + (myAssignee?.total_time_spent || 0);
+  }, 0);
+
+  const myNetVarianceSec = myTotalEstimatedSec - myTotalActualSec;
+
+  const formatHoursMinutes = (totalSec: number) => {
+    const absSec = Math.abs(totalSec);
+    const hrs = Math.floor(absSec / 3600);
+    const mins = Math.round((absSec % 3600) / 60);
+    if (hrs === 0) return `${mins}m`;
+    return `${hrs}h ${mins}m`;
+  };
 
   const today = formatCairoDate(new Date(), locale, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -195,133 +229,252 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* KPI ROW: Task Overview */}
-          {showTasks && stats && (
+          {/* KPI ROW: Task & Performance Overview */}
+          {showTasks && (
             <div className="space-y-6">
-              {isTaskAdmin && (
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-[-8px]">
-                  👥 {locale === 'ar' ? 'إحصائيات الفريق' : 'Team Workload Overview'}
-                </h3>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Total Tasks */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.totalTasks')}</span>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-extrabold">{stats.total}</div>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                      {t('dashboard.allAssignedObjectives')}
-                    </p>
-                  </CardContent>
-                </Card>
+              {isTaskAdmin ? (
+                <>
+                  {/* Task Admin View: Team Workload Overview */}
+                  {stats && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        {locale === 'ar' ? 'إحصائيات الفريق' : 'Team Workload Overview'}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Total Tasks */}
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <span className="text-sm font-medium text-muted-foreground">{t('dashboard.totalTasks')}</span>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-3xl font-extrabold">{stats.total}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                              {t('dashboard.allAssignedObjectives')}
+                            </p>
+                          </CardContent>
+                        </Card>
 
-                {/* In Progress */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.inProgress')}</span>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-extrabold">{stats.inProgress}</div>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                      {t('dashboard.activeWorkCurrentlyActive')}
-                    </p>
-                  </CardContent>
-                </Card>
+                        {/* In Progress */}
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <span className="text-sm font-medium text-muted-foreground">{t('dashboard.inProgress')}</span>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-3xl font-extrabold">{stats.inProgress}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                              {t('dashboard.activeWorkCurrentlyActive')}
+                            </p>
+                          </CardContent>
+                        </Card>
 
-                {/* Completed */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <span className="text-sm font-medium text-muted-foreground">{t('status.completed')}</span>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-extrabold text-violet-600">{stats.completed}</div>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                      {t('dashboard.tasksSuccessfullyDelivered')}
-                    </p>
-                  </CardContent>
-                </Card>
+                        {/* Completed */}
+                        <Card className="hover:shadow-md transition-shadow">
+                          <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <span className="text-sm font-medium text-muted-foreground">{t('status.completed')}</span>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-3xl font-extrabold text-violet-600">{stats.completed}</div>
+                            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                              {t('dashboard.tasksSuccessfullyDelivered')}
+                            </p>
+                          </CardContent>
+                        </Card>
 
-                {/* Overdue */}
-                <Card className={`hover:shadow-md transition-all duration-200 ${
-                  stats.overdue > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
-                }`}>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <span className="text-sm font-medium text-muted-foreground">{t('dashboard.overdueTasks')}</span>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-3xl font-extrabold ${stats.overdue > 0 ? 'text-rose-600' : ''}`}>
-                      {stats.overdue}
+                        {/* Overdue */}
+                        <Card className={`hover:shadow-md transition-all duration-200 ${
+                          stats.overdue > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
+                        }`}>
+                          <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <span className="text-sm font-medium text-muted-foreground">{t('dashboard.overdueTasks')}</span>
+                          </CardHeader>
+                          <CardContent>
+                            <div className={`text-3xl font-extrabold ${stats.overdue > 0 ? 'text-rose-600' : ''}`}>
+                              {stats.overdue}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                              {t('dashboard.incompletePastDeadline')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                      {t('dashboard.incompletePastDeadline')}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+                  )}
 
-              {/* Personal Workload Overview (Management only) */}
-              {isTaskAdmin && (
-                <div className="space-y-4 pt-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-[-8px]">
-                    👤 {locale === 'ar' ? 'إحصائياتي الشخصية' : 'My Workload Overview'}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* My Active Tasks */}
-                    <Card className="hover:shadow-md transition-shadow border-[#1D61E7]/15 bg-[#1D61E7]/5 dark:bg-[#1D61E7]/5">
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي النشطة' : 'My Active Tasks'}</span>
-                        <ClipboardList className="size-4 text-[#1D61E7]" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-extrabold text-[#1D61E7]">{myActiveTasks.length}</div>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                          {locale === 'ar' ? 'المهام المسندة إلي وغير المنتهية' : 'Pending tasks assigned to me'}
-                        </p>
-                      </CardContent>
-                    </Card>
+                  {/* Personal Time Performance Stats for Admin */}
+                  <div className="space-y-3 pt-1">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {locale === 'ar' ? 'أدائي في كفاءة الوقت' : 'My Time Efficiency Performance'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* On-Time Completion Rate */}
+                      <Card className="hover:shadow-md transition-shadow border-indigo-200/80 bg-indigo-50/30 dark:bg-indigo-950/10">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-xs font-medium text-muted-foreground">{t('dashboard.onTimeCompletion')}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-extrabold text-indigo-700 dark:text-indigo-300">
+                            {myOnTimeRate !== null ? `${myOnTimeRate}%` : '—'}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold truncate">
+                            {myCompletedTasksWithEstimate.length > 0
+                              ? t('dashboard.onTimeTasksDesc', { count: myOnTimeCount, total: myCompletedTasksWithEstimate.length })
+                              : (locale === 'ar' ? 'لا توجد مهام بوقت مقدر' : 'No estimated tasks yet')}
+                          </p>
+                        </CardContent>
+                      </Card>
 
-                    {/* My In Progress */}
-                    <Card className="hover:shadow-md transition-shadow">
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي قيد التنفيذ' : 'My In Progress'}</span>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">{myInProgressCount}</div>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                          {locale === 'ar' ? 'المهام التي أعمل عليها حالياً' : 'Tasks I am currently working on'}
-                        </p>
-                      </CardContent>
-                    </Card>
+                      {/* Time Saved / Wasted */}
+                      <Card className={`hover:shadow-md transition-shadow ${
+                        myCompletedTasksWithEstimate.length > 0
+                          ? myNetVarianceSec >= 0
+                            ? 'border-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/10'
+                            : 'border-amber-200 bg-amber-50/30 dark:bg-amber-950/10'
+                          : ''
+                      }`}>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-xs font-medium text-muted-foreground">{t('dashboard.timeEfficiency')}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className={`text-2xl font-extrabold ${
+                            myCompletedTasksWithEstimate.length === 0
+                              ? 'text-muted-foreground'
+                              : myNetVarianceSec >= 0
+                                ? 'text-emerald-700 dark:text-emerald-300'
+                                : 'text-amber-700 dark:text-amber-300'
+                          }`}>
+                            {myCompletedTasksWithEstimate.length > 0
+                              ? (myNetVarianceSec >= 0
+                                  ? `+${formatHoursMinutes(myNetVarianceSec)} ${locale === 'ar' ? 'مُوفّر' : 'Saved'}`
+                                  : `-${formatHoursMinutes(myNetVarianceSec)} ${locale === 'ar' ? 'زائد' : 'Exceeded'}`)
+                              : '—'}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold truncate">
+                            {t('dashboard.timeSavedDesc')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Non-Admin Employee View: Personal Workload + Time Performance Cards (No Duplicates) */
+                <div className="space-y-6">
+                  {/* Workload Row */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {locale === 'ar' ? 'مهامي وإحصائياتي' : 'My Workload Overview'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* My Active Tasks */}
+                      <Card className="hover:shadow-md transition-shadow border-[#1D61E7]/15 bg-[#1D61E7]/5 dark:bg-[#1D61E7]/5">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي النشطة' : 'My Active Tasks'}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-extrabold text-[#1D61E7]">{myActiveTasks.length}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {locale === 'ar' ? 'المهام غير المنتهية' : 'Pending assigned tasks'}
+                          </p>
+                        </CardContent>
+                      </Card>
 
-                    {/* My Completed */}
-                    <Card className="hover:shadow-md transition-shadow">
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي المكتملة' : 'My Completed'}</span>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-extrabold text-green-600 dark:text-green-400">{myCompletedCount}</div>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                          {locale === 'ar' ? 'المهام التي أنجزتها بنجاح' : 'Tasks I have successfully completed'}
-                        </p>
-                      </CardContent>
-                    </Card>
+                      {/* My In Progress */}
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'قيد التنفيذ' : 'In Progress'}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-extrabold text-blue-600 dark:text-blue-400">{myInProgressCount}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {locale === 'ar' ? 'قيد العمل حالياً' : 'Currently active tasks'}
+                          </p>
+                        </CardContent>
+                      </Card>
 
-                    {/* My Overdue */}
-                    <Card className={`hover:shadow-md transition-all duration-200 ${
-                      myOverdueCount > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
-                    }`}>
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مهامي المتأخرة' : 'My Overdue'}</span>
-                      </CardHeader>
-                      <CardContent>
-                        <div className={`text-3xl font-extrabold ${myOverdueCount > 0 ? 'text-rose-600' : ''}`}>{myOverdueCount}</div>
-                        <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
-                          {locale === 'ar' ? 'مهام متأخرة تجاوزت الموعد المحدد' : 'Incomplete tasks past deadline'}
-                        </p>
-                      </CardContent>
-                    </Card>
+                      {/* My Completed */}
+                      <Card className="hover:shadow-md transition-shadow">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'مكتملة' : 'Completed'}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-extrabold text-green-600 dark:text-green-400">{myCompletedCount}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {locale === 'ar' ? 'أُنجزت بنجاح' : 'Tasks delivered successfully'}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      {/* My Overdue */}
+                      <Card className={`hover:shadow-md transition-all duration-200 ${
+                        myOverdueCount > 0 ? 'border-rose-200 bg-rose-50/20 dark:bg-rose-950/5' : ''
+                      }`}>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{locale === 'ar' ? 'متأخرة' : 'Overdue'}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className={`text-3xl font-extrabold ${myOverdueCount > 0 ? 'text-rose-600' : ''}`}>{myOverdueCount}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {locale === 'ar' ? 'تجاوزت الموعد المحدد' : 'Incomplete tasks past deadline'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+
+                  {/* Time Intelligence & Performance Row */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {locale === 'ar' ? 'أدائي في كفاءة الوقت' : 'My Time Efficiency Performance'}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* On-Time Completion Rate */}
+                      <Card className="hover:shadow-md transition-shadow border-indigo-200/80 bg-indigo-50/30 dark:bg-indigo-950/10">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{t('dashboard.onTimeCompletion')}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-extrabold text-indigo-700 dark:text-indigo-300">
+                            {myOnTimeRate !== null ? `${myOnTimeRate}%` : '—'}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {myCompletedTasksWithEstimate.length > 0
+                              ? t('dashboard.onTimeTasksDesc', { count: myOnTimeCount, total: myCompletedTasksWithEstimate.length })
+                              : (locale === 'ar' ? 'لا توجد مهام بوقت مقدر' : 'No estimated tasks completed yet')}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Time Saved / Wasted */}
+                      <Card className={`hover:shadow-md transition-shadow ${
+                        myCompletedTasksWithEstimate.length > 0
+                          ? myNetVarianceSec >= 0
+                            ? 'border-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/10'
+                            : 'border-amber-200 bg-amber-50/30 dark:bg-amber-950/10'
+                          : ''
+                      }`}>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{t('dashboard.timeEfficiency')}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className={`text-3xl font-extrabold ${
+                            myCompletedTasksWithEstimate.length === 0
+                              ? 'text-muted-foreground'
+                              : myNetVarianceSec >= 0
+                                ? 'text-emerald-700 dark:text-emerald-300'
+                                : 'text-amber-700 dark:text-amber-300'
+                          }`}>
+                            {myCompletedTasksWithEstimate.length > 0
+                              ? (myNetVarianceSec >= 0
+                                  ? `+${formatHoursMinutes(myNetVarianceSec)} ${locale === 'ar' ? 'مُوفّر' : 'Saved'}`
+                                  : `-${formatHoursMinutes(myNetVarianceSec)} ${locale === 'ar' ? 'زائد' : 'Exceeded'}`)
+                              : '—'}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {t('dashboard.timeSavedDesc')}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                 </div>
               )}
