@@ -331,14 +331,21 @@ export default function FinanceDashboardPage() {
 
   const loadExpensesAndSalaries = async (monthStr: string) => {
     try {
-      const [expRes, salRes] = await Promise.all([
-        expensesApi.list({ month: monthStr }),
-        salariesApi.list({ month: monthStr }),
-      ]);
+      const expRes = await expensesApi.list({ month: monthStr });
       setExpenses(expRes.expenses || []);
-      setSalaries(salRes.salaries || []);
+
+      if (user?.role === 'owner') {
+        try {
+          const salRes = await salariesApi.list({ month: monthStr });
+          setSalaries(salRes.salaries || []);
+        } catch {
+          setSalaries([]);
+        }
+      } else {
+        setSalaries([]);
+      }
     } catch (err) {
-      console.warn('Failed to load expenses/salaries:', err);
+      console.warn('Failed to load expenses:', err);
     }
   };
 
@@ -2888,8 +2895,8 @@ export default function FinanceDashboardPage() {
           <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', gap: 16 }}>
             {[
               { id: 'expenses', label: '💸 ' + t('finance.expensesTab') },
-              { id: 'salaries', label: '👤 ' + t('finance.salariesTab') },
-            ].map(sub => (
+              user?.role === 'owner' ? { id: 'salaries', label: '👤 ' + t('finance.salariesTab') } : null,
+            ].filter(Boolean).map((sub: any) => (
               <button
                 key={sub.id}
                 type="button"
