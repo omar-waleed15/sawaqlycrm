@@ -636,7 +636,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                       name="due_date" 
                       type="datetime-local" 
                       value={form.due_date} 
-                      onChange={handleChange} 
+                      onChange={handleChange}
+                      className="w-full text-xs h-10 px-3"
                     />
                   </div>
                 </div>

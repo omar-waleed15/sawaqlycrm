@@ -320,6 +320,7 @@ export default function CreateTaskPage() {
                     type="datetime-local"
                     value={form.due_date}
                     onChange={handleChange}
+                    className="w-full text-xs h-10 px-3"
                   />
                 </div>
               </div>

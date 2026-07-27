@@ -25,6 +25,18 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
+function formatDatetimeLocal(isoStr?: string): string {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export default function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -85,7 +97,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         title: tData.title,
         description: tData.description || '',
         priority: tData.priority,
-        due_date: tData.due_date ? tData.due_date.split('T')[0] : '',
+        due_date: tData.due_date ? formatDatetimeLocal(tData.due_date) : '',
         drive_link: tData.drive_link || '',
         content_type: tData.content_type || '',
         content_description: tData.content_description || '',
@@ -296,7 +308,14 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="due_date">{t('createTask.dueDate')}</Label>
-                  <Input id="due_date" name="due_date" type="date" value={form.due_date} onChange={handleChange} />
+                  <Input
+                    id="due_date"
+                    name="due_date"
+                    type="datetime-local"
+                    value={form.due_date}
+                    onChange={handleChange}
+                    className="w-full text-xs h-10 px-3"
+                  />
                 </div>
               </div>
 
