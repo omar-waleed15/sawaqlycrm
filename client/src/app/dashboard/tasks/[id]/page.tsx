@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock, ChevronDown, MoreVertical, Download, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock, ChevronDown, MoreVertical, Download, ExternalLink, Plus, X } from 'lucide-react';
 
 function formatDate(dateStr?: string, t?: any, locale?: string): string {
   if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
@@ -72,6 +72,11 @@ function formatDuration(totalSeconds: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
+function parseSubmissionLinks(raw?: string): string[] {
+  if (!raw || !raw.trim()) return [];
+  return raw.split(/[\n,\s]+/).map(s => s.trim()).filter(s => s.length > 0);
+}
+
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -84,10 +89,29 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
-  // Member submission state
-  const [submissionLink, setSubmissionLink] = useState('');
+  // Member submission state (dynamic list of link inputs)
+  const [submissionLinkInputs, setSubmissionLinkInputs] = useState<string[]>(['']);
   const [submittingLink, setSubmittingLink] = useState(false);
   const [completionNote, setCompletionNote] = useState('');
+
+  const handleLinkInputChange = (index: number, value: string) => {
+    setSubmissionLinkInputs(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const handleAddLinkInput = () => {
+    setSubmissionLinkInputs(prev => [...prev, '']);
+  };
+
+  const handleRemoveLinkInput = (index: number) => {
+    setSubmissionLinkInputs(prev => {
+      if (prev.length <= 1) return [''];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
   // Admin review state
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
@@ -138,7 +162,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       // Load member's submission data
       const myA = taskData.task.task_assignees?.find(a => a.user_id === user?.id);
       if (myA) {
-        setSubmissionLink(myA.submission_link || '');
+        const existing = parseSubmissionLinks(myA.submission_link);
+        setSubmissionLinkInputs(existing.length > 0 ? existing : ['']);
         setCompletionNote(myA.completion_note || '');
       }
 
@@ -178,15 +203,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   // Member: submit work
   const handleSubmitWork = async () => {
-    if (!submissionLink.trim()) return;
+    const validLinks = submissionLinkInputs.map(l => l.trim()).filter(l => l.length > 0);
+    if (validLinks.length === 0) return;
+
     setSubmittingLink(true);
     try {
       const data = await tasksApi.update(id, {
-        submission_link: submissionLink,
+        submission_link: validLinks.join('\n'),
         status: 'submitted' as any,
         completion_note: completionNote || undefined,
       });
       setTask(data.task);
+      setSubmissionLinkInputs(validLinks.length > 0 ? validLinks : ['']);
     } catch (err) { console.error(err); }
     finally { setSubmittingLink(false); }
   };
@@ -648,26 +676,53 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {myAssignment.status === 'in_progress' && (
                     <div className="border-t pt-4 flex flex-col gap-4">
                       <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">📤 {t('taskDetail.submitWork')}</h4>
-                      
-                      {myAssignment.submission_link && (
-                        <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-100 px-3 py-2 rounded-lg font-semibold w-fit">
-                          <CheckCircle2 className="size-4 text-emerald-600" />
-                          <span>{t('taskDetail.previouslySubmitted')}</span>
-                          <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="underline hover:text-emerald-900 ml-1">
-                            {t('taskDetail.viewLink')} ↗
-                          </a>
-                        </div>
-                      )}
 
-                      <div className="flex flex-col gap-1.5">
-                        <Label className="text-xs font-bold text-foreground/80">{myAssignment.submission_link ? t('taskDetail.updateSubmissionLink') : t('taskDetail.pasteSubmissionLink')}</Label>
-                        <Input
-                          type="url"
-                          placeholder="https://drive.google.com/... or https://notion.so/..."
-                          value={submissionLink}
-                          onChange={e => setSubmissionLink(e.target.value)}
-                          className="h-9 text-xs"
-                        />
+                      {/* Dynamic Multi-Link Inputs */}
+                      <div className="flex flex-col gap-2.5">
+                        <Label className="text-xs font-bold text-foreground/80 flex items-center justify-between">
+                          <span>🔗 {locale === 'ar' ? 'روابط التسليم' : 'Submission Links'} ({submissionLinkInputs.filter(l => l.trim()).length}) *</span>
+                        </Label>
+
+                        <div className="flex flex-col gap-2">
+                          {submissionLinkInputs.map((linkVal, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <Input
+                                type="url"
+                                placeholder={
+                                  locale === 'ar'
+                                    ? `رابط العمل ${idx + 1} (Drive, Figma, Notion...)`
+                                    : `Work link ${idx + 1} (Drive, Figma, Notion...)`
+                                }
+                                value={linkVal}
+                                onChange={e => handleLinkInputChange(idx, e.target.value)}
+                                className="h-9 text-xs flex-1"
+                              />
+                              {submissionLinkInputs.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveLinkInput(idx)}
+                                  className="size-9 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 shrink-0"
+                                  title={locale === 'ar' ? 'حذف الرابط' : 'Remove Link'}
+                                >
+                                  <X className="size-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Button to add another link input field */}
+                        <Button
+                          type="button"
+                          onClick={handleAddLinkInput}
+                          variant="outline"
+                          size="sm"
+                          className="w-fit text-xs font-semibold gap-1.5 border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 mt-1"
+                        >
+                          {locale === 'ar' ? 'إضافة رابط آخر' : 'Add another link'}
+                        </Button>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
@@ -683,7 +738,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       </div>
 
                       <div className="flex justify-end">
-                        <Button onClick={handleSubmitWork} disabled={submittingLink || !submissionLink.trim()} className="text-xs font-bold px-4 h-9">
+                        <Button onClick={handleSubmitWork} disabled={submittingLink || submissionLinkInputs.every(l => !l.trim())} className="text-xs font-bold px-4 h-9">
                           {submittingLink ? <Loader2 className="size-4 animate-spin" /> : myAssignment.submission_link ? t('taskDetail.updateResubmit') : t('taskDetail.submitWork')}
                         </Button>
                       </div>
@@ -696,14 +751,21 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       <p className="text-xs text-[#1D61E7] bg-[#1D61E7]/5 border border-[#1D61E7]/10 rounded-lg p-3 leading-relaxed">
                         {t('taskDetail.submittedPendingDesc') || 'Your work has been submitted. Admins will review it soon.'}
                       </p>
-                      <div className="flex gap-2 flex-wrap items-center">
-                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1">
+                      <div className="flex flex-col gap-2">
+                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1 w-fit">
                           ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                         </div>
-                        {myAssignment.submission_link && (
-                          <a href={myAssignment.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs text-[#1D61E7] underline font-semibold flex items-center gap-1">
-                            📎 {t('taskDetail.yourSubmission') || 'View Submission Link'} ↗
-                          </a>
+                        {parseSubmissionLinks(myAssignment.submission_link).length > 0 && (
+                          <div className="flex flex-col gap-1 mt-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">📎 {locale === 'ar' ? 'روابط التسليم الخاص بك:' : 'Your Submission Links:'}</span>
+                            <div className="flex flex-col gap-1">
+                              {parseSubmissionLinks(myAssignment.submission_link).map((link, idx) => (
+                                <a key={idx} href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[#1D61E7] underline font-semibold flex items-center gap-1 hover:text-[#1553c7] break-all">
+                                  🔗 {parseSubmissionLinks(myAssignment.submission_link).length > 1 ? `${idx + 1}. ` : ''}{link} ↗
+                                </a>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
                       {myAssignment.completion_note && (
@@ -812,17 +874,22 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         {/* Submission details */}
                         {hasSubmitted ? (
                           <div className="bg-muted/40 border border-border/40 rounded-xl p-3.5 flex flex-col gap-2.5 ml-10">
-                            {a.submission_link && (
-                              <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                                <span className="text-muted-foreground font-bold">{t('taskDetail.submissionLinkLabel') || 'Link:'}</span>
-                                <a
-                                  href={a.submission_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[#1D61E7] underline font-medium truncate max-w-[280px] hover:text-[#1553c7]"
-                                >
-                                  {a.submission_link} ↗
-                                </a>
+                            {parseSubmissionLinks(a.submission_link).length > 0 && (
+                              <div className="flex flex-col gap-1 text-xs">
+                                <span className="text-muted-foreground font-bold">{t('taskDetail.submissionLinkLabel') || 'Submission Links:'}</span>
+                                <div className="flex flex-col gap-1">
+                                  {parseSubmissionLinks(a.submission_link).map((link, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={link.startsWith('http') ? link : `https://${link}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[#1D61E7] underline font-medium truncate max-w-[340px] hover:text-[#1553c7] flex items-center gap-1"
+                                    >
+                                      🔗 {parseSubmissionLinks(a.submission_link).length > 1 ? `${idx + 1}. ` : ''}{link} ↗
+                                    </a>
+                                  ))}
+                                </div>
                               </div>
                             )}
                             {a.completion_note && (
