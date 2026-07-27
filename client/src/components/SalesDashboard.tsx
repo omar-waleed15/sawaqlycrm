@@ -120,6 +120,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     notes: '',
     outcome: 'contacted',
     meeting_date: '',
+    meeting_attendees: [] as string[],
+    meeting_notes: '',
   });
 
   // Close Won Wizard State
@@ -315,7 +317,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   const openFollowUpFromDetail = (deal: Client) => {
     closeDealDetail();
     setSelectedLead(deal);
-    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '' });
+    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
     setErrorMsg('');
     setCallModalOpen(true);
   };
@@ -401,7 +403,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
 
   const handleOpenLogCall = (lead: Client) => {
     setSelectedLead(lead);
-    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '' });
+    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
     setErrorMsg('');
     setCallModalOpen(true);
   };
@@ -1061,17 +1063,65 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           </div>
 
           {callForm.outcome === 'meeting_scheduled' && (
-            <div className="flex flex-col gap-1.5 animate-fade-in">
-              <Label htmlFor="call-meeting">📅 {t('sales.meetingDateTime')} *</Label>
-              <Input
-                id="call-meeting"
-                type="datetime-local"
-                min={getCairoTodayString() + "T00:00"}
-                value={callForm.meeting_date}
-                onChange={e => setCallForm(p => ({ ...p, meeting_date: e.target.value }))}
-                required
-              />
-            </div>
+            <>
+              <div className="flex flex-col gap-1.5 animate-fade-in">
+                <Label htmlFor="call-meeting">📅 {t('sales.meetingDateTime')} *</Label>
+                <Input
+                  id="call-meeting"
+                  type="datetime-local"
+                  min={getCairoTodayString() + "T00:00"}
+                  value={callForm.meeting_date}
+                  onChange={e => setCallForm(p => ({ ...p, meeting_date: e.target.value }))}
+                  required
+                />
+              </div>
+
+              {/* Team Attendees Selection */}
+              <div className="flex flex-col gap-1.5 animate-fade-in">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Users className="size-3.5 text-primary" />
+                  {locale === 'ar' ? 'دعوة أعضاء الفريق للاجتماع' : 'Invite Team Members to Meeting'}
+                </Label>
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/20 min-h-[42px] items-center">
+                  {members.filter(m => m.role !== 'client').map(member => {
+                    const isSelected = callForm.meeting_attendees.includes(member.id);
+                    return (
+                      <Badge
+                        key={member.id}
+                        variant={isSelected ? "default" : "outline"}
+                        className={`cursor-pointer text-xs transition-all ${
+                          isSelected ? "bg-primary text-primary-foreground font-bold shadow-sm" : "hover:bg-muted text-muted-foreground"
+                        }`}
+                        onClick={() => {
+                          setCallForm(p => ({
+                            ...p,
+                            meeting_attendees: isSelected
+                              ? p.meeting_attendees.filter(id => id !== member.id)
+                              : [...p.meeting_attendees, member.id]
+                          }));
+                        }}
+                      >
+                        {isSelected ? "✓ " : "+ "} {member.name} ({member.role.replace('_', ' ')})
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* In-Person Location & Notes */}
+              <div className="flex flex-col gap-1.5 animate-fade-in">
+                <Label htmlFor="call-meeting-notes" className="text-xs font-semibold">
+                  📍 {locale === 'ar' ? 'مكان الاجتماع وملاحظات التحضير' : 'In-Person Meeting Location & Notes'}
+                </Label>
+                <Input
+                  id="call-meeting-notes"
+                  type="text"
+                  placeholder={locale === 'ar' ? 'مثال: مقر العميل في المعادي / تحضير خطة المحتوى' : 'e.g. Client Office in Maadi / Prepare content plan'}
+                  value={callForm.meeting_notes}
+                  onChange={e => setCallForm(p => ({ ...p, meeting_notes: e.target.value }))}
+                />
+              </div>
+            </>
           )}
 
           <div className="flex flex-col gap-1.5">

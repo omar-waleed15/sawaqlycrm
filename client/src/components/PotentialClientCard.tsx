@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Client, SalesCallLog } from '@/types';
 import { useAuth } from '@/lib/auth';
-import { salesApi, clientsApi } from '@/lib/api';
+import { salesApi, clientsApi, usersApi } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -83,6 +83,9 @@ export default function PotentialClientCard({
   const [outcome, setOutcome] = useState<string>('contacted');
   const [notes, setNotes] = useState('');
   const [meetingDate, setMeetingDate] = useState('');
+  const [meetingAttendees, setMeetingAttendees] = useState<string[]>([]);
+  const [meetingNotes, setMeetingNotes] = useState('');
+  const [teamMembers, setTeamMembers] = useState<import('@/types').User[]>([]);
   const [submittingLog, setSubmittingLog] = useState(false);
   const [logError, setLogError] = useState('');
 
@@ -93,6 +96,11 @@ export default function PotentialClientCard({
   useEffect(() => {
     if (isExpanded) {
       fetchLogs();
+      if (teamMembers.length === 0) {
+        usersApi.list().then(res => {
+          setTeamMembers((res.users || []).filter((u: any) => u.role !== 'client'));
+        }).catch(() => {});
+      }
     }
   }, [isExpanded]);
 
@@ -130,13 +138,17 @@ export default function PotentialClientCard({
         outcome,
         notes: notes.trim() || undefined,
       };
-      if (outcome === 'meeting_scheduled' && meetingDate) {
-        payload.meeting_date = meetingDate;
+      if (outcome === 'meeting_scheduled') {
+        if (meetingDate) payload.meeting_date = meetingDate;
+        if (meetingAttendees.length > 0) payload.meeting_attendees = meetingAttendees;
+        if (meetingNotes.trim()) payload.meeting_notes = meetingNotes.trim();
       }
 
       await salesApi.logCall(client.id, payload);
       setNotes('');
       setMeetingDate('');
+      setMeetingAttendees([]);
+      setMeetingNotes('');
       fetchLogs();
       onUpdate();
     } catch (err: any) {
@@ -375,19 +387,62 @@ export default function PotentialClientCard({
                   </div>
 
                   {outcome === 'meeting_scheduled' && (
-                    <div className="flex flex-col gap-1 slide-down">
-                      <Label htmlFor={`meet-date-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        {t('sales.meetingDate') || 'Meeting Date'}
-                      </Label>
-                      <Input
-                        id={`meet-date-${client.id}`}
-                        type="datetime-local"
-                        value={meetingDate}
-                        onChange={e => setMeetingDate(e.target.value)}
-                        required
-                        className="h-9"
-                      />
-                    </div>
+                    <>
+                      <div className="flex flex-col gap-1 slide-down">
+                        <Label htmlFor={`meet-date-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          📅 {t('sales.meetingDate') || 'Meeting Date'}
+                        </Label>
+                        <Input
+                          id={`meet-date-${client.id}`}
+                          type="datetime-local"
+                          value={meetingDate}
+                          onChange={e => setMeetingDate(e.target.value)}
+                          required
+                          className="h-9"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1 slide-down">
+                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          👥 {locale === 'ar' ? 'دعوة أعضاء الفريق للاجتماع' : 'Invite Team Members'}
+                        </Label>
+                        <div className="flex flex-wrap gap-1 p-1.5 rounded-md border bg-muted/20 min-h-[36px] items-center">
+                          {teamMembers.map(member => {
+                            const isSelected = meetingAttendees.includes(member.id);
+                            return (
+                              <Badge
+                                key={member.id}
+                                variant={isSelected ? "default" : "outline"}
+                                className={`cursor-pointer text-[10px] py-0.5 transition-all ${
+                                  isSelected ? "bg-primary text-primary-foreground font-bold" : "hover:bg-muted text-muted-foreground"
+                                }`}
+                                onClick={() => {
+                                  setMeetingAttendees(prev =>
+                                    isSelected ? prev.filter(id => id !== member.id) : [...prev, member.id]
+                                  );
+                                }}
+                              >
+                                {isSelected ? "✓ " : "+ "} {member.name}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 slide-down">
+                        <Label htmlFor={`meet-notes-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          📍 {locale === 'ar' ? 'مكان الاجتماع وملاحظات التحضير' : 'In-Person Location & Notes'}
+                        </Label>
+                        <Input
+                          id={`meet-notes-${client.id}`}
+                          type="text"
+                          placeholder="e.g. Client Office / Prepare content plan"
+                          value={meetingNotes}
+                          onChange={e => setMeetingNotes(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
 

@@ -115,6 +115,8 @@ export interface Client {
   pipeline_stage: 'new_lead' | 'contacted' | 'meeting_scheduled' | 'meeting_done' | 'won' | 'lost';
   sales_rep_id?: string;
   meeting_date?: string;
+  meeting_attendees?: string[];
+  meeting_notes?: string;
   start_date?: string;
   address?: string;
   content_plan_link?: string;

@@ -292,7 +292,7 @@ router.get('/leads/:leadId', authMiddleware, ownerOrSales, async (req: AuthReque
 // POST /api/sales/leads/:leadId/calls — Log a call outcome and comments (owner or sales)
 router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { leadId } = req.params;
-  const { notes, outcome, meeting_date } = req.body;
+  const { notes, outcome, meeting_date, meeting_attendees, meeting_notes } = req.body;
   const salesRepId = req.user!.id;
 
   if (!outcome) {
@@ -335,9 +335,12 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
 
     // 3. Update client stage & meeting_date if scheduled, and auto-assign sales_rep_id if unassigned
     const updates: Record<string, any> = { pipeline_stage: outcome };
-    if (outcome === 'meeting_scheduled' && meeting_date) {
-      updates.meeting_date = meeting_date;
+    if (outcome === 'meeting_scheduled') {
+      if (meeting_date) updates.meeting_date = meeting_date;
+      if (Array.isArray(meeting_attendees)) updates.meeting_attendees = meeting_attendees;
+      if (meeting_notes !== undefined) updates.meeting_notes = meeting_notes || null;
     }
+
     if (!lead.sales_rep_id) {
       updates.sales_rep_id = salesRepId;
     }
@@ -352,6 +355,25 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
     if (updateErr) {
       res.status(500).json({ error: updateErr.message });
       return;
+    }
+
+    // 4. Auto-generate Reminder for each invited team member
+    if (outcome === 'meeting_scheduled' && Array.isArray(meeting_attendees) && meeting_attendees.length > 0) {
+      const senderName = req.user?.name || 'A team member';
+      const meetingDateFormatted = meeting_date ? new Date(meeting_date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'Scheduled Date';
+      const reminderText = `📅 Meeting Attendance Request: You are invited by ${senderName} to attend an in-person client meeting with "${lead.name}" on ${meetingDateFormatted}.${meeting_notes ? ` Notes/Location: ${meeting_notes}` : ''}`;
+
+      const reminderRows = meeting_attendees.map((attendeeId: string) => ({
+        sender_id: salesRepId,
+        receiver_id: attendeeId,
+        content: reminderText,
+      }));
+
+      try {
+        await supabaseAdmin.from('reminders').insert(reminderRows);
+      } catch (remErr) {
+        console.error('Failed to auto-create meeting reminders:', remErr);
+      }
     }
 
     res.json({ lead: updatedLead });
@@ -486,7 +508,7 @@ router.get('/calendar-events', authMiddleware, ownerOrSales, async (req: AuthReq
       .not('meeting_date', 'is', null);
 
     if (!isOwner || (req.query.userId && req.query.userId !== 'all')) {
-      meetingsQuery = meetingsQuery.eq('sales_rep_id', targetUserId);
+      meetingsQuery = meetingsQuery.or(`sales_rep_id.eq.${targetUserId},meeting_attendees.cs.{${targetUserId}}`);
     }
 
     const { data: meetings, error: meetingsErr } = await meetingsQuery.order('meeting_date', { ascending: true });
