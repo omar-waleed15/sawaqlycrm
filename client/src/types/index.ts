@@ -504,11 +504,20 @@ export interface ClientReport {
   updated_at: string;
 }
 
+export interface ReminderAttachment {
+  url: string;
+  name: string;
+  type: 'image' | 'file';
+  size?: number;
+}
+
 export interface Reminder {
   id: string;
   sender_id: string;
   receiver_id: string;
   content: string;
+  attachments?: ReminderAttachment[];
+  review_link?: string;
   read_at?: string;
   completed_at?: string;
   created_at: string;

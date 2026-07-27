@@ -72,6 +72,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const [hasNewMessage, setHasNewMessage] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     if (pathname === '/dashboard/chat') {
       localStorage.setItem('last_read_chat_time', new Date().toISOString());
       setHasNewMessage(false);
@@ -79,9 +80,10 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     }
 
     const checkNewMessages = async () => {
+      if (!user) return;
       try {
         const data = await chatApi.list();
-        const messages = data.messages || [];
+        const messages = data?.messages || [];
         if (messages.length === 0) return;
 
         const latestMessage = messages[messages.length - 1];
@@ -93,8 +95,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         if (!lastRead || new Date(latestMessage.created_at) > new Date(lastRead)) {
           setHasNewMessage(true);
         }
-      } catch (err) {
-        console.error('Error checking new chat messages in sidebar:', err);
+      } catch {
+        // Silently swallow background polling errors when server is reloading/offline
       }
     };
 
@@ -102,7 +104,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
 
     const interval = setInterval(checkNewMessages, 10000);
     return () => clearInterval(interval);
-  }, [pathname, user?.id]);
+  }, [pathname, user]);
 
   const visibleItems = navItems.filter(item => {
     if (item.allowedRoles && (!user || !item.allowedRoles.includes(user.role))) return false;

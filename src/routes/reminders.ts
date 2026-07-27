@@ -3,7 +3,64 @@ import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { sendWebhookNotification } from '../lib/webhook';
 
+import multer from 'multer';
+
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+});
+
+// POST /api/reminders/upload — Upload attachment file for reminder
+router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRequest, res: Response): Promise<void> => {
+  if (!req.file) {
+    res.status(400).json({ error: 'No file uploaded' });
+    return;
+  }
+
+  try {
+    const file = req.file;
+    const fileExt = file.originalname.split('.').pop() || 'bin';
+    const filePath = `reminders/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+
+    let publicUrl = '';
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from('documents')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadErr) {
+      const { error: fallbackErr } = await supabaseAdmin.storage
+        .from('chat-attachments')
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (fallbackErr) {
+        publicUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+      } else {
+        const { data: urlData } = supabaseAdmin.storage.from('chat-attachments').getPublicUrl(filePath);
+        publicUrl = urlData.publicUrl;
+      }
+    } else {
+      const { data: urlData } = supabaseAdmin.storage.from('documents').getPublicUrl(filePath);
+      publicUrl = urlData.publicUrl;
+    }
+
+    res.json({
+      url: publicUrl,
+      name: file.originalname,
+      type: file.mimetype.startsWith('image/') ? 'image' : 'file',
+      size: file.size,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to upload attachment' });
+  }
+});
 
 // GET /api/reminders — List all reminders related to the current user (sent or received)
 router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -37,7 +94,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
 // POST /api/reminders — Create new reminders (supports single receiver_id or receiver_ids array)
 router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { receiver_id, receiver_ids, content } = req.body;
+  const { receiver_id, receiver_ids, content, attachments, review_link } = req.body;
   const senderId = req.user?.id;
 
   if (!senderId) {
@@ -62,6 +119,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promis
       sender_id: senderId,
       receiver_id: rId,
       content: content.trim(),
+      attachments: Array.isArray(attachments) ? attachments : [],
+      review_link: review_link ? String(review_link).trim() : null,
     }));
 
     const { data, error } = await supabaseAdmin

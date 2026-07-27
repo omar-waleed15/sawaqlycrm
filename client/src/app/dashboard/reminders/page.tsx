@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { remindersApi, usersApi } from '@/lib/api';
-import { Reminder, User } from '@/types';
+import { Reminder, User, ReminderAttachment } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +36,10 @@ import {
   AlertCircle,
   Plus,
   ChevronDown,
+  Paperclip,
+  ExternalLink,
+  FileText,
+  X,
 } from 'lucide-react';
 
 const COLORS = [
@@ -58,8 +63,30 @@ export default function RemindersPage() {
   // New reminder form state
   const [selectedReceiverIds, setSelectedReceiverIds] = useState<string[]>([]);
   const [content, setContent] = useState('');
+  const [reviewLink, setReviewLink] = useState('');
+  const [attachments, setAttachments] = useState<ReminderAttachment[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    setErrorMsg('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await remindersApi.uploadAttachment(formData);
+      setAttachments(prev => [...prev, res]);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to upload attachment');
+    } finally {
+      setUploadingFile(false);
+      e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -97,9 +124,16 @@ export default function RemindersPage() {
     setSubmitting(true);
     setErrorMsg('');
     try {
-      const res = await remindersApi.create({ receiver_ids: selectedReceiverIds, content });
+      const res = await remindersApi.create({
+        receiver_ids: selectedReceiverIds,
+        content,
+        review_link: reviewLink.trim() || undefined,
+        attachments,
+      });
       setReminders([...(res.reminders || []), ...reminders]);
       setContent('');
+      setReviewLink('');
+      setAttachments([]);
       setSelectedReceiverIds([]);
       setCreateModalOpen(false);
     } catch (err: any) {
@@ -250,9 +284,45 @@ export default function RemindersPage() {
                   </div>
 
                   {/* Note Content */}
-                  <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap flex-1 min-h-[60px]">
+                  <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap flex-1 min-h-[50px]">
                     {r.content}
                   </div>
+
+                  {/* Review Link Button */}
+                  {r.review_link && (
+                    <a
+                      href={r.review_link.startsWith('http') ? r.review_link : `https://${r.review_link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-colors w-fit border border-indigo-200 dark:border-indigo-800"
+                    >
+                      <ExternalLink className="size-3.5 shrink-0" />
+                      <span>{locale === 'ar' ? 'فتح رابط المراجعة ↗' : 'Open Link to Review ↗'}</span>
+                    </a>
+                  )}
+
+                  {/* Attachments Gallery */}
+                  {r.attachments && r.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-black/5">
+                      {r.attachments.map((att, aIdx) => (
+                        <a
+                          key={aIdx}
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-2 py-1 rounded bg-black/5 hover:bg-black/10 text-xs font-semibold text-foreground transition-all group"
+                        >
+                          {att.type === 'image' ? (
+                            <img src={att.url} alt={att.name} className="size-5 rounded object-cover" />
+                          ) : (
+                            <FileText className="size-3.5 text-indigo-600" />
+                          )}
+                          <span className="max-w-[120px] truncate group-hover:underline">{att.name}</span>
+                          <ExternalLink className="size-3 opacity-60" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Note Footer: Status Trackers & Receiver Action Buttons */}
                   <div className="flex flex-col gap-2 border-t border-black/5 pt-3 mt-auto">
@@ -405,9 +475,74 @@ export default function RemindersPage() {
               placeholder={t('reminders.placeholder') || 'Type your reminder here...'}
               value={content}
               onChange={e => setContent(e.target.value)}
-              rows={4}
+              rows={3}
               className="resize-none"
             />
+          </div>
+
+          {/* Link to Review */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="review_link" className="flex items-center gap-1.5 text-xs font-semibold">
+              <ExternalLink className="size-3.5 text-indigo-600" />
+              {locale === 'ar' ? 'رابط للمراجعة (اختياري)' : 'Link to Review (Optional)'}
+            </Label>
+            <Input
+              id="review_link"
+              type="url"
+              placeholder="https://docs.google.com/... or Figma link"
+              value={reviewLink}
+              onChange={e => setReviewLink(e.target.value)}
+              className="text-xs"
+            />
+          </div>
+
+          {/* Attach Photos or Files */}
+          <div className="flex flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-semibold">
+              <Paperclip className="size-3.5 text-indigo-600" />
+              {locale === 'ar' ? 'إرفاق صور أو ملفات (اختياري)' : 'Attach Photos or Files (Optional)'}
+            </Label>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  id="reminder-file-input"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  disabled={uploadingFile}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={uploadingFile}
+                  onClick={() => document.getElementById('reminder-file-input')?.click()}
+                  className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                >
+                  {uploadingFile && <Loader2 className="size-3.5 animate-spin mr-1" />}
+                  {uploadingFile ? (locale === 'ar' ? 'جاري الرفع...' : 'Uploading...') : (locale === 'ar' ? '+ رفع' : '+ Upload')}
+                </Button>
+              </div>
+
+              {/* Attachment Chips */}
+              {attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/20">
+                  {attachments.map((att, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-background border text-xs font-medium text-foreground">
+                      {att.type === 'image' ? '🖼️' : '📄'}
+                      <span className="max-w-[130px] truncate" title={att.name}>{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                        className="text-muted-foreground hover:text-destructive p-0.5"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-border">

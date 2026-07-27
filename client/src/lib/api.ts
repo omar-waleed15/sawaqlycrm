@@ -19,25 +19,32 @@ export async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    if (res.status === 401 || data.error === 'Invalid or expired token') {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+    if (!res.ok) {
+      if (res.status === 401 || data.error === 'Invalid or expired token') {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          window.location.href = '/login';
+        }
       }
+      throw new Error(data.error || `HTTP ${res.status}`);
     }
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
 
-  return data as T;
+    return data as T;
+  } catch (err: any) {
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error('Network error: Unable to reach backend API');
+    }
+    throw err;
+  }
 }
 
 function uploadFile(
@@ -386,6 +393,8 @@ export const closedClientsApi = {
   // Reports
   listReports: (clientId: string) =>
     request<{ reports: import('@/types').ClientReport[] }>(`/closed-clients/${clientId}/reports`),
+  getMonthlyCounts: (clientId: string, month: string) =>
+    request<{ month: string; counts: { num_posts: number; num_reels: number; num_stories: number; num_photos: number } }>(`/closed-clients/${clientId}/reports/monthly-counts?month=${month}`),
   createReport: (clientId: string, data: Partial<import('@/types').ClientReport>) =>
     request<{ report: import('@/types').ClientReport }>(`/closed-clients/${clientId}/reports`, { method: 'POST', body: JSON.stringify(data) }),
   updateReport: (clientId: string, reportId: string, data: Partial<import('@/types').ClientReport>) =>
@@ -397,7 +406,9 @@ export const closedClientsApi = {
 // Reminders API
 export const remindersApi = {
   list: () => request<{ reminders: import('@/types').Reminder[] }>('/reminders'),
-  create: (data: { receiver_ids: string[]; content: string }) =>
+  uploadAttachment: (formData: FormData) =>
+    uploadFile('/reminders/upload', formData) as Promise<import('@/types').ReminderAttachment>,
+  create: (data: { receiver_ids: string[]; content: string; attachments?: import('@/types').ReminderAttachment[]; review_link?: string }) =>
     request<{ reminders: import('@/types').Reminder[] }>('/reminders', { method: 'POST', body: JSON.stringify(data) }),
   markRead: (id: string) =>
     request<{ reminder: import('@/types').Reminder }>(`/reminders/${id}/read`, { method: 'PUT' }),

@@ -29,6 +29,7 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
   const [modalOpen, setModalOpen] = useState(false);
   const [editingReport, setEditingReport] = useState<ClientReport | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [fetchingCounts, setFetchingCounts] = useState(false);
   const [form, setForm] = useState({
     report_month: '',
     views: '',
@@ -40,6 +41,27 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
     num_photos: '',
     notes: '',
   });
+
+  const fetchAutoCounts = async (targetMonth: string) => {
+    if (!targetMonth || !clientId) return;
+    setFetchingCounts(true);
+    try {
+      const res = await closedClientsApi.getMonthlyCounts(clientId, targetMonth);
+      if (res.counts) {
+        setForm(prev => ({
+          ...prev,
+          num_posts: String(res.counts.num_posts),
+          num_reels: String(res.counts.num_reels),
+          num_stories: String(res.counts.num_stories),
+          num_photos: String(res.counts.num_photos),
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to auto-sync content counts:', err);
+    } finally {
+      setFetchingCounts(false);
+    }
+  };
 
   const resetForm = (report?: ClientReport) => {
     if (report) {
@@ -70,6 +92,7 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
         notes: ''
       });
       setEditingReport(null);
+      fetchAutoCounts(monthStr);
     }
     setModalOpen(true);
   };
@@ -307,9 +330,30 @@ export default function ClosedClientReport({ clientId, reports, onRefresh }: Clo
       {/* Modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingReport ? t('closedClients.report.editReport') : t('closedClients.report.addReport')}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <Label>{t('closedClients.report.month')}</Label>
-            <Input type="month" value={form.report_month} onChange={(e) => setForm({ ...form, report_month: e.target.value })} required />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="flex-1 w-full">
+              <Label>{t('closedClients.report.month')}</Label>
+              <Input
+                type="month"
+                value={form.report_month}
+                onChange={(e) => {
+                  const newMonth = e.target.value;
+                  setForm(prev => ({ ...prev, report_month: newMonth }));
+                  if (newMonth) fetchAutoCounts(newMonth);
+                }}
+                required
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={fetchingCounts || !form.report_month}
+              onClick={() => fetchAutoCounts(form.report_month)}
+              className="text-xs font-semibold gap-1 text-primary border-primary/30 shrink-0 mt-2 sm:mt-5"
+            >
+              {fetchingCounts ? <Loader2 className="size-3 animate-spin" /> : '⚡ Auto-sync Content Counts'}
+            </Button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
