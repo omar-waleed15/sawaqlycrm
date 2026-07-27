@@ -88,9 +88,9 @@ export default function ClientsDashboardPage() {
   const router = useRouter();
   const { t, locale } = useLanguage();
 
-  // Navigation Guard: only owner (admin) or team_leader
+  // Navigation Guard: owner, team_leader, sales, account_manager
   useEffect(() => {
-    if (user && !['owner', 'team_leader'].includes(user.role)) {
+    if (user && !['owner', 'team_leader', 'sales', 'account_manager'].includes(user.role)) {
       router.replace('/dashboard');
     }
   }, [user, router]);
@@ -204,7 +204,7 @@ export default function ClientsDashboardPage() {
   };
 
   useEffect(() => {
-    if (user && ['owner', 'team_leader', 'account_manager'].includes(user.role)) {
+    if (user && ['owner', 'team_leader', 'sales', 'account_manager'].includes(user.role)) {
       loadData();
     }
   }, [user]);
@@ -873,9 +873,9 @@ export default function ClientsDashboardPage() {
     document.body.removeChild(link);
   };
 
-  // Filter lists
-  const potentialClients = clients.filter(c => c.pipeline_stage !== 'won' && c.sales_rep_id);
-  const wonClients = clients.filter(c => c.pipeline_stage === 'won' && c.sales_rep_id);
+  // Filter lists: Any record where pipeline_stage !== 'won' is a prospective lead
+  const potentialClients = clients.filter(c => c.pipeline_stage !== 'won');
+  const wonClients = clients.filter(c => c.pipeline_stage === 'won');
 
   const filteredClients = (subTab === 'potential' ? potentialClients : wonClients).filter(c => {
     const q = clientSearch.toLowerCase();

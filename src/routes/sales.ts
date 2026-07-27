@@ -7,9 +7,12 @@ const router = Router();
 
 // GET /api/sales/dashboard — Fetch personal sales stats, targets, call logs, phone list, historical deals
 router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+  const isOwner = req.user!.role === 'owner' || req.user!.role === 'team_leader';
   let userId = req.user!.id;
-  if (req.user!.role === 'owner' && req.query.userId && typeof req.query.userId === 'string') {
-    userId = req.query.userId;
+  const filterUserId = req.query.userId && typeof req.query.userId === 'string' ? req.query.userId : null;
+
+  if (isOwner && filterUserId && filterUserId !== 'all') {
+    userId = filterUserId;
   }
   const today = new Date();
   const currentMonth = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -23,12 +26,19 @@ router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, 
       .eq('month', currentMonth)
       .maybeSingle();
 
-    // 2. Fetch clients associated with this rep
-    const { data: clients, error: clientsErr } = await supabaseAdmin
+    // 2. Fetch clients associated with this rep (or all clients for owner without explicit userId filter)
+    let clientsQuery = supabaseAdmin
       .from('clients')
-      .select('*')
-      .eq('sales_rep_id', userId)
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    if (isOwner && (!filterUserId || filterUserId === 'all')) {
+      // Owner/TL viewing overall agency dashboard: fetch all clients/leads
+    } else {
+      // Fetch leads assigned to this rep OR unassigned leads
+      clientsQuery = clientsQuery.or(`sales_rep_id.eq.${userId},sales_rep_id.is.null`);
+    }
+
+    const { data: clients, error: clientsErr } = await clientsQuery.order('created_at', { ascending: false });
 
     if (clientsErr) {
       res.status(500).json({ error: clientsErr.message });
@@ -36,10 +46,15 @@ router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, 
     }
 
     // 3. Fetch contracts associated with this rep
-    const { data: contracts, error: contractsErr } = await supabaseAdmin
+    let contractsQuery = supabaseAdmin
       .from('contracts')
-      .select('*, installments:contract_installments(*)')
-      .eq('sales_rep_id', userId);
+      .select('*, installments:contract_installments(*)');
+
+    if (!isOwner || (filterUserId && filterUserId !== 'all')) {
+      contractsQuery = contractsQuery.eq('sales_rep_id', userId);
+    }
+
+    const { data: contracts, error: contractsErr } = await contractsQuery;
 
     if (contractsErr) {
       res.status(500).json({ error: contractsErr.message });
@@ -47,11 +62,15 @@ router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, 
     }
 
     // 4. Fetch call logs
-    const { data: callLogs } = await supabaseAdmin
+    let callLogsQuery = supabaseAdmin
       .from('sales_call_logs')
-      .select('*, client:clients(id, name, company)')
-      .eq('sales_rep_id', userId)
-      .order('call_date', { ascending: false });
+      .select('*, client:clients(id, name, company)');
+
+    if (!isOwner || (filterUserId && filterUserId !== 'all')) {
+      callLogsQuery = callLogsQuery.or(`sales_rep_id.eq.${userId},sales_rep_id.is.null`);
+    }
+
+    const { data: callLogs } = await callLogsQuery.order('call_date', { ascending: false });
 
     // ── Compute achievements ────────────────────────────────────────────────
     let mrr = 0;
@@ -79,8 +98,8 @@ router.get('/dashboard', authMiddleware, ownerOrSales, async (req: AuthRequest, 
       }
     });
 
-    const activeLeads = (clients || []).filter(c => !['won', 'lost'].includes(c.pipeline_stage));
-    const historicalDeals = (clients || []).filter(c => ['won', 'lost'].includes(c.pipeline_stage));
+    const activeLeads = (clients || []).filter(c => c.pipeline_stage !== 'won');
+    const historicalDeals = (clients || []).filter(c => c.pipeline_stage === 'won');
     const totalDealsWon = (clients || []).filter(c => c.pipeline_stage === 'won').length;
     const totalMeetingsDone = (clients || []).filter(c => c.pipeline_stage === 'meeting_done').length;
 
@@ -252,7 +271,7 @@ router.get('/leads/:leadId', authMiddleware, ownerOrSales, async (req: AuthReque
       return;
     }
 
-    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId) {
+    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId && lead.sales_rep_id !== null) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -282,7 +301,7 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
   }
 
   try {
-    // 1. Verify lead belongs to sales rep (or caller is owner)
+    // 1. Verify lead belongs to sales rep or is unassigned (or caller is owner)
     const { data: lead, error: fetchErr } = await supabaseAdmin
       .from('clients')
       .select('*')
@@ -294,7 +313,7 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
       return;
     }
 
-    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId) {
+    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId && lead.sales_rep_id !== null) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
@@ -314,10 +333,13 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
       return;
     }
 
-    // 3. Update client stage & meeting_date if scheduled
+    // 3. Update client stage & meeting_date if scheduled, and auto-assign sales_rep_id if unassigned
     const updates: Record<string, any> = { pipeline_stage: outcome };
     if (outcome === 'meeting_scheduled' && meeting_date) {
       updates.meeting_date = meeting_date;
+    }
+    if (!lead.sales_rep_id) {
+      updates.sales_rep_id = salesRepId;
     }
 
     const { data: updatedLead, error: updateErr } = await supabaseAdmin
@@ -357,7 +379,7 @@ router.post('/leads/:leadId/close-won', authMiddleware, ownerOrSales, async (req
       return;
     }
 
-    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId) {
+    if (req.user!.role !== 'owner' && lead.sales_rep_id !== salesRepId && lead.sales_rep_id !== null) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
