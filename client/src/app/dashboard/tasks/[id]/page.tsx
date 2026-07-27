@@ -128,7 +128,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);
 
-  const canAdminister = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+  const canAdminister = (user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') && !myAssignment;
 
   const loadTask = async () => {
     try {
@@ -239,6 +239,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   // Admin: review actions
   const handleApprove = async (userId: string) => {
+    if (userId === user?.id) {
+      alert(locale === 'ar' ? 'لا يمكنك اعتماد عملك الخاص!' : 'You cannot approve your own task assignment!');
+      return;
+    }
     setSubmittingReview(prev => ({ ...prev, [userId]: true }));
     try {
       const rating = approvalRating[userId] || 10;
@@ -258,6 +262,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   };
 
   const handleRequestRevision = async (userId: string) => {
+    if (userId === user?.id) {
+      alert(locale === 'ar' ? 'لا يمكنك تقديم طلب تعديل لعملك الخاص!' : 'You cannot request revision on your own task assignment!');
+      return;
+    }
     const feedback = revisionFeedback[userId] || '';
     if (!feedback.trim()) return;
     setSubmittingReview(prev => ({ ...prev, [userId]: true }));
@@ -851,7 +859,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         )}
 
                         {/* Admin Action Forms */}
-                        {a.status === 'submitted' && (
+                        {a.status === 'submitted' && a.user_id !== user?.id && (
                           <div className="flex gap-2 justify-end ml-10 mt-1">
                             {!isWritingFeedback && !isApproving ? (
                               <>

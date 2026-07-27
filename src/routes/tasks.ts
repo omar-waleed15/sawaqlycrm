@@ -34,9 +34,24 @@ function isTaskAdmin(role: string): boolean {
   return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
 
-// Helper: check if user is allowed to administer a specific task (owner, team_leader, moderation, account_manager)
-async function canAdministerTask(_userId: string, role: string, _taskId: string): Promise<boolean> {
-  return ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
+// Helper: check if user is allowed to administer/review a specific task
+async function canAdministerTask(userId: string, role: string, taskId: string): Promise<boolean> {
+  const isAdminRole = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
+  if (!isAdminRole) return false;
+
+  // An admin/TL/moderator cannot administer or approve a task if they are assigned to it as a worker
+  const { data: assignment } = await supabaseAdmin
+    .from('task_assignees')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (assignment) {
+    return false; // Assigned worker cannot administer/approve their own task
+  }
+
+  return true;
 }
 
 // Helper: get computed task status based on assignees status
@@ -787,6 +802,11 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
 router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
   const { status, feedback, rating } = req.body;
+
+  if (req.user!.id === userId) {
+    res.status(403).json({ error: 'Access denied. You cannot approve or review your own task assignment.' });
+    return;
+  }
 
   if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
     res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });
