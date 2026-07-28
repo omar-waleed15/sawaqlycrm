@@ -33,6 +33,7 @@ import {
   UserCog,
   ListTodo,
   BookOpen,
+  FolderKanban,
 } from 'lucide-react';
 
 type SubTab = 'faq' | 'contentHub' | 'tasks' | 'contentPlan' | 'ideas' | 'calendar' | 'report' | 'account';
@@ -166,12 +167,21 @@ export default function ClosedClientDetailPage() {
       ) : (
         <>
           {/* Page Header */}
-          <div className="page-header mb-0">
+          <div className="page-header mb-0 flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="page-header-left">
               <h1 className="page-header-title">{client.name}</h1>
               {client.company && (
                 <p className="page-header-subtitle">{client.company}</p>
               )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => router.push(`/dashboard/closed-clients/${client.id}/onboarding`)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-full gap-1.5 shadow-sm"
+              >
+                <FolderKanban className="size-4" />
+                {t('clients.onboardingDirectory') || 'Client Directory Profile'}
+              </Button>
             </div>
           </div>
 

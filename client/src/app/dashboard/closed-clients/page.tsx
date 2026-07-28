@@ -40,6 +40,7 @@ import {
   Pencil,
   Trash2,
   Plus,
+  FolderKanban,
 } from 'lucide-react';
 
 function getCairoDateParts() {
@@ -232,12 +233,18 @@ export default function ClosedClientsPage() {
     setErrorMsg('');
     try {
       if (modalMode === 'create') {
-        await clientsApi.create(clientForm);
+        const res = await clientsApi.create(clientForm);
+        setClientModalOpen(false);
+        if (res?.client?.id) {
+          router.push(`/dashboard/closed-clients/${res.client.id}/onboarding`);
+          return;
+        }
+        loadClients();
       } else if (selectedClient) {
         await clientsApi.update(selectedClient.id, clientForm);
+        setClientModalOpen(false);
+        loadClients();
       }
-      setClientModalOpen(false);
-      loadClients();
     } catch (err: any) {
       setErrorMsg(err.message || 'Action failed');
     } finally {
@@ -281,7 +288,7 @@ export default function ClosedClientsPage() {
           <p className="page-header-subtitle">{t('closedClients.subtitle')}</p>
         </div>
         {['owner', 'team_leader', 'account_manager'].includes(user.role) && (
-          <Button onClick={() => resetClientForm()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
+          <Button onClick={() => router.push('/dashboard/closed-clients/new/onboarding')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
             <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" />
             {t('clients.addClient')}
           </Button>
@@ -375,6 +382,10 @@ export default function ClosedClientsPage() {
                           }
                         />
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/closed-clients/${client.id}/onboarding`)}>
+                            <FolderKanban className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-indigo-600" />
+                            {t('clients.onboardingDirectory') || 'Client Directory Profile'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => resetClientForm(client)}>
                             <Pencil className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
                             {t('common.edit')}

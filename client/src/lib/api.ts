@@ -506,3 +506,35 @@ export const rolesApi = {
       body: JSON.stringify(data),
     }),
 };
+
+// Client Onboarding / Directory API
+export const clientOnboardingApi = {
+  get: (clientId: string) =>
+    request<{ client: import('@/types').Client; onboarding: import('@/types').ClientOnboarding }>(`/client-onboarding/${clientId}`),
+  
+  update: (clientId: string, data: Partial<import('@/types').ClientOnboarding>) =>
+    request<{ onboarding: import('@/types').ClientOnboarding }>(`/client-onboarding/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  updateStep: (clientId: string, stepNum: number, body: { stepData: any; completedSteps?: number[]; currentStep?: number }) =>
+    request<{ onboarding: import('@/types').ClientOnboarding }>(`/client-onboarding/${clientId}/step/${stepNum}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  uploadAsset: (clientId: string, file: File, category: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', category);
+    return uploadFile(`/client-onboarding/${clientId}/upload`, formData) as Promise<{ file: import('@/types').OnboardingUploadedFile }>;
+  },
+
+  deleteAsset: (clientId: string, storage_path: string) =>
+    request(`/client-onboarding/${clientId}/upload`, {
+      method: 'DELETE',
+      body: JSON.stringify({ storage_path }),
+    }),
+};
+

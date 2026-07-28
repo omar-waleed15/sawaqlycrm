@@ -798,11 +798,13 @@ export default function ClientsDashboardPage() {
     try {
       if (modalMode === 'create') {
         await clientsApi.create(clientForm);
+        setClientModalOpen(false);
+        loadData(true);
       } else if (selectedClient) {
         await clientsApi.update(selectedClient.id, clientForm);
+        setClientModalOpen(false);
+        loadData(true);
       }
-      setClientModalOpen(false);
-      loadData(true);
     } catch (err: any) {
       setErrorMsg(err.message || 'Action failed');
     } finally {

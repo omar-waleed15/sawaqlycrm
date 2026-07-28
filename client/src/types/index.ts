@@ -558,3 +558,177 @@ export interface PersonalNote {
   created_at: string;
   updated_at: string;
 }
+
+// ── Client Directory / Onboarding Types ─────────────────────────────────
+
+export interface OnboardingOverview {
+  business_name?: string;
+  industry?: string;
+  business_description?: string;
+  website?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  google_maps_url?: string;
+  year_founded?: number | string;
+  email?: string;
+  phone?: string;
+  owner_name?: string;
+  owner_position?: string;
+  owner_phone?: string;
+  owner_email?: string;
+  primary_contact_name?: string;
+  primary_contact_position?: string;
+  primary_contact_phone?: string;
+  primary_contact_email?: string;
+  company_status?: 'Lead' | 'Discovery' | 'Onboarding' | 'Active Client' | 'Paused' | 'Former Client' | string;
+  social_instagram?: string;
+  social_tiktok?: string;
+  social_facebook?: string;
+  social_linkedin?: string;
+  social_youtube?: string;
+  social_website?: string;
+}
+
+export interface OnboardingUploadedFile {
+  name: string;
+  category: string;
+  public_url: string;
+  mimetype?: string;
+  size?: number;
+  storage_path?: string;
+  uploaded_at?: string;
+}
+
+export interface OnboardingBrandAssets {
+  uploaded_files?: OnboardingUploadedFile[];
+  color_palette?: string[];
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  background_color?: string;
+  typography?: string;
+  brand_style_notes?: string;
+  visual_inspiration?: string;
+  moodboard_links?: string;
+  additional_brand_notes?: string;
+}
+
+export interface OnboardingBusinessDiscovery {
+  about?: {
+    description?: string;
+    products?: string;
+    services?: string;
+    best_selling?: string;
+    highest_profit?: string;
+    usp?: string;
+  };
+  goals?: {
+    why_hired?: string;
+    main_objective?: string;
+    short_term_goals?: string;
+    long_term_goals?: string;
+    success_metrics?: string;
+    current_priorities?: string;
+  };
+  pain_points?: string[];
+  pain_points_notes?: string;
+  agency_opportunity?: {
+    biggest_opportunity?: string;
+    quick_wins?: string;
+    long_term_opportunities?: string;
+    content_opportunities?: string;
+    campaign_ideas?: string;
+    growth_opportunities?: string;
+    seasonal_opportunities?: string;
+    recommended_services?: string;
+    strategy_notes?: string;
+  };
+}
+
+export interface OnboardingTargetAudience {
+  primary_audience?: {
+    age_range?: string;
+    gender?: string;
+    location?: string;
+    occupation?: string;
+    income_level?: string;
+    interests?: string[];
+    hobbies?: string[];
+    pain_points?: string;
+    buying_motivations?: string;
+    buying_objections?: string;
+  };
+  customer_notes?: string;
+}
+
+export interface OnboardingCompetitorItem {
+  id: string;
+  name: string;
+  website?: string;
+  instagram?: string;
+  tiktok?: string;
+  facebook?: string;
+  strengths?: string;
+  weaknesses?: string;
+  content_style?: string;
+  doing_well?: string;
+  missing?: string;
+  opportunities?: string;
+  notes?: string;
+}
+
+export interface OnboardingCompetitorAnalysis {
+  competitors?: OnboardingCompetitorItem[];
+  analysis?: {
+    strengths?: string;
+    weaknesses?: string;
+    content_style?: string;
+    doing_well?: string;
+    missing?: string;
+    opportunities?: string;
+    notes?: string;
+  };
+}
+
+export interface OnboardingSocialMediaAuditItem {
+  platform: 'Instagram' | 'TikTok' | 'Facebook' | 'LinkedIn' | 'YouTube' | string;
+  username?: string;
+  profile_url?: string;
+  followers?: string;
+  posting_frequency?: string;
+  average_engagement?: string;
+  best_content?: string;
+  weakest_content?: string;
+  notes?: string;
+}
+
+export interface OnboardingSocialMediaAudit {
+  platforms?: OnboardingSocialMediaAuditItem[];
+  overall_notes?: string;
+}
+
+export interface OnboardingContentStrategy {
+  brand_voice?: string[];
+  content_pillars?: string[];
+  content_style?: string[];
+  things_to_avoid?: string;
+  creative_notes?: string;
+}
+
+export interface ClientOnboarding {
+  id?: string;
+  client_id: string;
+  current_step: number;
+  completed_steps: number[];
+  client_overview?: OnboardingOverview;
+  brand_assets?: OnboardingBrandAssets;
+  business_discovery?: OnboardingBusinessDiscovery;
+  target_audience?: OnboardingTargetAudience;
+  competitor_analysis?: OnboardingCompetitorAnalysis;
+  social_media_audit?: OnboardingSocialMediaAudit;
+  content_strategy?: OnboardingContentStrategy;
+  created_at?: string;
+  updated_at?: string;
+}
+

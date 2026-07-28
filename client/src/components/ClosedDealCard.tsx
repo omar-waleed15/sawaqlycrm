@@ -21,6 +21,7 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  FolderKanban,
 } from 'lucide-react';
 
 interface ClosedDealCardProps {
@@ -71,6 +72,10 @@ export default function ClosedDealCard({ client, locale, t, onEditClick, onDelet
                 }
               />
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.location.href = `/dashboard/clients/${client.id}/onboarding`}>
+                  <FolderKanban className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-indigo-600" />
+                  {t('clients.onboardingDirectory') || 'Client Directory Profile'}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEditClick(client)}>
                   <Pencil className="size-3.5 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
                   {t('common.edit')}

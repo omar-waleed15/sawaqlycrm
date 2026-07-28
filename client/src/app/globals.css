@@ -279,20 +279,61 @@ h4 { font-size: 0.9375rem; font-weight: 600; }
 }
 
 /* =========================================
-   SIDEBAR
+   SIDEBAR & RESPONSIVE DRAWER
    ========================================= */
 .sidebar {
   position: fixed;
   top: 0;
-  left: 0;
-  width: var(--sidebar-width);
+  bottom: 0;
+  width: var(--sidebar-width, 256px);
   height: 100vh;
   background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   z-index: 100;
   overflow-y: auto;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* LTR Position */
+html:not([dir="rtl"]) .sidebar {
+  left: 0;
+  right: auto;
+  border-right: 1px solid var(--color-border);
+}
+
+/* RTL Position */
+html[dir="rtl"] .sidebar {
+  right: 0;
+  left: auto;
+  border-left: 1px solid var(--color-border);
+}
+
+/* Mobile Screen Drawer (< 768px) */
+@media (max-width: 768px) {
+  html:not([dir="rtl"]) .sidebar {
+    transform: translateX(-100%);
+  }
+  html:not([dir="rtl"]) .sidebar.open,
+  html:not([dir="rtl"]) .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  html[dir="rtl"] .sidebar {
+    transform: translateX(100%);
+  }
+  html[dir="rtl"] .sidebar.open,
+  html[dir="rtl"] .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+/* Desktop Screen Fixed Sidebar (>= 769px) */
+@media (min-width: 769px) {
+  .sidebar,
+  html[dir="rtl"] .sidebar {
+    transform: translateX(0) !important;
+  }
 }
 
 .sidebar-logo {
@@ -3495,16 +3536,8 @@ html[dir="rtl"] .search-input-wrap input {
   font-size: 16px;
 }
 
-/* RTL mobile overrides */
+/* RTL mobile layout adjustments */
 @media (max-width: 768px) {
-  html[dir="rtl"] .sidebar {
-    transform: translateX(100%);
-  }
-
-  html[dir="rtl"] .sidebar.sidebar-open {
-    transform: translateX(0);
-  }
-
   html[dir="rtl"] .main-content {
     margin-right: 0;
   }

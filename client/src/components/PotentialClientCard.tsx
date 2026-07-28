@@ -40,6 +40,7 @@ import {
   Loader2,
   User,
   CheckCircle2,
+  FolderKanban,
 } from 'lucide-react';
 
 interface PotentialClientCardProps {

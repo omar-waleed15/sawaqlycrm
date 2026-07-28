@@ -117,7 +117,12 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
   const toggleLocale = () => setLocale(locale === 'en' ? 'ar' : 'en');
 
   return (
-    <aside className={cn('sidebar bg-white border-r border-[#E2E8F0] text-slate-800 shadow-sm', isOpen && 'open')}>
+    <aside
+      className={cn(
+        'sidebar bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 shadow-xl',
+        isOpen && 'open sidebar-open'
+      )}
+    >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-[#E2E8F0] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
