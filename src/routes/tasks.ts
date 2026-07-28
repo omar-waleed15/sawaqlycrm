@@ -380,6 +380,7 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
     if (fetchError) { res.status(500).json({ error: fetchError.message }); return; }
 
     // Dispatch webhook notifications in the background
+    console.log(`[Webhook Debug] Task created: ${fullTask?.id}, assignees count: ${fullTask?.task_assignees?.length || 0}`);
     if (fullTask && fullTask.task_assignees && fullTask.task_assignees.length > 0) {
       const sender = {
         id: req.user!.id,
@@ -388,6 +389,7 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
       };
 
       for (const a of fullTask.task_assignees) {
+        console.log(`[Webhook Debug] Assignee entry:`, JSON.stringify({ user_id: a.user_id, has_user: !!a.user, user_name: a.user?.name || 'N/A' }));
         if (a.user) {
           sendWebhookNotification({
             type: 'task',
@@ -406,9 +408,13 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
               email: a.user.email,
               phone: a.user.phone,
             },
-          }).catch(err => console.error('Failed to dispatch webhook:', err));
+          }).catch(err => console.error('[Webhook Debug] Failed to dispatch webhook:', err));
+        } else {
+          console.warn(`[Webhook Debug] Skipped: a.user is null/undefined for user_id=${a.user_id}`);
         }
       }
+    } else {
+      console.warn(`[Webhook Debug] No assignees found on task, skipping webhook dispatch.`);
     }
 
     res.status(201).json({ task: enrichTask(fullTask, req.user!.id, req.user!.role) });

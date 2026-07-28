@@ -138,6 +138,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promis
     }
 
     // Dispatch webhook notifications in the background
+    console.log(`[Webhook Debug] Reminder created, entries count: ${data?.length || 0}`);
     if (data && data.length > 0) {
       const sender = {
         id: req.user!.id,
@@ -146,6 +147,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promis
       };
 
       for (const r of data) {
+        console.log(`[Webhook Debug] Reminder entry:`, JSON.stringify({ id: r.id, has_receiver: !!r.receiver, receiver_name: r.receiver?.name || 'N/A' }));
         if (r.receiver) {
           sendWebhookNotification({
             type: 'reminder',
@@ -161,9 +163,13 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promis
               email: r.receiver.email,
               phone: r.receiver.phone,
             },
-          }).catch(err => console.error('Failed to dispatch webhook:', err));
+          }).catch(err => console.error('[Webhook Debug] Failed to dispatch reminder webhook:', err));
+        } else {
+          console.warn(`[Webhook Debug] Skipped: r.receiver is null for reminder id=${r.id}`);
         }
       }
+    } else {
+      console.warn(`[Webhook Debug] No reminder data returned, skipping webhook dispatch.`);
     }
 
     res.status(201).json({ reminders: data || [] });
