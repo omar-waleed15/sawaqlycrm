@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
 import { formatCairoDate } from '@/lib/dateUtils';
+import { sortActiveTasks } from '@/lib/taskSortUtils';
 
 export default function DailyTasksPage() {
   const { t, locale } = useLanguage();
@@ -88,7 +89,7 @@ export default function DailyTasksPage() {
         </div>
       ) : tasks.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-fade-in">
-          {tasks.map(task => (
+          {sortActiveTasks(tasks).map(task => (
             <TaskCard 
               key={task.id} 
               task={task} 

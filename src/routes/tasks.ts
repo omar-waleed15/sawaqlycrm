@@ -657,6 +657,12 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
         .eq('id', assignment.id);
 
       if (updateError) { res.status(500).json({ error: updateError.message }); return; }
+
+      // Touch parent task updated_at
+      await supabaseAdmin
+        .from('tasks')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', id);
     }
 
     // Re-fetch full task
@@ -866,6 +872,12 @@ router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (r
       .eq('user_id', userId);
 
     if (error) { res.status(500).json({ error: error.message }); return; }
+
+    // Touch parent task updated_at
+    await supabaseAdmin
+      .from('tasks')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', id);
 
     // Re-fetch full task
     const { data: fullTask, error: fetchError } = await supabaseAdmin

@@ -11,6 +11,7 @@ import SalesDashboard from '@/components/SalesDashboard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { sortActiveTasks } from '@/lib/taskSortUtils';
 import { Badge } from '@/components/ui/badge';
 import { getCairoTodayString, formatCairoDate, getCairoDateParts } from '@/lib/dateUtils';
 import {
@@ -98,10 +99,13 @@ export default function DashboardPage() {
     task.task_assignees?.some(a => a.user_id === user?.id)
   );
 
-  const myActiveTasks = myTasks.filter(task => {
-    const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
-    return myAssignee?.status !== 'completed';
-  });
+  const myActiveTasks = sortActiveTasks(
+    myTasks.filter(task => {
+      const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
+      return myAssignee?.status !== 'completed';
+    }),
+    user?.id
+  );
 
   const myInProgressCount = myTasks.filter(task => {
     const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
@@ -645,7 +649,7 @@ export default function DashboardPage() {
 
           {recentTasks.length > 0 ? (
             <div className="tasks-grid">
-              {recentTasks.map(task => (
+              {sortActiveTasks(recentTasks, user?.id).map(task => (
                 <TaskCard 
                   key={task.id} 
                   task={task} 

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi } from '@/lib/api';
 import { Task } from '@/types';
+import { sortActiveTasks } from '@/lib/taskSortUtils';
 import TaskCard from '@/components/TaskCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,11 +66,11 @@ export default function TasksPage() {
 
 
   const displayedTasks = activeTab === 'active'
-    ? tasks.filter(t => t.status !== 'completed')
+    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed'), user?.id)
     : activeTab === 'completed'
       ? tasks.filter(t => t.status === 'completed')
       : activeTab === 'my_tasks'
-        ? tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id))
+        ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)), user?.id)
         : tasks;
 
   const filteredDisplayed = displayedTasks;
