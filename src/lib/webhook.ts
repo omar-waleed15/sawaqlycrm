@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://joepush7758.app.n8n.cloud/webhook/d530c082-fd34-4595-94f2-9ab3fd9983dd';
 
 export interface WebhookPayload {
   type: 'task' | 'reminder';
