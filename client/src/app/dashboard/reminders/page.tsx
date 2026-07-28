@@ -423,14 +423,6 @@ export default function RemindersPage() {
         maxWidth={520}
       >
         <form onSubmit={handleSendReminder} className="flex flex-col gap-4 text-start">
-          {hasReminderDraft && (content || reviewLink || attachments.length > 0) && (
-            <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs p-2.5 rounded-lg flex items-center justify-between gap-2">
-              <span>✏️ {locale === 'ar' ? 'تم استرجاع المسودة تلقائياً' : 'Restored draft from previous session'}</span>
-              <button type="button" onClick={() => resetReminderForm()} className="font-bold underline hover:text-indigo-900 dark:hover:text-indigo-100 shrink-0">
-                {locale === 'ar' ? 'مسح المسودة' : 'Discard Draft'}
-              </button>
-            </div>
-          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>{t('reminders.recipient') || 'Send To'}</Label>

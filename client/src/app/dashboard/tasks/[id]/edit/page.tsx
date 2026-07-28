@@ -246,15 +246,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         </Button>
       </div>
 
-      {hasDraft && (
-        <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs p-3 rounded-xl flex items-center justify-between gap-2 shadow-xs">
-          <span>✏️ {locale === 'ar' ? 'تم استرجاع التعديلات غير المحفوظة تلقائياً' : 'Restored unsaved edits automatically from your previous session'}</span>
-          <button type="button" onClick={() => resetForm()} className="font-bold underline hover:text-indigo-900 dark:hover:text-indigo-100 shrink-0">
-            {locale === 'ar' ? 'مسح التعديلات' : 'Discard Draft'}
-          </button>
-        </div>
-      )}
-
       <div className="max-w-2xl">
         <Card>
           <CardContent className="pt-6">
