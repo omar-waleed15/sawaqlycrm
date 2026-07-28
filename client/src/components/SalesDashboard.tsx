@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/lib/i18n';
-import { getCairoTodayString, formatCairoDate, formatCairoTime, formatCairoDateTime, getCairoTodayPlusNDays, getCairoDateString, getCairoDateParts, toCairoISOString } from '@/lib/dateUtils';
+import { getCairoTodayString, formatCairoDate, formatCairoTime, formatCairoDateTime, formatLogDateTime, getCairoTodayPlusNDays, getCairoDateString, getCairoDateParts, toCairoISOString, getCairoDatetimeLocalString } from '@/lib/dateUtils';
 import { 
   Phone, 
   Plus, 
@@ -30,6 +30,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   X,
   Trash2,
   Target,
@@ -793,7 +795,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                                     <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap">
                                       <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
                                       <span>
-                                        {formatCairoDateTime(log.call_date, locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {formatLogDateTime(log.call_date, locale)}
                                       </span>
                                     </div>
                                     <p className="text-xs text-foreground mt-1 whitespace-pre-wrap leading-relaxed">
@@ -1247,199 +1249,370 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       </Modal>
 
       {/* ── Modal: Prospect Detail View ─────────────────────────────────────── */}
-      <Modal isOpen={!!detailDeal} onClose={closeDealDetail} title={`📋 ${t('sales.prospectDetails')}`} maxWidth={640}>
-        {detailDeal && (
-          <div className="flex flex-col gap-5">
-            {/* Status Header */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className={`text-xs py-1 px-3 font-bold uppercase ${
-                  (PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).bg
-                } ${
-                  (PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).color
-                }`}>
-                  {t((PIPELINE_STAGE_CONFIG[detailDeal.pipeline_stage] || PIPELINE_STAGE_CONFIG.won).labelKey)}
-                </Badge>
-                {detailDeal.company && (
-                  <span className="text-xs font-bold text-muted-foreground bg-muted border px-2 py-0.5 rounded flex items-center gap-1">
-                    <Building2 className="size-3" /> {detailDeal.company}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                {locale === 'ar' ? 'تمت الإضافة في ' : 'Added '}{formatCairoDate(detailDeal.created_at, locale, { month: 'long', day: 'numeric', year: 'numeric' })}
-              </span>
-            </div>
+      {/* ── Modal: Unified Lead Workspace (Details + Quick Log Update) ────────── */}
+      <Modal 
+        isOpen={!!detailDeal} 
+        onClose={closeDealDetail} 
+        title={detailDeal ? `👤 ${detailDeal.name}` : `📋 ${t('sales.prospectDetails')}`} 
+        maxWidth={920}
+      >
+        {detailDeal && (() => {
+          const leadList: Client[] = data?.phoneList || [];
+          const currentLeadIndex = leadList.findIndex((l: Client) => l.id === detailDeal.id);
+          const hasPrevLead = currentLeadIndex > 0;
+          const hasNextLead = currentLeadIndex >= 0 && currentLeadIndex < leadList.length - 1;
 
-            {/* Contact Info Card */}
-            <div className="bg-muted/30 border rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex items-center gap-2.5 text-sm">
-                <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
-                  <Phone className="size-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'الهاتف' : 'Phone'}</div>
-                  <a href={`tel:${detailDeal.phone}`} className="text-xs font-semibold text-foreground hover:text-indigo-600 transition-colors">
-                    {detailDeal.phone || '—'}
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 text-sm">
-                <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
-                  <MapPin className="size-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{t('sales.addressLabel')}</div>
-                  <span className="text-xs font-semibold text-foreground">{detailDeal.address || detailDeal.email || '—'}</span>
-                </div>
-              </div>
-              {detailDeal.meeting_date && (
-                <div className="flex items-center gap-2.5 text-sm sm:col-span-2">
-                  <div className="size-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center text-indigo-600 shrink-0">
-                    <Calendar className="size-4" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale === 'ar' ? 'تاريخ الاجتماع' : 'Meeting Date'}</div>
-                    <span className="text-xs font-semibold text-foreground">
-                      {formatCairoDateTime(detailDeal.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}
+          const goToPrevLead = () => {
+            if (hasPrevLead) openDealDetail(leadList[currentLeadIndex - 1]);
+          };
+          const goToNextLead = () => {
+            if (hasNextLead) openDealDetail(leadList[currentLeadIndex + 1]);
+          };
+
+          const handleSaveInlineLog = async (andNext: boolean = false) => {
+            if (callForm.outcome === 'meeting_scheduled' && !callForm.meeting_date) {
+              setErrorMsg(locale === 'ar' ? 'يرجى تحديد تاريخ ووقت الاجتماع' : 'Please select meeting date and time');
+              return;
+            }
+            setSubmitting(true);
+            setErrorMsg('');
+            try {
+              await salesApi.logCall(detailDeal.id, callForm);
+              await fetchDashboard(true);
+              setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
+              if (andNext && hasNextLead) {
+                openDealDetail(leadList[currentLeadIndex + 1]);
+              }
+            } catch (err: any) {
+              setErrorMsg(err.message || 'Failed to save call log');
+            } finally {
+              setSubmitting(false);
+            }
+          };
+
+          return (
+            <div className="flex flex-col gap-4">
+              {/* Header Navigation & Quick Actions Bar */}
+              <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b bg-muted/20 p-3 rounded-xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {currentLeadIndex >= 0 && (
+                    <span className="text-[11px] font-bold text-muted-foreground bg-muted border px-2 py-0.5 rounded-md">
+                      {locale === 'ar' ? `عميل ${currentLeadIndex + 1} من ${leadList.length}` : `Lead ${currentLeadIndex + 1} of ${leadList.length}`}
                     </span>
-                  </div>
+                  )}
+                  {detailDeal.company && (
+                    <span className="text-xs font-bold text-muted-foreground bg-muted border px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Building2 className="size-3" /> {detailDeal.company}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={goToPrevLead}
+                    disabled={!hasPrevLead}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold gap-1 px-2.5"
+                  >
+                    <ChevronLeft className="size-3.5 rtl:rotate-180" /> {locale === 'ar' ? 'السابق' : 'Prev'}
+                  </Button>
+                  <Button
+                    onClick={goToNextLead}
+                    disabled={!hasNextLead}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-semibold gap-1 px-2.5"
+                  >
+                    {locale === 'ar' ? 'التالي' : 'Next'} <ChevronRight className="size-3.5 rtl:rotate-180" />
+                  </Button>
+                </div>
+              </div>
+
+              {errorMsg && (
+                <div className="p-3 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-semibold">
+                  {errorMsg}
                 </div>
               )}
-            </div>
 
-            {/* Project & Contract Info (for won deals) */}
-            {detailDeal.pipeline_stage === 'won' && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <DollarSign className="size-3" /> {locale === 'ar' ? 'المشروع والعقد' : 'Project & Contract'}
-                </h4>
-                {loadingDealData ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
-                    <Loader2 className="size-3.5 animate-spin" /> {t('common.loading')}
+              {/* Main 2-Column Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Left Column (7 cols): Lead Info & History Timeline */}
+                <div className="lg:col-span-7 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    {/* Contact Bar & Quick Stage Switcher */}
+                    <div className="bg-muted/30 border rounded-xl p-3.5 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                          <a
+                            href={`tel:${detailDeal.phone}`}
+                            className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg transition-all"
+                          >
+                            <Phone className="size-3.5" /> {detailDeal.phone || '—'}
+                          </a>
+                          {(detailDeal.address || detailDeal.email) && (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[200px]">
+                              <MapPin className="size-3 shrink-0" /> {detailDeal.address || detailDeal.email}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Stage Dropdown */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {t('clients.stageCol')}:
+                          </span>
+                          <Select
+                            value={detailDeal.pipeline_stage || 'new_lead'}
+                            onValueChange={async (newStage) => {
+                              if (!newStage) return;
+                              try {
+                                setSubmitting(true);
+                                await clientsApi.update(detailDeal.id, { pipeline_stage: newStage });
+                                await fetchDashboard(true);
+                                setDetailDeal(prev => prev ? ({ ...prev, pipeline_stage: newStage as any }) : null);
+                              } catch (e: any) {
+                                setErrorMsg(e.message || 'Failed to update stage');
+                              } finally {
+                                setSubmitting(false);
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-7 text-xs font-bold w-[140px] bg-background border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
+                              <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                              <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
+                              <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
+                              <SelectItem value="won">{t('sales.won')}</SelectItem>
+                              <SelectItem value="lost">{t('sales.lost')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {detailDeal.meeting_date && (
+                        <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40">
+                          <Calendar className="size-4 shrink-0" />
+                          <span>{t('sales.meeting')}: {formatCairoDateTime(detailDeal.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Timeline of Logs */}
+                    <div className="space-y-2">
+                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Clock className="size-3.5 text-indigo-500" /> {t('sales.callLogs')}
+                      </h4>
+                      {(() => {
+                        const logs = data?.callLogs.filter(log => log.client_id === detailDeal.id) || [];
+                        return logs.length > 0 ? (
+                          <div className="relative border-l-2 border-border/60 pl-4 ml-2 space-y-3.5 max-h-[280px] overflow-y-auto pr-1">
+                            {logs.map(log => {
+                              const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
+                              return (
+                                <div key={log.id} className="relative group">
+                                  <div className="absolute left-[-22px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-xs group-hover:scale-125 transition-all" />
+                                  <div className="flex flex-col gap-1 bg-muted/20 border p-2.5 rounded-lg">
+                                    <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
+                                      <Badge variant="outline" className={`text-[9px] py-0 px-1.5 uppercase font-bold ${outcomeCfg.color} ${outcomeCfg.bg}`}>
+                                        {t(outcomeCfg.labelKey)}
+                                      </Badge>
+                                      <span>
+                                        {formatLogDateTime(log.call_date, locale)}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                      {log.notes || <span className="italic text-muted-foreground/50">{t('sales.noComments')}</span>}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/50 italic py-3 text-center bg-muted/20 border rounded-lg">
+                            {t('sales.noCallLogs')}
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {dealProjects.length > 0 ? dealProjects.map(proj => (
-                      <div key={proj.id} className="bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-foreground">{proj.name}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {t('clients.status')}: <span className="font-semibold capitalize">{proj.status}</span>
-                            {proj.budget > 0 && <> • {t('clients.budget')}: <span className="font-semibold">{formatCurrency(proj.budget, locale)}</span></>}
+
+                  {/* Won Projects & Push Task bar */}
+                  {detailDeal.pipeline_stage === 'won' && !salesRepId && (
+                    <div className="pt-2 border-t flex items-center justify-between gap-2">
+                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                        🏆 {locale === 'ar' ? 'صفقة رابحة' : 'Deal Closed Won'}
+                      </span>
+                      <Button
+                        onClick={() => openPushTaskForDeal(detailDeal)}
+                        className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8"
+                        size="sm"
+                      >
+                        <Rocket className="size-3.5" /> {t('sales.pushNewTask')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column (5 cols): Embedded Quick Log & Scheduler Form */}
+                <div className="lg:col-span-5 bg-card border rounded-xl p-4 shadow-xs space-y-3.5 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b">
+                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Phone className="size-3.5 text-indigo-500" />
+                        {locale === 'ar' ? 'سجل نتيجة مكالمة جديد' : 'Log New Call Update'}
+                      </h4>
+                    </div>
+
+                    {/* Outcome Dropdown */}
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        {t('sales.callOutcome')}
+                      </Label>
+                      <Select
+                        value={callForm.outcome}
+                        onValueChange={v => setCallForm(prev => ({
+                          ...prev,
+                          outcome: v || 'contacted',
+                          meeting_date: v === 'meeting_scheduled' ? (prev.meeting_date || getCairoDatetimeLocalString()) : prev.meeting_date
+                        }))}
+                      >
+                        <SelectTrigger className="h-8 text-xs font-bold bg-background border">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="contacted">📞 {t('sales.contacted')}</SelectItem>
+                          <SelectItem value="no_answer">📵 {t('sales.noAnswer')}</SelectItem>
+                          <SelectItem value="interested">⭐ {t('sales.interested')}</SelectItem>
+                          <SelectItem value="meeting_scheduled">📅 {t('sales.meetingScheduled')}</SelectItem>
+                          <SelectItem value="negotiation">🤝 {t('sales.negotiation')}</SelectItem>
+                          <SelectItem value="won">🟢 {t('sales.won')}</SelectItem>
+                          <SelectItem value="lost">🔴 {t('sales.lost')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Meeting Fields if meeting_scheduled */}
+                    {callForm.outcome === 'meeting_scheduled' && (
+                      <div className="space-y-3 p-2.5 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 rounded-lg slide-down">
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            📅 {t('sales.meetingDate')}
+                          </Label>
+                          <Input
+                            type="datetime-local"
+                            value={callForm.meeting_date}
+                            onChange={e => setCallForm(prev => ({ ...prev, meeting_date: e.target.value }))}
+                            className="h-8 text-xs font-semibold bg-background"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            👥 {locale === 'ar' ? 'دعوة أعضاء الفريق' : 'Invite Team'}
+                          </Label>
+                          <div className="flex flex-wrap gap-1 p-1.5 rounded-md border bg-background min-h-[32px] items-center max-h-[80px] overflow-y-auto">
+                            {members.map(m => {
+                              const isSelected = callForm.meeting_attendees.includes(m.id);
+                              return (
+                                <Badge
+                                  key={m.id}
+                                  variant={isSelected ? "default" : "outline"}
+                                  className={`cursor-pointer text-[10px] py-0.5 transition-all ${
+                                    isSelected ? "bg-indigo-600 text-white font-bold" : "hover:bg-muted text-muted-foreground"
+                                  }`}
+                                  onClick={() => setCallForm(prev => ({
+                                    ...prev,
+                                    meeting_attendees: isSelected
+                                      ? prev.meeting_attendees.filter(id => id !== m.id)
+                                      : [...prev.meeting_attendees, m.id]
+                                  }))}
+                                >
+                                  {m.name}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-[9px] font-bold uppercase bg-white dark:bg-background">
-                          {locale === 'ar' ? 'مشروع' : 'Project'}
-                        </Badge>
+
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            📌 {locale === 'ar' ? 'مكان أو أجندة الاجتماع' : 'Meeting Notes'}
+                          </Label>
+                          <Input
+                            placeholder={locale === 'ar' ? 'مثال: المقر الرئيسي' : 'e.g. Headquarters / Online'}
+                            value={callForm.meeting_notes}
+                            onChange={e => setCallForm(prev => ({ ...prev, meeting_notes: e.target.value }))}
+                            className="h-8 text-xs bg-background"
+                          />
+                        </div>
                       </div>
-                    )) : (
-                      <p className="text-xs text-muted-foreground/60 italic py-1">{t('clients.noProjects')}</p>
                     )}
 
-                    {dealContracts.length > 0 ? dealContracts.map(contract => (
-                      <div key={contract.id} className="bg-green-50/50 dark:bg-green-950/10 border border-green-100 dark:border-green-900/30 rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-bold text-foreground">{contract.name}</div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
-                            {formatCurrency(contract.amount, locale)}
-                            {contract.is_recurring && <> • <span className="capitalize">{contract.billing_cycle}</span></>}
-                            {' '}• <span className="font-semibold capitalize">{contract.status}</span>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-[9px] font-bold uppercase bg-white dark:bg-background">
-                          {locale === 'ar' ? 'عقد' : 'Contract'}
-                        </Badge>
-                      </div>
-                    )) : (
-                      <p className="text-xs text-muted-foreground/60 italic py-1">{locale === 'ar' ? 'لا توجد عقود مرتبطة بهذا العميل.' : 'No contracts linked to this client.'}</p>
-                    )}
+                    {/* Notes Textarea */}
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        📝 {t('sales.notes')}
+                      </Label>
+                      <Textarea
+                        placeholder={locale === 'ar' ? 'اكتب ملاحظات ونتائج المكالمة...' : 'Write notes & call summary...'}
+                        value={callForm.notes}
+                        onChange={e => setCallForm(prev => ({ ...prev, notes: e.target.value }))}
+                        className="text-xs min-h-[75px] max-h-[120px] resize-y bg-background"
+                      />
+                    </div>
                   </div>
-                )}
+
+                  {/* Submission Action Buttons */}
+                  <div className="flex flex-col gap-2 pt-2 border-t">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => handleSaveInlineLog(false)}
+                        disabled={submitting}
+                        className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1"
+                      >
+                        {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <Phone className="size-3.5" />}
+                        {t('common.save')}
+                      </Button>
+                      <Button
+                        onClick={() => handleSaveInlineLog(true)}
+                        disabled={submitting || !hasNextLead}
+                        variant="outline"
+                        className="h-9 text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 gap-1"
+                      >
+                        {locale === 'ar' ? 'حفظ والتالي' : 'Save & Next'}
+                        <ChevronRight className="size-3.5 rtl:rotate-180" />
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
+                      <Button
+                        onClick={() => handleDeleteDeal(detailDeal.id, detailDeal.name)}
+                        variant="ghost"
+                        className="h-6 text-[10px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-1"
+                        disabled={deletingDeal}
+                      >
+                        <Trash2 className="size-3 mr-1" /> {t('sales.deleteProspect')}
+                      </Button>
+                      <Button
+                        onClick={closeDealDetail}
+                        variant="ghost"
+                        className="h-6 text-[10px] px-1"
+                      >
+                        {t('common.close')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-
-            {/* Call Logs Timeline */}
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Clock className="size-3" /> {t('sales.callLogs')}
-              </h4>
-              {(() => {
-                const logs = data?.callLogs.filter(log => log.client_id === detailDeal.id) || [];
-                return logs.length > 0 ? (
-                  <div className="relative border-l-2 border-border/60 pl-4 ml-2 space-y-4 max-h-[220px] overflow-y-auto pr-1">
-                    {logs.map(log => {
-                      const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
-                      return (
-                        <div key={log.id} className="relative">
-                          <div className="absolute left-[-22px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-sm" />
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
-                              <span className={`capitalize ${outcomeCfg.color}`}>{t(outcomeCfg.labelKey)}</span>
-                              <span>
-                                {formatCairoDateTime(log.call_date, locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className="text-xs text-foreground mt-0.5 whitespace-pre-wrap leading-relaxed">
-                              {log.notes || <span className="italic text-muted-foreground/50">{t('sales.noComments')}</span>}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground/50 italic py-2">
-                    {t('sales.noCallLogs')}
-                  </p>
-                );
-              })()}
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 flex-wrap pt-3 border-t mt-1">
-              {detailDeal.pipeline_stage === 'won' && !salesRepId && (
-                <Button
-                  onClick={() => openPushTaskForDeal(detailDeal)}
-                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs"
-                  size="sm"
-                >
-                  <Rocket className="size-3.5" /> {t('sales.pushNewTask')}
-                </Button>
-              )}
-              {!salesRepId && (
-                <>
-                  <Button
-                    onClick={() => openFollowUpFromDetail(detailDeal)}
-                    variant="outline"
-                    className="gap-1.5 text-xs font-semibold"
-                    size="sm"
-                  >
-                    <Phone className="size-3.5" /> {t('sales.followUp')}
-                  </Button>
-                  <Button
-                    onClick={() => handleDeleteDeal(detailDeal.id, detailDeal.name)}
-                    variant="destructive"
-                    className="gap-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white"
-                    size="sm"
-                    disabled={deletingDeal}
-                  >
-                    {deletingDeal ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
-                    {t('sales.deleteProspect')}
-                  </Button>
-                </>
-              )}
-              <Button
-                onClick={closeDealDetail}
-                variant="ghost"
-                className="ml-auto text-xs"
-                size="sm"
-              >
-                {t('common.close')}
-              </Button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
 
       {/* ── Modal: Push Task for Won Deal ───────────────────────────────────── */}

@@ -156,3 +156,26 @@ export function getCairoTodayPlusNDays(days: number): string {
   d.setDate(d.getDate() + days);
   return getCairoDateString(d);
 }
+
+/**
+ * Format Call Log timestamps (call_date) which come in UTC ISO format from DB.
+ * Converts UTC ISO string to Africa/Cairo local time (+3 hours offset).
+ */
+export function formatLogDateTime(
+  dateInput: Date | string | number | null | undefined,
+  locale: string = 'en-US'
+): string {
+  if (!dateInput) return '';
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return '';
+
+  const resolvedLocale = locale === 'ar' ? 'ar-EG' : locale === 'en-GB' ? 'en-GB' : 'en-US';
+  return d.toLocaleString(resolvedLocale, {
+    timeZone: 'Africa/Cairo',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

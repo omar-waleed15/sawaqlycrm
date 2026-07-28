@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCairoDate, toCairoISOString } from '@/lib/dateUtils';
+import { formatCairoDate, toCairoISOString, formatLogDateTime } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -161,7 +161,7 @@ export default function PotentialClientCard({
 
   const formatDateLabel = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
-    return formatCairoDate(dateStr, locale);
+    return formatLogDateTime(dateStr, locale);
   };
 
   return (
@@ -378,11 +378,13 @@ export default function PotentialClientCard({
                         <SelectValue placeholder="Select outcome..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
-                        <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
-                        <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
-                        <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
-                        <SelectItem value="lost">{t('sales.lost')}</SelectItem>
+                        <SelectItem value="contacted">📞 {t('sales.contacted')}</SelectItem>
+                        <SelectItem value="no_answer">📵 {t('sales.noAnswer')}</SelectItem>
+                        <SelectItem value="interested">⭐ {t('sales.interested')}</SelectItem>
+                        <SelectItem value="meeting_scheduled">📅 {t('sales.meetingScheduled')}</SelectItem>
+                        <SelectItem value="negotiation">🤝 {t('sales.negotiation')}</SelectItem>
+                        <SelectItem value="won">🟢 {t('sales.won')}</SelectItem>
+                        <SelectItem value="lost">🔴 {t('sales.lost')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
