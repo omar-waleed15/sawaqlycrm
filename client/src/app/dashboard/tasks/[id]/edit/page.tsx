@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client, Attachment } from '@/types';
+import { parseCairoDateTimeToISO } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -180,7 +181,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         title: form.title,
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
-        due_date: form.due_date || undefined,
+        due_date: form.due_date ? parseCairoDateTimeToISO(form.due_date) : undefined,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
         content_description: form.content_description || undefined,

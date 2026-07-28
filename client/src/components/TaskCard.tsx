@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi } from '@/lib/api';
-import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue, getCairoDatetimeLocalString } from '@/lib/dateUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,15 +68,7 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export function formatDatetimeLocal(isoStr?: string): string {
-  if (!isoStr) return '';
-  const d = new Date(isoStr);
-  if (isNaN(d.getTime())) return '';
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  return getCairoDatetimeLocalString(isoStr);
 }
 
 export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCardProps) {

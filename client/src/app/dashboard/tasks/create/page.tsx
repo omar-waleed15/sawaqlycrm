@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client } from '@/types';
+import { parseCairoDateTimeToISO } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -128,7 +129,7 @@ export default function CreateTaskPage() {
         title: form.title,
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
-        due_date: form.due_date ? new Date(form.due_date).toISOString() : undefined,
+        due_date: form.due_date ? parseCairoDateTimeToISO(form.due_date) : undefined,
         estimated_time_minutes: totalEstMins > 0 ? totalEstMins : undefined,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,

@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { formatCairoDateTime, getCairoDateParts } from '@/lib/dateUtils';
+import { formatCairoDateTime, getCairoDateParts, parseCairoDateTimeToISO } from '@/lib/dateUtils';
 import { ar } from 'date-fns/locale/ar';
 import { cn } from '@/lib/utils';
 import { ContentTable } from '@/components/content-hub/ContentTable';
@@ -90,28 +90,12 @@ const buildCairoDateTime = (
   if (ampm === 'PM' && h !== 12) h += 12;
   if (ampm === 'AM' && h === 12) h = 0;
   
+  const pad = (n: number) => String(n).padStart(2, '0');
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
   
-  const offsetFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    timeZoneName: 'longOffset'
-  });
-  const offsetPart = offsetFormatter.formatToParts(new Date(year, date.getMonth(), date.getDate(), h, m))
-    .find(p => p.type === 'timeZoneName')?.value;
-  
-  let offset = '+02:00';
-  if (offsetPart) {
-    const match = offsetPart.match(/GMT([+-]\d+)/);
-    if (match) {
-      offset = match[1].padStart(3, '0') + ':00';
-    } else if (offsetPart.includes('GMT')) {
-      offset = '+00:00';
-    }
-  }
-  
-  return `${year}-${month}-${day}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00${offset}`;
+  return parseCairoDateTimeToISO(`${year}-${month}-${day}T${pad(h)}:${pad(m)}`);
 };
 
 export default function ContentHubPage() {
