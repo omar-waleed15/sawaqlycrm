@@ -293,35 +293,11 @@ function parseCairoTimeToISO(dateStr?: string | null): string | null {
   if (!dateStr) return null;
   const str = dateStr.trim();
   if (!str) return null;
-  if (str.endsWith('Z') || (str.includes('T') && (str.includes('+', 10) || (str.includes('-', 10) && str.indexOf('-', 10) > 10)))) {
-    const d = new Date(str);
-    return isNaN(d.getTime()) ? str : d.toISOString();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00`;
   }
-  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!match) {
-    const d = new Date(str);
-    return isNaN(d.getTime()) ? str : d.toISOString();
-  }
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-  const hour = parseInt(match[4], 10);
-  const minute = parseInt(match[5], 10);
-  const second = match[6] ? parseInt(match[6], 10) : 0;
-
-  const naiveUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric', month: 'numeric', day: 'numeric',
-    hour: 'numeric', minute: 'numeric', second: 'numeric',
-    hour12: false, hourCycle: 'h23'
-  });
-  const parts = Object.fromEntries(formatter.formatToParts(naiveUtc).map(p => [p.type, p.value]));
-  let cairoHour = parseInt(parts.hour, 10);
-  if (cairoHour === 24) cairoHour = 0;
-  const cairoUtcTime = Date.UTC(parseInt(parts.year, 10), parseInt(parts.month, 10) - 1, parseInt(parts.day, 10), cairoHour, parseInt(parts.minute, 10), parseInt(parts.second, 10));
-  const offsetMs = cairoUtcTime - naiveUtc.getTime();
-  return new Date(naiveUtc.getTime() - offsetMs).toISOString();
+  return str;
 }
 
 // POST /api/sales/leads/:leadId/calls — Log a call outcome and comments (owner or sales)
@@ -395,7 +371,20 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
     // 4. Auto-generate Reminder for each invited team member
     if (outcome === 'meeting_scheduled' && Array.isArray(meeting_attendees) && meeting_attendees.length > 0) {
       const senderName = req.user?.name || 'A team member';
-      const meetingDateFormatted = meeting_date ? new Date(meeting_date).toLocaleString('en-US', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : 'Scheduled Date';
+      let meetingDateFormatted = 'Scheduled Date';
+      if (meeting_date) {
+        const match = meeting_date.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+        if (match) {
+          let h = parseInt(match[4], 10);
+          const m = match[5];
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          h = h % 12 || 12;
+          const pad = (n: number) => String(n).padStart(2, '0');
+          meetingDateFormatted = `${match[1]}-${match[2]}-${match[3]}, ${pad(h)}:${m} ${ampm}`;
+        } else {
+          meetingDateFormatted = String(meeting_date);
+        }
+      }
       const reminderText = `📅 Meeting Attendance Request: You are invited by ${senderName} to attend an in-person client meeting with "${lead.name}" on ${meetingDateFormatted}.${meeting_notes ? ` Notes/Location: ${meeting_notes}` : ''}`;
 
       const reminderRows = meeting_attendees.map((attendeeId: string) => ({
