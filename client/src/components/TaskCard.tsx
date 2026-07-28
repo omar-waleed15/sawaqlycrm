@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi } from '@/lib/api';
-import { formatCairoDate, formatCairoDateTime, isDateOverdue, getCairoDatetimeLocalString } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue, getCairoDatetimeLocalString, getCairoTodayString, getCairoDateString, parseCairoDateTimeToISO, formatServerTimestamp } from '@/lib/dateUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -225,6 +225,16 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (form.due_date) {
+      const creationDateStr = task.created_at ? getCairoDateString(task.created_at) : getCairoTodayString();
+      const dueDateStr = getCairoDateString(form.due_date);
+      if (dueDateStr < creationDateStr) {
+        setError(locale === 'ar' ? 'تاريخ التسليم لا يمكن أن يكون قبل تاريخ الإنشاء' : 'Due date cannot be earlier than task creation date');
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -234,7 +244,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
         title: form.title,
         description: form.description || undefined,
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
-        due_date: form.due_date ? new Date(form.due_date).toISOString() : undefined,
+        due_date: form.due_date ? parseCairoDateTimeToISO(form.due_date) : undefined,
         estimated_time_minutes: totalEstMins > 0 ? totalEstMins : null,
         drive_link: form.drive_link || undefined,
         content_type: form.content_type || undefined,
@@ -395,7 +405,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
               <span className="inline-flex items-center gap-1 shrink-0 font-medium">
                 <span>📅</span>
                 <span className="text-muted-foreground/80">{t('taskDetail.created') || 'Created'}:</span>
-                <span className="font-semibold text-foreground">{formatCairoDateTime(task.created_at, locale)}</span>
+                <span className="font-semibold text-foreground">{formatServerTimestamp(task.created_at, locale)}</span>
               </span>
               {task.due_date && (
                 <>
@@ -627,6 +637,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                       id="edit-due_date" 
                       name="due_date" 
                       type="datetime-local" 
+                      min={task.created_at ? getCairoDatetimeLocalString(task.created_at) : getCairoDatetimeLocalString()}
                       value={form.due_date} 
                       onChange={handleChange}
                       className="w-full text-xs h-10 px-3"

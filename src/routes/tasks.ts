@@ -303,6 +303,15 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
     return;
   }
 
+  if (due_date) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueDateStr = String(due_date).split('T')[0];
+    if (dueDateStr < todayStr) {
+      res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
+      return;
+    }
+  }
+
   try {
     // Create the task (shared fields only)
     const insertData: Record<string, unknown> = {
@@ -488,7 +497,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
     // Verify task exists
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('tasks')
-      .select('id')
+      .select('id, created_at')
       .eq('id', id)
       .single();
 
@@ -500,6 +509,15 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
     if (admin) {
       // Admin: update shared task fields
       const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
+
+      if (due_date) {
+        const createdStr = existing.created_at ? new Date(existing.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const dueDateStr = String(due_date).split('T')[0];
+        if (dueDateStr < createdStr) {
+          res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
+          return;
+        }
+      }
 
       const updates: Record<string, unknown> = {};
       if (title !== undefined) updates.title = title;

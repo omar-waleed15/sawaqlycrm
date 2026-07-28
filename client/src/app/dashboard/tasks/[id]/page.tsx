@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, commentsApi } from '@/lib/api';
 import { Task, TaskAssignee, Comment, User } from '@/types';
-import { formatCairoDate, formatCairoDateTime, isDateOverdue } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue, formatServerTimestamp } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Button } from '@/components/ui/button';
@@ -1177,7 +1177,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">{t('taskDetail.created') || 'Created Date'}</span>
                 <span className="text-muted-foreground text-xs font-semibold flex items-center gap-1.5">
-                  📅 {formatDetailDateTime(task.created_at, t, locale)}
+                  📅 {formatServerTimestamp(task.created_at, locale)}
                 </span>
               </div>
 

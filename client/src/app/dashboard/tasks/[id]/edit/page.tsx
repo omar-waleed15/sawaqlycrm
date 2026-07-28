@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client, Attachment } from '@/types';
-import { parseCairoDateTimeToISO } from '@/lib/dateUtils';
+import { parseCairoDateTimeToISO, getCairoTodayString, getCairoDateString, getCairoDatetimeLocalString } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -75,6 +75,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [linkInputs, setLinkInputs] = useState<string[]>(['']);
+  const [taskCreatedAt, setTaskCreatedAt] = useState<string>('');
 
   useEffect(() => {
     if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
@@ -88,6 +89,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       closedClientsApi.list(),
     ]).then(([taskData, usersData, clientsData]) => {
       const tData = taskData.task;
+      if (tData.created_at) setTaskCreatedAt(tData.created_at);
       const myA = tData.task_assignees?.find((a: any) => a.user_id === user?.id);
 
       const isOwnerRole = user?.role === 'owner';
@@ -179,6 +181,16 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (form.due_date) {
+      const creationDateStr = taskCreatedAt ? getCairoDateString(taskCreatedAt) : getCairoTodayString();
+      const dueDateStr = getCairoDateString(form.due_date);
+      if (dueDateStr < creationDateStr) {
+        setError(locale === 'ar' ? 'تاريخ التسليم لا يمكن أن يكون قبل تاريخ الإنشاء' : 'Due date cannot be earlier than task creation date');
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -330,6 +342,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     id="due_date"
                     name="due_date"
                     type="datetime-local"
+                    min={taskCreatedAt ? getCairoDatetimeLocalString(taskCreatedAt) : getCairoDatetimeLocalString()}
                     value={form.due_date}
                     onChange={handleChange}
                     className="w-full text-xs h-10 px-3"

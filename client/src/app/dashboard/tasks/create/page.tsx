@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
 import { User, Client } from '@/types';
-import { parseCairoDateTimeToISO } from '@/lib/dateUtils';
+import { parseCairoDateTimeToISO, getCairoTodayString, getCairoDateString, getCairoDatetimeLocalString } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -121,6 +121,16 @@ export default function CreateTaskPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (form.due_date) {
+      const todayStr = getCairoTodayString();
+      const dueDateStr = getCairoDateString(form.due_date);
+      if (dueDateStr < todayStr) {
+        setError(locale === 'ar' ? 'تاريخ التسليم لا يمكن أن يكون قبل تاريخ الإنشاء' : 'Due date cannot be earlier than task creation date');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -332,6 +342,7 @@ export default function CreateTaskPage() {
                     id="due_date"
                     name="due_date"
                     type="datetime-local"
+                    min={getCairoDatetimeLocalString()}
                     value={form.due_date}
                     onChange={handleChange}
                     className="w-full text-xs h-10 px-3"

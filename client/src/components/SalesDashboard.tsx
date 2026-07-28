@@ -291,6 +291,10 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     if (!pushTaskForm.title.trim()) { setPushTaskError('Task title is required'); return; }
     if (pushTaskForm.assignee_ids.length === 0) { setPushTaskError('Please assign at least one member'); return; }
     if (!pushTaskForm.due_date) { setPushTaskError('Please set a deadline'); return; }
+    if (pushTaskForm.due_date < getCairoTodayString()) {
+      setPushTaskError(locale === 'ar' ? 'تاريخ التسليم لا يمكن أن يكون قبل تاريخ الإنشاء' : 'Due date cannot be earlier than task creation date');
+      return;
+    }
 
     setPushingTask(true);
     setPushTaskError('');

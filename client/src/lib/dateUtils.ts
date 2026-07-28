@@ -18,7 +18,7 @@ export function getDateParts(dateInput?: Date | string | number | null) {
 
   if (typeof dateInput === 'string') {
     const str = dateInput.trim();
-    // Match ISO/datetime-local pattern YYYY-MM-DD[T ]HH:mm(:ss)?
+    // Match ISO/datetime-local pattern YYYY-MM-DD[T ]HH:mm(:ss)? directly without timezone offset shifting
     const match = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
     if (match) {
       return {
@@ -158,15 +158,29 @@ export function getCairoTodayPlusNDays(days: number): string {
 }
 
 /**
- * Format Call Log timestamps (call_date) which come in UTC ISO format from DB.
- * Converts UTC ISO string to Africa/Cairo local time (+3 hours offset).
+ * Format server UTC timestamps (e.g. task.created_at, call_date) in Africa/Cairo (+3h offset).
  */
-export function formatLogDateTime(
+export function formatServerTimestamp(
   dateInput: Date | string | number | null | undefined,
   locale: string = 'en-US'
 ): string {
   if (!dateInput) return '';
-  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+
+  let d: Date;
+  if (typeof dateInput === 'string') {
+    let str = dateInput.trim();
+    if (!str) return '';
+    // Append 'Z' if missing so JavaScript parses server ISO strings as UTC (+3h Cairo offset)
+    if (!str.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(str)) {
+      str = str.replace(' ', 'T') + 'Z';
+    }
+    d = new Date(str);
+  } else if (typeof dateInput === 'number') {
+    d = new Date(dateInput);
+  } else {
+    d = dateInput;
+  }
+
   if (isNaN(d.getTime())) return '';
 
   const resolvedLocale = locale === 'ar' ? 'ar-EG' : locale === 'en-GB' ? 'en-GB' : 'en-US';
@@ -178,4 +192,15 @@ export function formatLogDateTime(
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * Format Call Log timestamps (call_date) which come in UTC ISO format from DB.
+ * Converts UTC ISO string to Africa/Cairo local time (+3 hours offset).
+ */
+export function formatLogDateTime(
+  dateInput: Date | string | number | null | undefined,
+  locale: string = 'en-US'
+): string {
+  return formatServerTimestamp(dateInput, locale);
 }
