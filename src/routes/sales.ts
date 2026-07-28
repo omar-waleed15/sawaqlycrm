@@ -360,7 +360,7 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
     // 4. Auto-generate Reminder for each invited team member
     if (outcome === 'meeting_scheduled' && Array.isArray(meeting_attendees) && meeting_attendees.length > 0) {
       const senderName = req.user?.name || 'A team member';
-      const meetingDateFormatted = meeting_date ? new Date(meeting_date).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'Scheduled Date';
+      const meetingDateFormatted = meeting_date ? new Date(meeting_date).toLocaleString('en-US', { timeZone: 'Africa/Cairo', dateStyle: 'medium', timeStyle: 'short' }) : 'Scheduled Date';
       const reminderText = `📅 Meeting Attendance Request: You are invited by ${senderName} to attend an in-person client meeting with "${lead.name}" on ${meetingDateFormatted}.${meeting_notes ? ` Notes/Location: ${meeting_notes}` : ''}`;
 
       const reminderRows = meeting_attendees.map((attendeeId: string) => ({

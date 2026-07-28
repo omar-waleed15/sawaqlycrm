@@ -8,7 +8,7 @@ import { salesApi } from '@/lib/api';
 import { Client, SalesCallLog, Contract, User } from '@/types';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
-import { formatCairoDate, formatCairoTime, getCairoDateString } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoTime, getCairoDateString, toCairoISOString } from '@/lib/dateUtils';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -137,7 +137,7 @@ export default function SalesCalendarPage() {
       await salesApi.logCall(selectedLeadId, {
         outcome: newCallOutcome,
         notes: newCallNotes || undefined,
-        meeting_date: newCallOutcome === 'meeting_scheduled' && newCallDate ? newCallDate : undefined,
+        meeting_date: newCallOutcome === 'meeting_scheduled' && newCallDate ? toCairoISOString(newCallDate) : undefined,
       });
       setNewCallNotes('');
       setNewCallDate('');

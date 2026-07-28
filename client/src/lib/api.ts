@@ -1,3 +1,5 @@
+import { toCairoISOString } from './dateUtils';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 function getToken(): string | null {
@@ -322,11 +324,16 @@ export const salesApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  logCall: (leadId: string, data: { notes?: string; outcome: string; meeting_date?: string }) =>
-    request<{ lead: import('@/types').Client }>(`/sales/leads/${leadId}/calls`, {
+  logCall: (leadId: string, data: { notes?: string; outcome: string; meeting_date?: string; meeting_attendees?: string[]; meeting_notes?: string }) => {
+    const payload = { ...data };
+    if (payload.meeting_date) {
+      payload.meeting_date = toCairoISOString(payload.meeting_date);
+    }
+    return request<{ lead: import('@/types').Client }>(`/sales/leads/${leadId}/calls`, {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
   closeWon: (leadId: string, data?: {
     name?: string;
     amount?: number;

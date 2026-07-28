@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { formatCairoDate } from '@/lib/dateUtils';
+import { formatCairoDate, toCairoISOString } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -140,7 +140,7 @@ export default function PotentialClientCard({
         notes: notes.trim() || undefined,
       };
       if (outcome === 'meeting_scheduled') {
-        if (meetingDate) payload.meeting_date = meetingDate;
+        if (meetingDate) payload.meeting_date = toCairoISOString(meetingDate);
         if (meetingAttendees.length > 0) payload.meeting_attendees = meetingAttendees;
         if (meetingNotes.trim()) payload.meeting_notes = meetingNotes.trim();
       }

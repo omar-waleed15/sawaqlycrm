@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/lib/i18n';
-import { getCairoTodayString, formatCairoDate, formatCairoTime, formatCairoDateTime, getCairoTodayPlusNDays, getCairoDateString, getCairoDateParts } from '@/lib/dateUtils';
+import { getCairoTodayString, formatCairoDate, formatCairoTime, formatCairoDateTime, getCairoTodayPlusNDays, getCairoDateString, getCairoDateParts, toCairoISOString } from '@/lib/dateUtils';
 import { 
   Phone, 
   Plus, 

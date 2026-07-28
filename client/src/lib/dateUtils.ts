@@ -1,6 +1,22 @@
 /**
- * Date utilities for sawaqlycrm, enforcing Africa/Cairo timezone.
+ * Convert a datetime string (especially from datetime-local input like "2026-07-28T19:00")
+ * to a full ISO 8601 UTC string for consistent API submission and PostgreSQL TIMESTAMPTZ storage.
  */
+export function toCairoISOString(dateInput?: string | null): string {
+  if (!dateInput) return '';
+  const str = dateInput.trim();
+  if (!str) return '';
+
+  // If already standard ISO with timezone offset or Z, standardise it
+  if (str.endsWith('Z') || (str.includes('T') && (str.includes('+', 10) || (str.includes('-', 10) && str.indexOf('-', 10) > 10)))) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toISOString();
+  }
+
+  const date = new Date(str);
+  if (isNaN(date.getTime())) return str;
+  return date.toISOString();
+}
 
 // Helper to get Cairo date parts
 export function getCairoDateParts(dateInput?: Date | string | number) {
