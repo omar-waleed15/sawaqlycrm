@@ -1699,46 +1699,19 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                     </div>
                   </div>
 
-                  {/* Content Assets */}
+                  {/* Resource & Drive Links */}
                   <div className="border-t border-border pt-4">
-                    <h4 className="text-xs font-bold mb-3 uppercase tracking-wider text-muted-foreground">{t('createTask.contentAssets')}</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="push-content-type">{t('createTask.contentType')}</Label>
-                        <Select value={pushTaskForm.content_type} onValueChange={v => setPushTaskForm(p => ({ ...p, content_type: v || '' }))}>
-                          <SelectTrigger id="push-content-type">
-                            <SelectValue placeholder={t('createTask.selectContentType')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="post">{t('contentType.post')}</SelectItem>
-                            <SelectItem value="story">{t('contentType.story')}</SelectItem>
-                            <SelectItem value="reel">{t('contentType.reel')}</SelectItem>
-                            <SelectItem value="photos">{t('contentType.photos')}</SelectItem>
-                            <SelectItem value="other">{t('contentType.other')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="push-drive-link">{t('createTask.driveLink')}</Label>
-                        <Input
-                          id="push-drive-link"
-                          type="url"
-                          placeholder="https://drive.google.com/…"
-                          value={pushTaskForm.drive_link}
-                          onChange={e => setPushTaskForm(p => ({ ...p, drive_link: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-1.5 mt-3">
-                      <Label htmlFor="push-content-desc">{t('createTask.contentDetails')}</Label>
-                      <Textarea
-                        id="push-content-desc"
-                        placeholder={t('createTask.contentDetailsPlaceholder')}
-                        value={pushTaskForm.content_description}
-                        onChange={e => setPushTaskForm(p => ({ ...p, content_description: e.target.value }))}
-                        rows={2}
-                      />
-                    </div>
+                    <Label htmlFor="push-drive-link" className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                      🔗 {t('createTask.driveLink') || 'Resource & Drive Links'}
+                    </Label>
+                    <Textarea
+                      id="push-drive-link"
+                      placeholder="https://drive.google.com/..."
+                      value={pushTaskForm.drive_link}
+                      onChange={e => setPushTaskForm(p => ({ ...p, drive_link: e.target.value }))}
+                      rows={2}
+                      className="text-xs bg-background"
+                    />
                   </div>
 
                   {/* Project & Assignees */}

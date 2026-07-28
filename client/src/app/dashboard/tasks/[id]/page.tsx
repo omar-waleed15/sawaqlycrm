@@ -438,27 +438,36 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     🎬 {t('taskDetail.contentDetailsAssets') || 'Content Details & Assets'}
                   </h3>
 
-                  {/* Google Drive Link */}
-                  {task.drive_link && (
-                    <div className="flex flex-col gap-1.5 text-xs text-start">
-                      <span className="font-bold text-muted-foreground uppercase tracking-wide">{t('taskDetail.googleDriveAttachments') || 'Google Drive Link'}</span>
-                      <div className="flex items-center gap-3 bg-[#1D61E7]/5 border border-border/60 p-3 rounded-lg flex-wrap min-w-0">
-                        <a
-                          href={task.drive_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#1D61E7] hover:underline font-semibold break-all text-xs flex-1 min-w-0 text-start"
-                        >
-                          {task.drive_link}
-                        </a>
-                        <a href={task.drive_link} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                          <Button size="sm" className="h-7 px-3 text-xs bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1 rounded">
-                            {t('common.open') || 'Open'} ↗
-                          </Button>
-                        </a>
+                  {/* Resource & Drive Links */}
+                  {task.drive_link && (() => {
+                    const links = task.drive_link.split(/[\n,\s]+/).map(l => l.trim()).filter(l => l.length > 0);
+                    return (
+                      <div className="flex flex-col gap-1.5 text-xs text-start">
+                        <span className="font-bold text-muted-foreground uppercase tracking-wide">
+                          🔗 {locale === 'ar' ? 'الروابط المرفقة' : 'Resource Links'} ({links.length})
+                        </span>
+                        <div className="flex flex-col gap-2">
+                          {links.map((link, idx) => (
+                            <div key={idx} className="flex items-center gap-3 bg-[#1D61E7]/5 border border-border/60 p-2.5 rounded-lg flex-wrap min-w-0">
+                              <a
+                                href={link.startsWith('http') ? link : `https://${link}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#1D61E7] hover:underline font-semibold break-all text-xs flex-1 min-w-0 text-start"
+                              >
+                                {link}
+                              </a>
+                              <a href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                <Button size="sm" className="h-7 px-3 text-xs bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1 rounded">
+                                  {t('common.open') || 'Open'} ↗
+                                </Button>
+                              </a>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Uploaded Attachments */}
                   {task.attachments && task.attachments.length > 0 && (

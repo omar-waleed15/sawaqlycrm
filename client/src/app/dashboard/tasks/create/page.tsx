@@ -64,6 +64,7 @@ export default function CreateTaskPage() {
   const { formState: form, setFormState: setForm, clearDraft, resetForm, hasDraft } = useFormDraft('task_create', INITIAL_TASK_FORM);
 
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [linkInputs, setLinkInputs] = useState<string[]>(['']);
 
   useEffect(() => {
     if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
@@ -124,6 +125,7 @@ export default function CreateTaskPage() {
 
     try {
       const totalEstMins = (Number(form.estimated_hours || 0) * 60) + Number(form.estimated_minutes || 0);
+      const validLinks = linkInputs.map(l => l.trim()).filter(l => l.length > 0);
 
       const data = await tasksApi.create({
         title: form.title,
@@ -131,9 +133,7 @@ export default function CreateTaskPage() {
         priority: form.priority as 'low' | 'medium' | 'high' | 'urgent',
         due_date: form.due_date ? parseCairoDateTimeToISO(form.due_date) : undefined,
         estimated_time_minutes: totalEstMins > 0 ? totalEstMins : undefined,
-        drive_link: form.drive_link || undefined,
-        content_type: form.content_type || undefined,
-        content_description: form.content_description || undefined,
+        drive_link: validLinks.length > 0 ? validLinks.join('\n') : undefined,
         client_id: form.client_id || undefined,
         is_deliverable: form.is_deliverable,
         deliverable_type: form.is_deliverable ? form.deliverable_type : undefined,
@@ -220,49 +220,48 @@ export default function CreateTaskPage() {
                 />
               </div>
 
-              {/* Content Assets */}
+              {/* Resource & Drive Links (Multi-Link) */}
               <div className="border-t border-border pt-4">
-                <h4 className="text-sm font-bold mb-3">🎥 {t('createTask.contentAssets')}</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="content_type">{t('createTask.contentType')}</Label>
-                    <Select value={form.content_type} onValueChange={v => handleSelectChange('content_type', v || '')}>
-                      <SelectTrigger id="content_type">
-                        <SelectValue placeholder={t('createTask.selectContentType')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="post">{t('contentType.post')}</SelectItem>
-                        <SelectItem value="story">{t('contentType.story')}</SelectItem>
-                        <SelectItem value="reel">{t('contentType.reel')}</SelectItem>
-                        <SelectItem value="photos">{t('contentType.photos')}</SelectItem>
-                        <SelectItem value="other">{t('contentType.other')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="drive_link">{t('createTask.driveLink')}</Label>
-                    <Input
-                      id="drive_link"
-                      name="drive_link"
-                      type="url"
-                      placeholder="https://drive.google.com/..."
-                      value={form.drive_link}
-                      onChange={handleChange}
-                    />
-                  </div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="font-bold text-sm text-foreground flex items-center gap-1.5">
+                    🔗 {t('createTask.driveLink') || 'Resource & Drive Links'}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1 text-indigo-600 border-indigo-200"
+                    onClick={() => setLinkInputs(prev => [...prev, ''])}
+                  >
+                    <Plus className="size-3.5" /> {locale === 'ar' ? 'إضافة رابط آخر' : 'Add Another Link'}
+                  </Button>
                 </div>
-
-                <div className="flex flex-col gap-1.5 mt-3">
-                  <Label htmlFor="content_description">{t('createTask.contentDetails')}</Label>
-                  <Textarea
-                    id="content_description"
-                    name="content_description"
-                    placeholder={t('createTask.contentDetailsPlaceholder')}
-                    value={form.content_description}
-                    onChange={handleChange}
-                    rows={3}
-                  />
+                <div className="space-y-2">
+                  {linkInputs.map((link, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <Input
+                        type="url"
+                        placeholder="https://drive.google.com/..."
+                        value={link}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setLinkInputs(prev => prev.map((l, i) => i === idx ? val : l));
+                        }}
+                        className="text-xs h-9 flex-1"
+                      />
+                      {linkInputs.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 shrink-0"
+                          onClick={() => setLinkInputs(prev => prev.filter((_, i) => i !== idx))}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
