@@ -289,6 +289,41 @@ router.get('/leads/:leadId', authMiddleware, ownerOrSales, async (req: AuthReque
   }
 });
 
+function parseCairoTimeToISO(dateStr?: string | null): string | null {
+  if (!dateStr) return null;
+  const str = dateStr.trim();
+  if (!str) return null;
+  if (str.endsWith('Z') || (str.includes('T') && (str.includes('+', 10) || (str.includes('-', 10) && str.indexOf('-', 10) > 10)))) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toISOString();
+  }
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toISOString();
+  }
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  const hour = parseInt(match[4], 10);
+  const minute = parseInt(match[5], 10);
+  const second = match[6] ? parseInt(match[6], 10) : 0;
+
+  const naiveUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false, hourCycle: 'h23'
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(naiveUtc).map(p => [p.type, p.value]));
+  let cairoHour = parseInt(parts.hour, 10);
+  if (cairoHour === 24) cairoHour = 0;
+  const cairoUtcTime = Date.UTC(parseInt(parts.year, 10), parseInt(parts.month, 10) - 1, parseInt(parts.day, 10), cairoHour, parseInt(parts.minute, 10), parseInt(parts.second, 10));
+  const offsetMs = cairoUtcTime - naiveUtc.getTime();
+  return new Date(naiveUtc.getTime() - offsetMs).toISOString();
+}
+
 // POST /api/sales/leads/:leadId/calls — Log a call outcome and comments (owner or sales)
 router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { leadId } = req.params;
@@ -336,7 +371,7 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
     // 3. Update client stage & meeting_date if scheduled, and auto-assign sales_rep_id if unassigned
     const updates: Record<string, any> = { pipeline_stage: outcome };
     if (outcome === 'meeting_scheduled') {
-      if (meeting_date) updates.meeting_date = meeting_date;
+      if (meeting_date) updates.meeting_date = parseCairoTimeToISO(meeting_date);
       if (Array.isArray(meeting_attendees)) updates.meeting_attendees = meeting_attendees;
       if (meeting_notes !== undefined) updates.meeting_notes = meeting_notes || null;
     }

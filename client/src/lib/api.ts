@@ -7,6 +7,25 @@ function getToken(): string | null {
   return localStorage.getItem('access_token');
 }
 
+function sanitizePayloadDates(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizePayloadDates);
+  
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    const keyLower = key.toLowerCase();
+    if (typeof val === 'string' && (keyLower.includes('date') || keyLower.includes('time')) && val.includes('T')) {
+      result[key] = toCairoISOString(val);
+    } else if (typeof val === 'object' && val !== null) {
+      result[key] = sanitizePayloadDates(val);
+    } else {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
 export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -21,9 +40,21 @@ export async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  let body = options.body;
+  if (typeof body === 'string' && body.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(body);
+      const sanitized = sanitizePayloadDates(parsed);
+      body = JSON.stringify(sanitized);
+    } catch (e) {
+      // Keep original body if parsing fails
+    }
+  }
+
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
+      body,
       headers,
     });
 
