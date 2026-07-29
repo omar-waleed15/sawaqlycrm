@@ -61,7 +61,8 @@ export async function request<T>(
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      if (res.status === 401 || data.error === 'Invalid or expired token') {
+      const isAuthLogin = endpoint.startsWith('/auth/login');
+      if (!isAuthLogin && (res.status === 401 || data.error === 'Invalid or expired token')) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');

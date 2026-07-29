@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const { login } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
@@ -29,7 +30,13 @@ export default function LoginPage() {
       await login(email, password);
       router.replace('/');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      const msg = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+      setError(msg);
+      // Retain email, focus password field so user can re-enter easily
+      setTimeout(() => {
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -79,6 +86,7 @@ export default function LoginPage() {
             </label>
             <input
               id="password"
+              ref={passwordRef}
               type="password"
               placeholder={mounted ? t('login.passwordPlaceholder') : '••••••••'}
               value={password}

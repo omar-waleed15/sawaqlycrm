@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
@@ -10,6 +10,7 @@ export default function ClientLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const { login } = useAuth();
   const router = useRouter();
 
@@ -22,7 +23,12 @@ export default function ClientLoginPage() {
       await login(email, password);
       router.replace('/');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.');
+      const msg = err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+      setError(msg);
+      setTimeout(() => {
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
+      }, 50);
     } finally {
       setLoading(false);
     }
@@ -74,6 +80,7 @@ export default function ClientLoginPage() {
             </label>
             <input
               id="password"
+              ref={passwordRef}
               type="password"
               placeholder="••••••••"
               value={password}
