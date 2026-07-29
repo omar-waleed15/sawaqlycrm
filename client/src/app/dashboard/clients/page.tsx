@@ -68,8 +68,11 @@ function formatCurrency(amount: number, locale?: string): string {
 const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; className: string }> = {
   new_lead:          { labelKey: 'sales.newLead',       className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
   contacted:         { labelKey: 'sales.contacted',      className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
+  no_answer:         { labelKey: 'sales.noAnswer',       className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  interested:        { labelKey: 'sales.interested',     className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' },
   meeting_scheduled: { labelKey: 'sales.meetingScheduled', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' },
   meeting_done:      { labelKey: 'sales.meetingDone',    className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+  negotiation:       { labelKey: 'sales.negotiation',    className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
   won:               { labelKey: 'sales.won',            className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
   lost:              { labelKey: 'sales.lost',           className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300' },
 };
@@ -1162,6 +1165,7 @@ export default function ClientsDashboardPage() {
                 <SelectContent>
                   <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
                   <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                  <SelectItem value="no_answer">{t('sales.noAnswer')}</SelectItem>
                   <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
                   <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
                   <SelectItem value="lost">{t('sales.lost')}</SelectItem>

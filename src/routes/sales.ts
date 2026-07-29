@@ -345,12 +345,28 @@ router.post('/leads/:leadId/calls', authMiddleware, ownerOrSales, async (req: Au
     }
 
     // 3. Update client stage & meeting_date if scheduled, and auto-assign sales_rep_id if unassigned
-    const updates: Record<string, any> = { pipeline_stage: outcome };
+    // Only outcomes that correspond to a valid pipeline stage should update pipeline_stage.
+    // Informational outcomes (no_answer, interested, negotiation) are logged but don't change the stage.
+    const OUTCOME_TO_STAGE: Record<string, string> = {
+      contacted: 'contacted',
+      no_answer: 'no_answer',
+      meeting_scheduled: 'meeting_scheduled',
+      meeting_done: 'meeting_done',
+      won: 'won',
+      lost: 'lost',
+    };
+
+    const updates: Record<string, any> = {};
+    const mappedStage = OUTCOME_TO_STAGE[outcome];
+    if (mappedStage) {
+      updates.pipeline_stage = mappedStage;
+    }
     if (outcome === 'meeting_scheduled') {
       if (meeting_date) updates.meeting_date = parseCairoTimeToISO(meeting_date);
       if (Array.isArray(meeting_attendees)) updates.meeting_attendees = meeting_attendees;
       if (meeting_notes !== undefined) updates.meeting_notes = meeting_notes || null;
     }
+
 
     if (!lead.sales_rep_id) {
       updates.sales_rep_id = salesRepId;

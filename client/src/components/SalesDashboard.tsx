@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { salesApi, attachmentsApi, usersApi, projectsApi, tasksApi, contractsApi, clientsApi } from '@/lib/api';
 import { SalesDashboardData, Client, SalesCallLog, User, Project, Contract, Task } from '@/types';
 import Modal from '@/components/Modal';
+import StageUpdateModal from '@/components/StageUpdateModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,19 +55,15 @@ function formatCurrency(amount: number, locale: string = 'en'): string {
 }
 
 
-const OUTCOMES = [
-  { value: 'contacted', labelKey: 'sales.contacted' },
-  { value: 'meeting_scheduled', labelKey: 'sales.meetingScheduled' },
-  { value: 'meeting_done', labelKey: 'sales.meetingDone' },
-  { value: 'won', labelKey: 'sales.wonCloseDeal' },
-  { value: 'lost', labelKey: 'sales.lost' },
-];
 
 const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; color: string; bg: string }> = {
   new_lead:          { labelKey: 'sales.newLead',       color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
   contacted:         { labelKey: 'sales.contacted',      color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200' },
+  no_answer:         { labelKey: 'sales.noAnswer',       color: 'text-amber-700', bg: 'bg-amber-100 border-amber-200' },
+  interested:        { labelKey: 'sales.interested',     color: 'text-teal-700', bg: 'bg-teal-100 border-teal-200' },
   meeting_scheduled: { labelKey: 'sales.meetingScheduled', color: 'text-indigo-700', bg: 'bg-indigo-100 border-indigo-200' },
   meeting_done:      { labelKey: 'sales.meetingDone',    color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200' },
+  negotiation:       { labelKey: 'sales.negotiation',    color: 'text-orange-700', bg: 'bg-orange-100 border-orange-200' },
   won:               { labelKey: 'sales.won',            color: 'text-green-700', bg: 'bg-green-100 border-green-200' },
   lost:              { labelKey: 'sales.lost',           color: 'text-rose-700', bg: 'bg-rose-100 border-rose-200' },
 };
@@ -107,7 +104,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
 
   // Modals state
   const [leadModalOpen, setLeadModalOpen] = useState(false);
-  const [callModalOpen, setCallModalOpen] = useState(false);
   const [closeWonModalOpen, setCloseWonModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -118,13 +114,8 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
   ]);
 
   const [selectedLead, setSelectedLead] = useState<Client | null>(null);
-  const [callForm, setCallForm] = useState({
-    notes: '',
-    outcome: 'contacted',
-    meeting_date: '',
-    meeting_attendees: [] as string[],
-    meeting_notes: '',
-  });
+  const [stageModalOpen, setStageModalOpen] = useState(false);
+  const [stageModalTarget, setStageModalTarget] = useState<{ client: Client; stage: string } | null>(null);
 
   // Close Won Wizard State
   const [closeWonStep, setCloseWonStep] = useState(1);
@@ -319,15 +310,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     }
   };
 
-  // Follow-up from deal detail
-  const openFollowUpFromDetail = (deal: Client) => {
-    closeDealDetail();
-    setSelectedLead(deal);
-    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
-    setErrorMsg('');
-    setCallModalOpen(true);
-  };
-
   const [deletingDeal, setDeletingDeal] = useState(false);
 
   const handleDeleteDeal = async (dealId: string, dealName: string) => {
@@ -407,47 +389,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
     }
   };
 
-  const handleOpenLogCall = (lead: Client) => {
-    setSelectedLead(lead);
-    setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
-    setErrorMsg('');
-    setCallModalOpen(true);
-  };
-
-  const handleLogCall = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-    if (callForm.outcome === 'meeting_scheduled' && !callForm.meeting_date) {
-      setErrorMsg('Please select a date and time for the meeting');
-      return;
-    }
-
-    if (callForm.outcome === 'won') {
-      // Close Won scenario, close Call Modal and open Close Won wizard
-      setCallModalOpen(false);
-      setCloseWonStep(1);
-      setCloseWonForm(prev => ({
-        ...prev,
-        contractName: `${selectedLead.company || selectedLead.name} - Contract`,
-        taskDueDate: getCairoTodayPlusNDays(7),
-      }));
-      setErrorMsg('');
-      setCloseWonModalOpen(true);
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMsg('');
-    try {
-      await salesApi.logCall(selectedLead.id, callForm);
-      setCallModalOpen(false);
-      fetchDashboard(true);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to log call data');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleCloseWonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -759,15 +700,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                           {isExpanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                           {t('sales.logs')} ({leadLogs.length})
                         </Button>
-                        {!salesRepId && (
-                           <Button 
-                             onClick={(e) => { e.stopPropagation(); handleOpenLogCall(lead); }}
-                             className="h-8 text-xs font-bold gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3"
-                             size="sm"
-                           >
-                             <Phone className="size-3.5 animate-pulse" /> {t('sales.logCallOutcome')}
-                           </Button>
-                         )}
+
                         <Button
                           onClick={(e) => { e.stopPropagation(); handleDeleteDeal(lead.id, lead.name); }}
                           variant="ghost"
@@ -1011,6 +944,7 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                     <SelectContent>
                       <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
                       <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                      <SelectItem value="no_answer">{t('sales.noAnswer')}</SelectItem>
                       <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
                       <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
                     </SelectContent>
@@ -1042,114 +976,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
         </form>
       </Modal>
 
-      {/* ── Modal: Log Call Outcome ────────────────────────────────────────── */}
-      <Modal isOpen={callModalOpen} onClose={() => setCallModalOpen(false)} title={`${t('sales.logCallOutcome')}: ${selectedLead?.name}`}>
-        <form onSubmit={handleLogCall} className="flex flex-col gap-4">
-          {errorMsg && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-3 py-2 rounded-md">
-              {errorMsg}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="call-outcome">{t('sales.logOutcome')} *</Label>
-            <Select 
-              value={callForm.outcome} 
-              onValueChange={v => setCallForm(p => ({ ...p, outcome: v || 'contacted' }))}
-            >
-              <SelectTrigger id="call-outcome">
-                <SelectValue placeholder={locale === 'ar' ? 'اختر النتيجة...' : 'Select outcome...'} />
-              </SelectTrigger>
-              <SelectContent>
-                {OUTCOMES.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{t(opt.labelKey)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {callForm.outcome === 'meeting_scheduled' && (
-            <>
-              <div className="flex flex-col gap-1.5 animate-fade-in">
-                <Label htmlFor="call-meeting">📅 {t('sales.meetingDateTime')} *</Label>
-                <Input
-                  id="call-meeting"
-                  type="datetime-local"
-                  min={getCairoTodayString() + "T00:00"}
-                  value={callForm.meeting_date}
-                  onChange={e => setCallForm(p => ({ ...p, meeting_date: e.target.value }))}
-                  required
-                />
-              </div>
-
-              {/* Team Attendees Selection */}
-              <div className="flex flex-col gap-1.5 animate-fade-in">
-                <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Users className="size-3.5 text-primary" />
-                  {locale === 'ar' ? 'دعوة أعضاء الفريق للاجتماع' : 'Invite Team Members to Meeting'}
-                </Label>
-                <div className="flex flex-wrap gap-1.5 p-2 rounded-md border bg-muted/20 min-h-[42px] items-center">
-                  {members.filter(m => m.role !== 'client').map(member => {
-                    const isSelected = callForm.meeting_attendees.includes(member.id);
-                    return (
-                      <Badge
-                        key={member.id}
-                        variant={isSelected ? "default" : "outline"}
-                        className={`cursor-pointer text-xs transition-all ${
-                          isSelected ? "bg-primary text-primary-foreground font-bold shadow-sm" : "hover:bg-muted text-muted-foreground"
-                        }`}
-                        onClick={() => {
-                          setCallForm(p => ({
-                            ...p,
-                            meeting_attendees: isSelected
-                              ? p.meeting_attendees.filter(id => id !== member.id)
-                              : [...p.meeting_attendees, member.id]
-                          }));
-                        }}
-                      >
-                        {isSelected ? "✓ " : "+ "} {member.name} ({member.role.replace('_', ' ')})
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* In-Person Location & Notes */}
-              <div className="flex flex-col gap-1.5 animate-fade-in">
-                <Label htmlFor="call-meeting-notes" className="text-xs font-semibold">
-                  📍 {locale === 'ar' ? 'مكان الاجتماع وملاحظات التحضير' : 'In-Person Meeting Location & Notes'}
-                </Label>
-                <Input
-                  id="call-meeting-notes"
-                  type="text"
-                  placeholder={locale === 'ar' ? 'مثال: مقر العميل في المعادي / تحضير خطة المحتوى' : 'e.g. Client Office in Maadi / Prepare content plan'}
-                  value={callForm.meeting_notes}
-                  onChange={e => setCallForm(p => ({ ...p, meeting_notes: e.target.value }))}
-                />
-              </div>
-            </>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="call-notes">{t('sales.notesComments')}</Label>
-            <Textarea
-              id="call-notes"
-              placeholder={t('sales.notesPlaceholder')}
-              value={callForm.notes}
-              onChange={e => setCallForm(p => ({ ...p, notes: e.target.value }))}
-              rows={4}
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t mt-2">
-            <Button type="button" variant="outline" onClick={() => setCallModalOpen(false)}>{t('common.cancel')}</Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-              {callForm.outcome === 'won' ? t('sales.closeWon') : t('sales.logBtn')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* ── Modal: Close Won Deal (Optional Contract) ────────────────────── */}
       <Modal isOpen={closeWonModalOpen} onClose={() => setCloseWonModalOpen(false)} title={t('sales.closeWon')}>
@@ -1253,12 +1079,12 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
       </Modal>
 
       {/* ── Modal: Prospect Detail View ─────────────────────────────────────── */}
-      {/* ── Modal: Unified Lead Workspace (Details + Quick Log Update) ────────── */}
+      {/* ── Modal: Unified Lead Workspace ────────── */}
       <Modal 
         isOpen={!!detailDeal} 
         onClose={closeDealDetail} 
         title={detailDeal ? `👤 ${detailDeal.name}` : `📋 ${t('sales.prospectDetails')}`} 
-        maxWidth={920}
+        maxWidth={720}
       >
         {detailDeal && (() => {
           const leadList: Client[] = data?.phoneList || [];
@@ -1271,27 +1097,6 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           };
           const goToNextLead = () => {
             if (hasNextLead) openDealDetail(leadList[currentLeadIndex + 1]);
-          };
-
-          const handleSaveInlineLog = async (andNext: boolean = false) => {
-            if (callForm.outcome === 'meeting_scheduled' && !callForm.meeting_date) {
-              setErrorMsg(locale === 'ar' ? 'يرجى تحديد تاريخ ووقت الاجتماع' : 'Please select meeting date and time');
-              return;
-            }
-            setSubmitting(true);
-            setErrorMsg('');
-            try {
-              await salesApi.logCall(detailDeal.id, callForm);
-              await fetchDashboard(true);
-              setCallForm({ notes: '', outcome: 'contacted', meeting_date: '', meeting_attendees: [], meeting_notes: '' });
-              if (andNext && hasNextLead) {
-                openDealDetail(leadList[currentLeadIndex + 1]);
-              }
-            } catch (err: any) {
-              setErrorMsg(err.message || 'Failed to save call log');
-            } finally {
-              setSubmitting(false);
-            }
           };
 
           return (
@@ -1339,280 +1144,150 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
                 </div>
               )}
 
-              {/* Main 2-Column Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                
-                {/* Left Column (7 cols): Lead Info & History Timeline */}
-                <div className="lg:col-span-7 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-4">
-                    {/* Contact Bar & Quick Stage Switcher */}
-                    <div className="bg-muted/30 border rounded-xl p-3.5 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <a
-                            href={`tel:${detailDeal.phone}`}
-                            className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg transition-all"
-                          >
-                            <Phone className="size-3.5" /> {detailDeal.phone || '—'}
-                          </a>
-                          {(detailDeal.address || detailDeal.email) && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[200px]">
-                              <MapPin className="size-3 shrink-0" /> {detailDeal.address || detailDeal.email}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Stage Dropdown */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            {t('clients.stageCol')}:
-                          </span>
-                          <Select
-                            value={detailDeal.pipeline_stage || 'new_lead'}
-                            onValueChange={async (newStage) => {
-                              if (!newStage) return;
-                              try {
-                                setSubmitting(true);
-                                await clientsApi.update(detailDeal.id, { pipeline_stage: newStage });
-                                await fetchDashboard(true);
-                                setDetailDeal(prev => prev ? ({ ...prev, pipeline_stage: newStage as any }) : null);
-                              } catch (e: any) {
-                                setErrorMsg(e.message || 'Failed to update stage');
-                              } finally {
-                                setSubmitting(false);
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="h-7 text-xs font-bold w-[140px] bg-background border">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
-                              <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
-                              <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
-                              <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
-                              <SelectItem value="won">{t('sales.won')}</SelectItem>
-                              <SelectItem value="lost">{t('sales.lost')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {detailDeal.meeting_date && (
-                        <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40">
-                          <Calendar className="size-4 shrink-0" />
-                          <span>{t('sales.meeting')}: {formatCairoDateTime(detailDeal.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                        </div>
+              {/* Lead Info & History Timeline */}
+              <div className="space-y-4">
+                {/* Contact Bar & Quick Stage Switcher */}
+                <div className="bg-muted/30 border rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`tel:${detailDeal.phone}`}
+                        className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg transition-all"
+                      >
+                        <Phone className="size-3.5" /> {detailDeal.phone || '—'}
+                      </a>
+                      {(detailDeal.address || detailDeal.email) && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[200px]">
+                          <MapPin className="size-3 shrink-0" /> {detailDeal.address || detailDeal.email}
+                        </span>
                       )}
                     </div>
 
-                    {/* Timeline of Logs */}
-                    <div className="space-y-2">
-                      <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                        <Clock className="size-3.5 text-indigo-500" /> {t('sales.callLogs')}
-                      </h4>
-                      {(() => {
-                        const logs = data?.callLogs.filter(log => log.client_id === detailDeal.id) || [];
-                        return logs.length > 0 ? (
-                          <div className="relative border-l-2 border-border/60 pl-4 ml-2 space-y-3.5 max-h-[280px] overflow-y-auto pr-1">
-                            {logs.map(log => {
-                              const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
-                              return (
-                                <div key={log.id} className="relative group">
-                                  <div className="absolute left-[-22px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-xs group-hover:scale-125 transition-all" />
-                                  <div className="flex flex-col gap-1 bg-muted/20 border p-2.5 rounded-lg">
-                                    <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
-                                      <Badge variant="outline" className={`text-[9px] py-0 px-1.5 uppercase font-bold ${outcomeCfg.color} ${outcomeCfg.bg}`}>
-                                        {t(outcomeCfg.labelKey)}
-                                      </Badge>
-                                      <span>
-                                        {formatLogDateTime(log.call_date, locale)}
-                                      </span>
-                                    </div>
-                                    <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                                      {log.notes || <span className="italic text-muted-foreground/50">{t('sales.noComments')}</span>}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground/50 italic py-3 text-center bg-muted/20 border rounded-lg">
-                            {t('sales.noCallLogs')}
-                          </p>
-                        );
-                      })()}
+                    {/* Stage Dropdown */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        {t('clients.stageCol')}:
+                      </span>
+                      <Select
+                        value={detailDeal.pipeline_stage || 'new_lead'}
+                        onValueChange={(newStage) => {
+                          if (!newStage) return;
+                          if (newStage === 'won') {
+                            setSelectedLead(detailDeal);
+                            closeDealDetail();
+                            setCloseWonStep(1);
+                            setCloseWonForm(prev => ({
+                              ...prev,
+                              contractName: `${detailDeal.company || detailDeal.name} - Contract`,
+                              taskDueDate: getCairoTodayPlusNDays(7),
+                            }));
+                            setErrorMsg('');
+                            setCloseWonModalOpen(true);
+                            return;
+                          }
+                          setStageModalTarget({ client: detailDeal, stage: newStage });
+                          setStageModalOpen(true);
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs font-bold w-[140px] bg-background border">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
+                          <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                          <SelectItem value="no_answer">{t('sales.noAnswer')}</SelectItem>
+                          <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
+                          <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
+                          <SelectItem value="won">{t('sales.won')}</SelectItem>
+                          <SelectItem value="lost">{t('sales.lost')}</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  {/* Won Projects & Push Task bar */}
-                  {detailDeal.pipeline_stage === 'won' && !salesRepId && (
-                    <div className="pt-2 border-t flex items-center justify-between gap-2">
-                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                        🏆 {locale === 'ar' ? 'صفقة رابحة' : 'Deal Closed Won'}
-                      </span>
-                      <Button
-                        onClick={() => openPushTaskForDeal(detailDeal)}
-                        className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8"
-                        size="sm"
-                      >
-                        <Rocket className="size-3.5" /> {t('sales.pushNewTask')}
-                      </Button>
+                  {detailDeal.meeting_date && (
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/40 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900/40">
+                      <Calendar className="size-4 shrink-0" />
+                      <span>{t('sales.meeting')}: {formatCairoDateTime(detailDeal.meeting_date, locale, { dateStyle: 'medium', timeStyle: 'short' })}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Right Column (5 cols): Embedded Quick Log & Scheduler Form */}
-                <div className="lg:col-span-5 bg-card border rounded-xl p-4 shadow-xs space-y-3.5 flex flex-col justify-between">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b">
-                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <Phone className="size-3.5 text-indigo-500" />
-                        {locale === 'ar' ? 'سجل نتيجة مكالمة جديد' : 'Log New Call Update'}
-                      </h4>
-                    </div>
-
-                    {/* Outcome Dropdown */}
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        {t('sales.callOutcome')}
-                      </Label>
-                      <Select
-                        value={callForm.outcome}
-                        onValueChange={v => setCallForm(prev => ({
-                          ...prev,
-                          outcome: v || 'contacted',
-                          meeting_date: v === 'meeting_scheduled' ? (prev.meeting_date || getCairoDatetimeLocalString()) : prev.meeting_date
-                        }))}
-                      >
-                        <SelectTrigger className="h-8 text-xs font-bold bg-background border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="contacted">📞 {t('sales.contacted')}</SelectItem>
-                          <SelectItem value="no_answer">📵 {t('sales.noAnswer')}</SelectItem>
-                          <SelectItem value="interested">⭐ {t('sales.interested')}</SelectItem>
-                          <SelectItem value="meeting_scheduled">📅 {t('sales.meetingScheduled')}</SelectItem>
-                          <SelectItem value="negotiation">🤝 {t('sales.negotiation')}</SelectItem>
-                          <SelectItem value="won">🟢 {t('sales.won')}</SelectItem>
-                          <SelectItem value="lost">🔴 {t('sales.lost')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Meeting Fields if meeting_scheduled */}
-                    {callForm.outcome === 'meeting_scheduled' && (
-                      <div className="space-y-3 p-2.5 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 rounded-lg slide-down">
-                        <div className="flex flex-col gap-1">
-                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            📅 {t('sales.meetingDate')}
-                          </Label>
-                          <Input
-                            type="datetime-local"
-                            value={callForm.meeting_date}
-                            onChange={e => setCallForm(prev => ({ ...prev, meeting_date: e.target.value }))}
-                            className="h-8 text-xs font-semibold bg-background"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            👥 {locale === 'ar' ? 'دعوة أعضاء الفريق' : 'Invite Team'}
-                          </Label>
-                          <div className="flex flex-wrap gap-1 p-1.5 rounded-md border bg-background min-h-[32px] items-center max-h-[80px] overflow-y-auto">
-                            {members.map(m => {
-                              const isSelected = callForm.meeting_attendees.includes(m.id);
-                              return (
-                                <Badge
-                                  key={m.id}
-                                  variant={isSelected ? "default" : "outline"}
-                                  className={`cursor-pointer text-[10px] py-0.5 transition-all ${
-                                    isSelected ? "bg-indigo-600 text-white font-bold" : "hover:bg-muted text-muted-foreground"
-                                  }`}
-                                  onClick={() => setCallForm(prev => ({
-                                    ...prev,
-                                    meeting_attendees: isSelected
-                                      ? prev.meeting_attendees.filter(id => id !== m.id)
-                                      : [...prev.meeting_attendees, m.id]
-                                  }))}
-                                >
-                                  {m.name}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            📌 {locale === 'ar' ? 'مكان أو أجندة الاجتماع' : 'Meeting Notes'}
-                          </Label>
-                          <Input
-                            placeholder={locale === 'ar' ? 'مثال: المقر الرئيسي' : 'e.g. Headquarters / Online'}
-                            value={callForm.meeting_notes}
-                            onChange={e => setCallForm(prev => ({ ...prev, meeting_notes: e.target.value }))}
-                            className="h-8 text-xs bg-background"
-                          />
-                        </div>
+                {/* Timeline of Logs */}
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="size-3.5 text-indigo-500" /> {t('sales.callLogs')}
+                  </h4>
+                  {(() => {
+                    const logs = data?.callLogs.filter(log => log.client_id === detailDeal.id) || [];
+                    return logs.length > 0 ? (
+                      <div className="relative border-l-2 border-border/60 pl-4 ml-2 space-y-3.5 max-h-[280px] overflow-y-auto pr-1">
+                        {logs.map(log => {
+                          const outcomeCfg = PIPELINE_STAGE_CONFIG[log.outcome] || PIPELINE_STAGE_CONFIG.new_lead;
+                          return (
+                            <div key={log.id} className="relative group">
+                              <div className="absolute left-[-22px] top-1.5 size-2.5 rounded-full border-2 border-white dark:border-background bg-indigo-500 shadow-xs group-hover:scale-125 transition-all" />
+                              <div className="flex flex-col gap-1 bg-muted/20 border p-2.5 rounded-lg">
+                                <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground flex-wrap gap-1">
+                                  <Badge variant="outline" className={`text-[9px] py-0 px-1.5 uppercase font-bold ${outcomeCfg.color} ${outcomeCfg.bg}`}>
+                                    {t(outcomeCfg.labelKey)}
+                                  </Badge>
+                                  <span>
+                                    {formatLogDateTime(log.call_date, locale)}
+                                  </span>
+                                </div>
+                                {log.notes && (
+                                  <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {log.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-
-                    {/* Notes Textarea */}
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        📝 {t('sales.notes')}
-                      </Label>
-                      <Textarea
-                        placeholder={locale === 'ar' ? 'اكتب ملاحظات ونتائج المكالمة...' : 'Write notes & call summary...'}
-                        value={callForm.notes}
-                        onChange={e => setCallForm(prev => ({ ...prev, notes: e.target.value }))}
-                        className="text-xs min-h-[75px] max-h-[120px] resize-y bg-background"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Submission Action Buttons */}
-                  <div className="flex flex-col gap-2 pt-2 border-t">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        onClick={() => handleSaveInlineLog(false)}
-                        disabled={submitting}
-                        className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white gap-1"
-                      >
-                        {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <Phone className="size-3.5" />}
-                        {t('common.save')}
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveInlineLog(true)}
-                        disabled={submitting || !hasNextLead}
-                        variant="outline"
-                        className="h-9 text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 gap-1"
-                      >
-                        {locale === 'ar' ? 'حفظ والتالي' : 'Save & Next'}
-                        <ChevronRight className="size-3.5 rtl:rotate-180" />
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
-                      <Button
-                        onClick={() => handleDeleteDeal(detailDeal.id, detailDeal.name)}
-                        variant="ghost"
-                        className="h-6 text-[10px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-1"
-                        disabled={deletingDeal}
-                      >
-                        <Trash2 className="size-3 mr-1" /> {t('sales.deleteProspect')}
-                      </Button>
-                      <Button
-                        onClick={closeDealDetail}
-                        variant="ghost"
-                        className="h-6 text-[10px] px-1"
-                      >
-                        {t('common.close')}
-                      </Button>
-                    </div>
-                  </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground/50 italic py-3 text-center bg-muted/20 border rounded-lg">
+                        {t('sales.noCallLogs')}
+                      </p>
+                    );
+                  })()}
                 </div>
+
+                {/* Won Projects & Push Task bar */}
+                {detailDeal.pipeline_stage === 'won' && !salesRepId && (
+                  <div className="pt-2 border-t flex items-center justify-between gap-2">
+                    <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                      🏆 {locale === 'ar' ? 'صفقة رابحة' : 'Deal Closed Won'}
+                    </span>
+                    <Button
+                      onClick={() => openPushTaskForDeal(detailDeal)}
+                      className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs h-8"
+                      size="sm"
+                    >
+                      <Rocket className="size-3.5" /> {t('sales.pushNewTask')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="flex items-center justify-between text-xs pt-3 border-t">
+                <Button
+                  onClick={() => handleDeleteDeal(detailDeal.id, detailDeal.name)}
+                  variant="ghost"
+                  className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2"
+                  disabled={deletingDeal}
+                >
+                  <Trash2 className="size-3.5 mr-1" /> {t('sales.deleteProspect')}
+                </Button>
+                <Button
+                  onClick={closeDealDetail}
+                  variant="outline"
+                  className="h-8 text-xs px-3"
+                >
+                  {t('common.close')}
+                </Button>
               </div>
             </div>
           );
@@ -1801,6 +1476,19 @@ export default function SalesDashboard({ salesRepId }: SalesDashboardProps = {})
           </div>
         )}
       </Modal>
+
+      <StageUpdateModal
+        isOpen={stageModalOpen}
+        onClose={() => setStageModalOpen(false)}
+        client={stageModalTarget?.client || null}
+        targetStage={stageModalTarget?.stage || null}
+        onSuccess={() => {
+          fetchDashboard(true);
+          if (detailDeal && stageModalTarget?.stage) {
+            setDetailDeal(prev => prev ? ({ ...prev, pipeline_stage: stageModalTarget.stage as any }) : null);
+          }
+        }}
+      />
     </div>
   );
 }

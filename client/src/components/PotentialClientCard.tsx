@@ -3,15 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Client, SalesCallLog } from '@/types';
 import { useAuth } from '@/lib/auth';
-import { salesApi, clientsApi, usersApi } from '@/lib/api';
+import { salesApi, clientsApi } from '@/lib/api';
 import { useLanguage } from '@/lib/i18n';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { formatCairoDate, toCairoISOString, formatLogDateTime } from '@/lib/dateUtils';
+import { formatCairoDate, formatLogDateTime } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -20,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import StageUpdateModal from '@/components/StageUpdateModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,8 +56,11 @@ interface PotentialClientCardProps {
 const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; color: string; border: string; bg: string }> = {
   new_lead:          { labelKey: 'sales.newLead',          color: 'text-slate-600 dark:text-slate-300',      border: 'border-slate-200 dark:border-slate-700', bg: 'bg-slate-50 dark:bg-slate-900/30' },
   contacted:         { labelKey: 'sales.contacted',         color: 'text-blue-600 dark:text-blue-400',         border: 'border-blue-200 dark:border-blue-900/40', bg: 'bg-blue-50 dark:bg-blue-950/20' },
+  no_answer:         { labelKey: 'sales.noAnswer',          color: 'text-amber-600 dark:text-amber-400',       border: 'border-amber-200 dark:border-amber-900/40', bg: 'bg-amber-50 dark:bg-amber-950/20' },
+  interested:        { labelKey: 'sales.interested',        color: 'text-teal-600 dark:text-teal-400',         border: 'border-teal-200 dark:border-teal-900/40', bg: 'bg-teal-50 dark:bg-teal-950/20' },
   meeting_scheduled: { labelKey: 'sales.meetingScheduled',   color: 'text-indigo-600 dark:text-indigo-400',     border: 'border-indigo-200 dark:border-indigo-900/40', bg: 'bg-indigo-50 dark:bg-indigo-950/20' },
   meeting_done:      { labelKey: 'sales.meetingDone',       color: 'text-purple-600 dark:text-purple-400',     border: 'border-purple-200 dark:border-purple-900/40', bg: 'bg-purple-50 dark:bg-purple-950/20' },
+  negotiation:       { labelKey: 'sales.negotiation',       color: 'text-orange-600 dark:text-orange-400',     border: 'border-orange-200 dark:border-orange-900/40', bg: 'bg-orange-50 dark:bg-orange-950/20' },
   lost:              { labelKey: 'sales.lost',              color: 'text-rose-600 dark:text-rose-400',         border: 'border-rose-200 dark:border-rose-900/40', bg: 'bg-rose-50 dark:bg-rose-950/20' },
 };
 
@@ -79,16 +80,8 @@ export default function PotentialClientCard({
 
   const [logs, setLogs] = useState<SalesCallLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-
-  // Call form states
-  const [outcome, setOutcome] = useState<string>('contacted');
-  const [notes, setNotes] = useState('');
-  const [meetingDate, setMeetingDate] = useState('');
-  const [meetingAttendees, setMeetingAttendees] = useState<string[]>([]);
-  const [meetingNotes, setMeetingNotes] = useState('');
-  const [teamMembers, setTeamMembers] = useState<import('@/types').User[]>([]);
-  const [submittingLog, setSubmittingLog] = useState(false);
-  const [logError, setLogError] = useState('');
+  const [stageModalOpen, setStageModalOpen] = useState(false);
+  const [pendingStage, setPendingStage] = useState<string | null>(null);
 
   const currentStage = client.pipeline_stage || 'new_lead';
   const stageCfg = PIPELINE_STAGE_CONFIG[currentStage] || PIPELINE_STAGE_CONFIG.new_lead;
@@ -97,11 +90,6 @@ export default function PotentialClientCard({
   useEffect(() => {
     if (isExpanded) {
       fetchLogs();
-      if (teamMembers.length === 0) {
-        usersApi.list().then(res => {
-          setTeamMembers((res.users || []).filter((u: any) => u.role !== 'client'));
-        }).catch(() => {});
-      }
     }
   }, [isExpanded]);
 
@@ -126,38 +114,6 @@ export default function PotentialClientCard({
     }
   };
 
-  const handleAddLogSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!outcome) {
-      setLogError('Outcome is required');
-      return;
-    }
-    try {
-      setSubmittingLog(true);
-      setLogError('');
-      const payload: any = {
-        outcome,
-        notes: notes.trim() || undefined,
-      };
-      if (outcome === 'meeting_scheduled') {
-        if (meetingDate) payload.meeting_date = toCairoISOString(meetingDate);
-        if (meetingAttendees.length > 0) payload.meeting_attendees = meetingAttendees;
-        if (meetingNotes.trim()) payload.meeting_notes = meetingNotes.trim();
-      }
-
-      await salesApi.logCall(client.id, payload);
-      setNotes('');
-      setMeetingDate('');
-      setMeetingAttendees([]);
-      setMeetingNotes('');
-      fetchLogs();
-      onUpdate();
-    } catch (err: any) {
-      setLogError(err.message || 'Failed to save log');
-    } finally {
-      setSubmittingLog(false);
-    }
-  };
 
   const formatDateLabel = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
@@ -225,13 +181,25 @@ export default function PotentialClientCard({
                 {t(stageCfg.labelKey) || currentStage}
               </Badge>
             ) : (
-              <Select value={currentStage} onValueChange={val => handleStageChange(val || 'new_lead')}>
+              <Select
+                value={currentStage}
+                onValueChange={val => {
+                  if (!val) return;
+                  if (val === 'won') {
+                    onCloseWonClick(client);
+                    return;
+                  }
+                  setPendingStage(val);
+                  setStageModalOpen(true);
+                }}
+              >
                 <SelectTrigger className={cn("h-7 px-2.5 text-xs font-semibold rounded-md border w-[150px] bg-card", stageCfg.color, stageCfg.border)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new_lead">{t('sales.newLead')}</SelectItem>
                   <SelectItem value="contacted">{t('sales.contacted')}</SelectItem>
+                  <SelectItem value="no_answer">{t('sales.noAnswer')}</SelectItem>
                   <SelectItem value="meeting_scheduled">{t('sales.meetingScheduled')}</SelectItem>
                   <SelectItem value="meeting_done">{t('sales.meetingDone')}</SelectItem>
                   <SelectItem value="lost">{t('sales.lost')}</SelectItem>
@@ -355,133 +323,21 @@ export default function PotentialClientCard({
               )}
             </div>
 
-            {/* Logger Form */}
-            {!isAdmin && (
-              <form onSubmit={handleAddLogSubmit} className="flex flex-col gap-3.5 bg-muted/10 border rounded-xl p-4 text-start">
-                <h4 className="text-xs font-bold text-foreground">
-                  📝 {t('sales.logCallOutcome') || 'Log New Call / Interaction'}
-                </h4>
 
-                {logError && (
-                  <div className="bg-destructive/10 border border-destructive/30 text-destructive text-[11px] px-2.5 py-1.5 rounded-md">
-                    {logError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={`outcome-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      {t('sales.callOutcome') || 'Call Outcome'}
-                    </Label>
-                    <Select value={outcome} onValueChange={val => setOutcome(val || 'contacted')}>
-                      <SelectTrigger id={`outcome-${client.id}`} className="h-9 bg-card">
-                        <SelectValue placeholder="Select outcome..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="contacted">📞 {t('sales.contacted')}</SelectItem>
-                        <SelectItem value="no_answer">📵 {t('sales.noAnswer')}</SelectItem>
-                        <SelectItem value="interested">⭐ {t('sales.interested')}</SelectItem>
-                        <SelectItem value="meeting_scheduled">📅 {t('sales.meetingScheduled')}</SelectItem>
-                        <SelectItem value="negotiation">🤝 {t('sales.negotiation')}</SelectItem>
-                        <SelectItem value="won">🟢 {t('sales.won')}</SelectItem>
-                        <SelectItem value="lost">🔴 {t('sales.lost')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {outcome === 'meeting_scheduled' && (
-                    <>
-                      <div className="flex flex-col gap-1 slide-down">
-                        <Label htmlFor={`meet-date-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                          📅 {t('sales.meetingDate') || 'Meeting Date'}
-                        </Label>
-                        <Input
-                          id={`meet-date-${client.id}`}
-                          type="datetime-local"
-                          value={meetingDate}
-                          onChange={e => setMeetingDate(e.target.value)}
-                          required
-                          className="h-9"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1 slide-down">
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                          👥 {locale === 'ar' ? 'دعوة أعضاء الفريق للاجتماع' : 'Invite Team Members'}
-                        </Label>
-                        <div className="flex flex-wrap gap-1 p-1.5 rounded-md border bg-muted/20 min-h-[36px] items-center">
-                          {teamMembers.map(member => {
-                            const isSelected = meetingAttendees.includes(member.id);
-                            return (
-                              <Badge
-                                key={member.id}
-                                variant={isSelected ? "default" : "outline"}
-                                className={`cursor-pointer text-[10px] py-0.5 transition-all ${
-                                  isSelected ? "bg-primary text-primary-foreground font-bold" : "hover:bg-muted text-muted-foreground"
-                                }`}
-                                onClick={() => {
-                                  setMeetingAttendees(prev =>
-                                    isSelected ? prev.filter(id => id !== member.id) : [...prev, member.id]
-                                  );
-                                }}
-                              >
-                                {isSelected ? "✓ " : "+ "} {member.name}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1 slide-down">
-                        <Label htmlFor={`meet-notes-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                          📍 {locale === 'ar' ? 'مكان الاجتماع وملاحظات التحضير' : 'In-Person Location & Notes'}
-                        </Label>
-                        <Input
-                          id={`meet-notes-${client.id}`}
-                          type="text"
-                          placeholder="e.g. Client Office / Prepare content plan"
-                          value={meetingNotes}
-                          onChange={e => setMeetingNotes(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor={`notes-${client.id}`} className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    {t('sales.notes') || 'Notes'}
-                  </Label>
-                  <Textarea
-                    id={`notes-${client.id}`}
-                    placeholder="Summarize call details, negotiations, or comments..."
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    rows={2}
-                    className="bg-card resize-none"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={submittingLog}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-8 text-xs px-3"
-                  >
-                    {submittingLog ? (
-                      <><Loader2 className="size-3.5 animate-spin mr-1.5" /> {t('common.loading')}</>
-                    ) : (
-                      t('common.save')
-                    )}
-                  </Button>
-                </div>
-              </form>
-            )}
           </div>
         )}
       </CardContent>
+
+      <StageUpdateModal
+        isOpen={stageModalOpen}
+        onClose={() => setStageModalOpen(false)}
+        client={client}
+        targetStage={pendingStage}
+        onSuccess={() => {
+          fetchLogs();
+          onUpdate();
+        }}
+      />
     </Card>
   );
 }

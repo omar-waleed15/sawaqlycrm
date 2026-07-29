@@ -112,7 +112,7 @@ export interface Client {
   email?: string;
   phone?: string;
   status: 'active' | 'inactive';
-  pipeline_stage: 'new_lead' | 'contacted' | 'meeting_scheduled' | 'meeting_done' | 'won' | 'lost';
+  pipeline_stage: 'new_lead' | 'contacted' | 'no_answer' | 'meeting_scheduled' | 'meeting_done' | 'won' | 'lost';
   sales_rep_id?: string;
   meeting_date?: string;
   meeting_attendees?: string[];

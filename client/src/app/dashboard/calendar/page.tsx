@@ -60,8 +60,11 @@ function formatDate(date: Date, locale?: string): string {
 const PIPELINE_STAGE_CONFIG: Record<string, { labelKey: string; color: string; bg: string }> = {
   new_lead:          { labelKey: 'sales.newLead',       color: 'text-slate-600', bg: 'bg-slate-100 border-slate-200' },
   contacted:         { labelKey: 'sales.contacted',      color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200' },
+  no_answer:         { labelKey: 'sales.noAnswer',       color: 'text-amber-700', bg: 'bg-amber-100 border-amber-200' },
+  interested:        { labelKey: 'sales.interested',     color: 'text-teal-700', bg: 'bg-teal-100 border-teal-200' },
   meeting_scheduled: { labelKey: 'sales.meetingScheduled', color: 'text-indigo-700', bg: 'bg-indigo-100 border-indigo-200' },
   meeting_done:      { labelKey: 'sales.meetingDone',    color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200' },
+  negotiation:       { labelKey: 'sales.negotiation',    color: 'text-orange-700', bg: 'bg-orange-100 border-orange-200' },
   won:               { labelKey: 'sales.won',            color: 'text-green-700', bg: 'bg-green-100 border-green-200' },
   lost:              { labelKey: 'sales.lost',           color: 'text-rose-700', bg: 'bg-rose-100 border-rose-200' },
 };
