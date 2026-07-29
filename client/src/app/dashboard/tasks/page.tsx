@@ -8,6 +8,7 @@ import { tasksApi } from '@/lib/api';
 import { Task } from '@/types';
 import { sortActiveTasks } from '@/lib/taskSortUtils';
 import TaskCard from '@/components/TaskCard';
+import CreateTaskModal from '@/components/CreateTaskModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'completed' | 'archived'>('active');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
 
@@ -43,8 +45,49 @@ export default function TasksPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, priorityFilter, activeTab, user]);
 
-  const loadTasks = () => {
-    setLoading(true);
+  // Live Task Event Listeners & Focus Refetch
+  useEffect(() => {
+    const handleTaskCreated = (e: any) => {
+      if (e.detail) {
+        setTasks(prev => [e.detail, ...prev.filter(t => t.id !== e.detail.id)]);
+      }
+      loadTasks(false);
+    };
+
+    const handleTaskUpdated = (e: any) => {
+      if (e.detail) {
+        setTasks(prev => prev.map(t => t.id === e.detail.id ? e.detail : t));
+      }
+      loadTasks(false);
+    };
+
+    const handleTaskDeleted = (e: any) => {
+      if (e.detail?.id) {
+        setTasks(prev => prev.filter(t => t.id !== e.detail.id));
+      }
+      loadTasks(false);
+    };
+
+    const handleFocus = () => {
+      loadTasks(false);
+    };
+
+    window.addEventListener('app-task-created', handleTaskCreated);
+    window.addEventListener('app-task-updated', handleTaskUpdated);
+    window.addEventListener('app-task-deleted', handleTaskDeleted);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('app-task-created', handleTaskCreated);
+      window.removeEventListener('app-task-updated', handleTaskUpdated);
+      window.removeEventListener('app-task-deleted', handleTaskDeleted);
+      window.removeEventListener('focus', handleFocus);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, priorityFilter, activeTab, user]);
+
+  const loadTasks = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const params: Record<string, string> = {};
     if (statusFilter) params.status = statusFilter;
     if (priorityFilter) params.priority = priorityFilter;
@@ -58,7 +101,9 @@ export default function TasksPage() {
       params.assignee_id = user.id;
     }
     tasksApi.list(params)
-      .then(data => setTasks(data.tasks))
+      .then(data => {
+        setTasks(data.tasks || []);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -88,12 +133,10 @@ export default function TasksPage() {
           </p>
         </div>
         {isOwner && (
-          <Link href="/dashboard/tasks/create">
-            <Button>
-              <Plus className="size-4" />
-              {t('tasks.createTask')}
-            </Button>
-          </Link>
+          <Button onClick={() => setCreateModalOpen(true)}>
+            <Plus className="size-4" />
+            {t('tasks.createTask')}
+          </Button>
         )}
       </div>
 
@@ -233,12 +276,21 @@ export default function TasksPage() {
                     : t('tasks.noActiveMember')}
           </div>
           {isOwner && !statusFilter && !priorityFilter && activeTab === 'active' && (
-            <Link href="/dashboard/tasks/create">
-              <Button><Plus className="size-4" /> {t('tasks.createTask')}</Button>
-            </Link>
+            <Button onClick={() => setCreateModalOpen(true)}>
+              <Plus className="size-4" /> {t('tasks.createTask')}
+            </Button>
           )}
         </div>
       )}
+
+      <CreateTaskModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={(newTask) => {
+          setTasks(prev => [newTask, ...prev.filter(t => t.id !== newTask.id)]);
+          loadTasks(false);
+        }}
+      />
     </div>
   );
 }

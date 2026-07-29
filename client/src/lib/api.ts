@@ -53,9 +53,14 @@ export async function request<T>(
 
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, {
+      cache: 'no-store',
       ...options,
       body,
-      headers,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        ...headers,
+      },
     });
 
     const data = await res.json().catch(() => ({}));
@@ -175,11 +180,27 @@ export const tasksApi = {
   daily: () => request<{ tasks: import('@/types').Task[] }>('/tasks/daily'),
   stats: () => request<{ stats: import('@/types').DashboardStats }>('/tasks/stats'),
   get: (id: string) => request<{ task: import('@/types').Task }>(`/tasks/${id}`),
-  create: (data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) =>
-    request<{ task: import('@/types').Task }>('/tasks', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) =>
-    request<{ task: import('@/types').Task }>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  create: async (data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) => {
+    const res = await request<{ task: import('@/types').Task }>('/tasks', { method: 'POST', body: JSON.stringify(data) });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app-task-created', { detail: res.task }));
+    }
+    return res;
+  },
+  update: async (id: string, data: Partial<import('@/types').Task> & { assignee_ids?: string[] }) => {
+    const res = await request<{ task: import('@/types').Task }>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app-task-updated', { detail: res.task }));
+    }
+    return res;
+  },
+  delete: async (id: string) => {
+    const res = await request(`/tasks/${id}`, { method: 'DELETE' });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app-task-deleted', { detail: { id } }));
+    }
+    return res;
+  },
   addAssignee: (taskId: string, userId: string) =>
     request<{ task: import('@/types').Task }>(`/tasks/${taskId}/assignees`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
   removeAssignee: (taskId: string, userId: string) =>
