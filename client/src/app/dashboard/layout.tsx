@@ -12,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { t } = useLanguage();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -42,10 +43,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <header className="mobile-topbar md:hidden flex items-center justify-between px-4 border-b border-border bg-background fixed top-0 left-0 right-0 z-40 h-[68px]">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors relative"
           title={t('nav.openMenu')}
         >
           <Menu className="size-6" />
+          {hasUnread && (
+            <span className="absolute top-1.5 right-1.5 size-2.5 rounded-full bg-rose-500 animate-pulse border-2 border-background" />
+          )}
         </button>
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-base shrink-0">
@@ -75,7 +79,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onUnreadChange={setHasUnread}
+      />
       <main className="main-content">
         {children}
       </main>

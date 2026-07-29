@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
+import { clientChatApi } from '@/lib/api';
+import { playNotificationSound } from '@/lib/notificationSound';
 import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe, MessageSquare, Menu } from 'lucide-react';
 
 export default function ClientPortalLayout({ children }: { children: React.ReactNode }) {
@@ -55,7 +57,45 @@ export default function ClientPortalLayout({ children }: { children: React.React
   }
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const prevUnreadChatRef = useRef(false);
   const toggleLocale = () => setLocale(locale === 'en' ? 'ar' : 'en');
+
+  // Check unread chat for client portal
+  useEffect(() => {
+    if (!user || user.role !== 'client') return;
+
+    if (pathname === '/client/chat') {
+      localStorage.setItem('last_read_client_portal_chat_time', new Date().toISOString());
+      setHasUnreadChat(false);
+      prevUnreadChatRef.current = false;
+      return;
+    }
+
+    const checkUnreadChat = async () => {
+      try {
+        const res = await clientChatApi.listMessages(user.id).catch(() => ({ messages: [] }));
+        const messages = res.messages || [];
+        if (messages.length === 0) return;
+        const latestMsg = messages[messages.length - 1];
+        if (latestMsg.sender_type === 'user') {
+          const lastRead = localStorage.getItem('last_read_client_portal_chat_time');
+          const isNew = !lastRead || new Date(latestMsg.created_at) > new Date(lastRead);
+          if (isNew && !prevUnreadChatRef.current) {
+            playNotificationSound('message');
+          }
+          prevUnreadChatRef.current = isNew;
+          setHasUnreadChat(isNew);
+        }
+      } catch {
+        // Silently swallow background polling errors
+      }
+    };
+
+    checkUnreadChat();
+    const interval = setInterval(checkUnreadChat, 10000);
+    return () => clearInterval(interval);
+  }, [pathname, user]);
 
   const navLinks = [
     { label: t('portal.overview'), href: '/client', icon: LayoutDashboard },
@@ -135,14 +175,17 @@ export default function ClientPortalLayout({ children }: { children: React.React
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2.5 px-4 py-2 transition-all text-[10px] uppercase font-mono tracking-wider font-extrabold ${
+                  className={`flex items-center gap-2.5 px-4 py-2 transition-all text-[10px] uppercase font-mono tracking-wider font-extrabold relative ${
                     isActive 
                       ? 'bg-[#0F172A] text-white rounded-full shadow-xs' 
                       : 'text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A] rounded-full'
                   }`}
                 >
                   <Icon className="size-3.5" />
-                  <span>{link.label}</span>
+                  <span className="flex-1">{link.label}</span>
+                  {link.href === '/client/chat' && hasUnreadChat && (
+                    <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
+                  )}
                 </Link>
               );
             })}

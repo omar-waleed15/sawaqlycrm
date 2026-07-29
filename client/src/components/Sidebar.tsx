@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { chatApi } from '@/lib/api';
+import { chatApi, remindersApi, tasksApi, clientChatApi } from '@/lib/api';
+import { playNotificationSound } from '@/lib/notificationSound';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -63,48 +64,134 @@ const navItems: NavItem[] = [
   { href: '/dashboard/settings', labelKey: 'nav.settings',      icon: Settings,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
 ];
 
-export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
+export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: boolean; onClose?: () => void; onUnreadChange?: (hasUnread: boolean) => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t, locale, setLocale } = useLanguage();
   const { theme, setTheme } = useTheme();
 
   const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [hasNewClientChatMessage, setHasNewClientChatMessage] = useState(false);
+  const [hasNewReminder, setHasNewReminder] = useState(false);
+  const [hasNewTask, setHasNewTask] = useState(false);
 
+  // Track previous unread flags to play chime on new incoming items
+  const prevUnreadRef = useRef({
+    reminder: false,
+    task: false,
+    chat: false,
+    clientChat: false,
+  });
+
+  // Clear unread on route entry
   useEffect(() => {
-    if (!user) return;
-    if (pathname === '/dashboard/chat') {
+    if (pathname.startsWith('/dashboard/chat')) {
       localStorage.setItem('last_read_chat_time', new Date().toISOString());
       setHasNewMessage(false);
-      return;
     }
+    if (pathname.startsWith('/dashboard/client-chat')) {
+      localStorage.setItem('last_read_client_chat_time', new Date().toISOString());
+      setHasNewClientChatMessage(false);
+    }
+    if (pathname.startsWith('/dashboard/reminders')) {
+      localStorage.setItem('last_read_reminders_time', new Date().toISOString());
+      setHasNewReminder(false);
+    }
+    if (pathname.startsWith('/dashboard/tasks')) {
+      localStorage.setItem('last_read_tasks_time', new Date().toISOString());
+      setHasNewTask(false);
+    }
+  }, [pathname]);
 
-    const checkNewMessages = async () => {
+  // Background unread polling loop
+  useEffect(() => {
+    if (!user) return;
+
+    const checkUnreads = async () => {
       if (!user) return;
       try {
-        const data = await chatApi.list();
-        const messages = data?.messages || [];
-        if (messages.length === 0) return;
-
-        const latestMessage = messages[messages.length - 1];
-        if (latestMessage.user_id === user?.id) {
-          return;
+        // 1. Check Reminders
+        if (!pathname.startsWith('/dashboard/reminders')) {
+          const remindersRes = await remindersApi.list().catch(() => ({ reminders: [] }));
+          const inboxReminders = (remindersRes.reminders || []).filter((r: any) => r.receiver_id === user.id);
+          const hasUnreadR = inboxReminders.some((r: any) => !r.read_at);
+          if (hasUnreadR && !prevUnreadRef.current.reminder) {
+            playNotificationSound('reminder');
+          }
+          prevUnreadRef.current.reminder = hasUnreadR;
+          setHasNewReminder(hasUnreadR);
         }
 
-        const lastRead = localStorage.getItem('last_read_chat_time');
-        if (!lastRead || new Date(latestMessage.created_at) > new Date(lastRead)) {
-          setHasNewMessage(true);
+        // 2. Check Tasks
+        if (!pathname.startsWith('/dashboard/tasks')) {
+          const tasksRes = await tasksApi.list({ assignee_id: user.id }).catch(() => ({ tasks: [] }));
+          const userTasks = tasksRes.tasks || [];
+          const lastReadTasks = localStorage.getItem('last_read_tasks_time');
+          const hasUnreadT = userTasks.some((t: any) => {
+            if (t.status === 'completed') return false;
+            if (!lastReadTasks) return true;
+            return new Date(t.created_at) > new Date(lastReadTasks);
+          });
+          if (hasUnreadT && !prevUnreadRef.current.task) {
+            playNotificationSound('task');
+          }
+          prevUnreadRef.current.task = hasUnreadT;
+          setHasNewTask(hasUnreadT);
+        }
+
+        // 3. Check Global Chat
+        if (!pathname.startsWith('/dashboard/chat')) {
+          const chatRes = await chatApi.list().catch(() => ({ messages: [] }));
+          const messages = chatRes.messages || [];
+          if (messages.length > 0) {
+            const latestMessage = messages[messages.length - 1];
+            if (latestMessage.user_id !== user.id) {
+              const lastReadChat = localStorage.getItem('last_read_chat_time');
+              const isNewMsg = !lastReadChat || new Date(latestMessage.created_at) > new Date(lastReadChat);
+              if (isNewMsg && !prevUnreadRef.current.chat) {
+                playNotificationSound('message');
+              }
+              prevUnreadRef.current.chat = isNewMsg;
+              setHasNewMessage(isNewMsg);
+            }
+          }
+        }
+
+        // 4. Check Client Chat
+        if (!pathname.startsWith('/dashboard/client-chat') && (user.role === 'owner' || user.role === 'team_leader' || user.role === 'account_manager')) {
+          const clientChatRes = await clientChatApi.listRooms().catch(() => ({ rooms: [] }));
+          const rooms = clientChatRes.rooms || [];
+          const lastReadClientChat = localStorage.getItem('last_read_client_chat_time');
+          const hasUnreadCC = rooms.some((r: any) => {
+            if (r.unread_count > 0) return true;
+            if (!r.last_message) return false;
+            if (r.last_message.sender_type === 'user' && r.last_message.sender_id === user.id) return false;
+            if (!lastReadClientChat) return true;
+            return new Date(r.last_message.created_at) > new Date(lastReadClientChat);
+          });
+          if (hasUnreadCC && !prevUnreadRef.current.clientChat) {
+            playNotificationSound('message');
+          }
+          prevUnreadRef.current.clientChat = hasUnreadCC;
+          setHasNewClientChatMessage(hasUnreadCC);
         }
       } catch {
-        // Silently swallow background polling errors when server is reloading/offline
+        // Silently swallow errors during server restart
       }
     };
 
-    checkNewMessages();
-
-    const interval = setInterval(checkNewMessages, 10000);
+    checkUnreads();
+    const interval = setInterval(checkUnreads, 10000);
     return () => clearInterval(interval);
   }, [pathname, user]);
+
+  const hasAnyUnread = hasNewMessage || hasNewClientChatMessage || hasNewReminder || hasNewTask;
+
+  useEffect(() => {
+    if (onUnreadChange) {
+      onUnreadChange(hasAnyUnread);
+    }
+  }, [hasAnyUnread, onUnreadChange]);
 
   const visibleItems = navItems.filter(item => {
     if (item.allowedRoles && (!user || !item.allowedRoles.includes(user.role))) return false;
@@ -171,7 +258,16 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
               <Icon className="size-4 shrink-0" />
               <span className="flex-1">{t(item.labelKey)}</span>
               {item.href === '/dashboard/chat' && hasNewMessage && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 size-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
+              )}
+              {item.href === '/dashboard/client-chat' && hasNewClientChatMessage && (
+                <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
+              )}
+              {item.href === '/dashboard/reminders' && hasNewReminder && (
+                <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
+              )}
+              {item.href === '/dashboard/tasks' && hasNewTask && (
+                <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
               )}
             </Link>
           );

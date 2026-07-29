@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { parseCairoDateTimeToISO, getCairoTodayString } from '@/lib/dateUtils';
-import { Loader2, Plus, X, Paperclip, CheckCircle2, Rocket } from 'lucide-react';
+import { Loader2, Plus, X, Paperclip, CheckCircle2, Rocket, Trash2 } from 'lucide-react';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [dueDate, setDueDate] = useState('');
   const [clientId, setClientId] = useState('');
-  const [driveLink, setDriveLink] = useState('');
+  const [linkInputs, setLinkInputs] = useState<string[]>(['']);
   const [isDeliverable, setIsDeliverable] = useState(false);
   const [deliverableType, setDeliverableType] = useState<'post' | 'reel' | 'story' | 'photo'>('post');
   const [deliverableMonth, setDeliverableMonth] = useState(() => {
@@ -60,7 +60,7 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
       setPriority('medium');
       setDueDate('');
       setClientId('');
-      setDriveLink('');
+      setLinkInputs(['']);
       setIsDeliverable(false);
       setAssigneeIds([]);
       setPendingFiles([]);
@@ -96,12 +96,13 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
     setError('');
 
     try {
+      const validLinks = linkInputs.map(l => l.trim()).filter(l => l.length > 0);
       const data = await tasksApi.create({
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
         due_date: dueDate ? parseCairoDateTimeToISO(dueDate) : undefined,
-        drive_link: driveLink.trim() || undefined,
+        drive_link: validLinks.length > 0 ? validLinks.join('\n') : undefined,
         client_id: clientId || undefined,
         is_deliverable: isDeliverable,
         deliverable_type: isDeliverable ? deliverableType : undefined,
@@ -225,19 +226,50 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="task-drive" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              🔗 {locale === 'ar' ? 'رابط ملفات (Drive/Dropbox)' : 'Drive / Cloud Link'}
+        {/* Multi-Link Inputs */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              🔗 {locale === 'ar' ? 'روابط مراجع وملفات (Drive/Figma/Dropbox)' : 'Resource Links (Drive, Figma, Dropbox)'}
             </Label>
-            <Input
-              id="task-drive"
-              type="url"
-              placeholder="https://drive.google.com/..."
-              value={driveLink}
-              onChange={e => setDriveLink(e.target.value)}
-              className="h-9 text-xs"
-            />
+            <button
+              type="button"
+              onClick={() => setLinkInputs(prev => [...prev, ''])}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            >
+              + {locale === 'ar' ? 'إضافة رابط آخر' : 'Add Another Link'}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-0.5">
+            {linkInputs.map((link, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  type="url"
+                  placeholder={locale === 'ar' ? 'https://drive.google.com/...' : 'https://drive.google.com/file/...'}
+                  value={link}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setLinkInputs(prev => prev.map((l, i) => i === idx ? val : l));
+                  }}
+                  className="h-9 text-xs flex-1"
+                />
+                {linkInputs.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                    onClick={() => setLinkInputs(prev => prev.filter((_, i) => i !== idx))}
+                    title={locale === 'ar' ? 'حذف الرابط' : 'Remove Link'}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
