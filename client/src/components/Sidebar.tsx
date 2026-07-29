@@ -9,6 +9,7 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { chatApi, remindersApi, tasksApi, clientChatApi } from '@/lib/api';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { createBackgroundTimer, sendDesktopNotification } from '@/lib/backgroundNotification';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -103,7 +104,7 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
     }
   }, [pathname]);
 
-  // Background unread polling loop
+  // Unthrottled Web Worker background unread polling loop (runs every 3s even when tab is minimized/hidden)
   useEffect(() => {
     if (!user) return;
 
@@ -111,54 +112,60 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
       if (!user) return;
       try {
         // 1. Check Reminders
-        if (!pathname.startsWith('/dashboard/reminders')) {
-          const remindersRes = await remindersApi.list().catch(() => ({ reminders: [] }));
-          const inboxReminders = (remindersRes.reminders || []).filter((r: any) => r.receiver_id === user.id);
-          const hasUnreadR = inboxReminders.some((r: any) => !r.read_at);
-          if (hasUnreadR && !prevUnreadRef.current.reminder) {
-            playNotificationSound('reminder');
-          }
-          prevUnreadRef.current.reminder = hasUnreadR;
-          setHasNewReminder(hasUnreadR);
+        const remindersRes = await remindersApi.list().catch(() => ({ reminders: [] }));
+        const inboxReminders = (remindersRes.reminders || []).filter((r: any) => r.receiver_id === user.id);
+        const hasUnreadR = inboxReminders.some((r: any) => !r.read_at);
+        if (hasUnreadR && !prevUnreadRef.current.reminder) {
+          playNotificationSound('reminder');
+          sendDesktopNotification(locale === 'ar' ? '🔔 تذكير جديد' : '🔔 New Reminder Received', {
+            body: locale === 'ar' ? 'لديك تذكير جديد في صندوق الوارد.' : 'You have a new reminder waiting in your Inbox.',
+            tag: 'reminder-notification',
+          });
         }
+        prevUnreadRef.current.reminder = hasUnreadR;
+        setHasNewReminder(pathname.startsWith('/dashboard/reminders') ? false : hasUnreadR);
 
         // 2. Check Tasks
-        if (!pathname.startsWith('/dashboard/tasks')) {
-          const tasksRes = await tasksApi.list({ assignee_id: user.id }).catch(() => ({ tasks: [] }));
-          const userTasks = tasksRes.tasks || [];
-          const lastReadTasks = localStorage.getItem('last_read_tasks_time');
-          const hasUnreadT = userTasks.some((t: any) => {
-            if (t.status === 'completed') return false;
-            if (!lastReadTasks) return true;
-            return new Date(t.created_at) > new Date(lastReadTasks);
+        const tasksRes = await tasksApi.list({ assignee_id: user.id }).catch(() => ({ tasks: [] }));
+        const userTasks = tasksRes.tasks || [];
+        const lastReadTasks = localStorage.getItem('last_read_tasks_time');
+        const hasUnreadT = userTasks.some((t: any) => {
+          if (t.status === 'completed') return false;
+          if (!lastReadTasks) return true;
+          return new Date(t.created_at) > new Date(lastReadTasks);
+        });
+        if (hasUnreadT && !prevUnreadRef.current.task) {
+          playNotificationSound('task');
+          sendDesktopNotification(locale === 'ar' ? '📋 مهمة جديدة مكلفة لك' : '📋 New Task Assigned', {
+            body: locale === 'ar' ? 'تم تكليفك بمهمة جديدة في النظام.' : 'A new task has been assigned to you.',
+            tag: 'task-notification',
           });
-          if (hasUnreadT && !prevUnreadRef.current.task) {
-            playNotificationSound('task');
-          }
-          prevUnreadRef.current.task = hasUnreadT;
-          setHasNewTask(hasUnreadT);
         }
+        prevUnreadRef.current.task = hasUnreadT;
+        setHasNewTask(pathname.startsWith('/dashboard/tasks') ? false : hasUnreadT);
 
         // 3. Check Global Chat
-        if (!pathname.startsWith('/dashboard/chat')) {
-          const chatRes = await chatApi.list().catch(() => ({ messages: [] }));
-          const messages = chatRes.messages || [];
-          if (messages.length > 0) {
-            const latestMessage = messages[messages.length - 1];
-            if (latestMessage.user_id !== user.id) {
-              const lastReadChat = localStorage.getItem('last_read_chat_time');
-              const isNewMsg = !lastReadChat || new Date(latestMessage.created_at) > new Date(lastReadChat);
-              if (isNewMsg && !prevUnreadRef.current.chat) {
-                playNotificationSound('message');
-              }
-              prevUnreadRef.current.chat = isNewMsg;
-              setHasNewMessage(isNewMsg);
+        const chatRes = await chatApi.list().catch(() => ({ messages: [] }));
+        const messages = chatRes.messages || [];
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          if (latestMessage.user_id !== user.id) {
+            const lastReadChat = localStorage.getItem('last_read_chat_time');
+            const isNewMsg = !lastReadChat || new Date(latestMessage.created_at) > new Date(lastReadChat);
+            if (isNewMsg && !prevUnreadRef.current.chat) {
+              playNotificationSound('message');
+              sendDesktopNotification(locale === 'ar' ? '💬 رسالة محادثة جديدة' : '💬 New Team Chat Message', {
+                body: `${(latestMessage as any).user_name || (latestMessage as any).user?.name || 'Team member'}: ${latestMessage.content.slice(0, 50)}`,
+                tag: 'chat-notification',
+              });
             }
+            prevUnreadRef.current.chat = isNewMsg;
+            setHasNewMessage(pathname.startsWith('/dashboard/chat') ? false : isNewMsg);
           }
         }
 
         // 4. Check Client Chat
-        if (!pathname.startsWith('/dashboard/client-chat') && (user.role === 'owner' || user.role === 'team_leader' || user.role === 'account_manager')) {
+        if (user.role === 'owner' || user.role === 'team_leader' || user.role === 'account_manager') {
           const clientChatRes = await clientChatApi.listRooms().catch(() => ({ rooms: [] }));
           const rooms = clientChatRes.rooms || [];
           const lastReadClientChat = localStorage.getItem('last_read_client_chat_time');
@@ -171,9 +178,13 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
           });
           if (hasUnreadCC && !prevUnreadRef.current.clientChat) {
             playNotificationSound('message');
+            sendDesktopNotification(locale === 'ar' ? '💬 رسالة عميل جديدة' : '💬 New Client Message', {
+              body: locale === 'ar' ? 'وصلت رسالة جديدة من أحد العملاء.' : 'A client sent a new chat message.',
+              tag: 'client-chat-notification',
+            });
           }
           prevUnreadRef.current.clientChat = hasUnreadCC;
-          setHasNewClientChatMessage(hasUnreadCC);
+          setHasNewClientChatMessage(pathname.startsWith('/dashboard/client-chat') ? false : hasUnreadCC);
         }
       } catch {
         // Silently swallow errors during server restart
@@ -181,9 +192,9 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
     };
 
     checkUnreads();
-    const interval = setInterval(checkUnreads, 10000);
-    return () => clearInterval(interval);
-  }, [pathname, user]);
+    const cleanupWorker = createBackgroundTimer(checkUnreads, 3000);
+    return () => cleanupWorker();
+  }, [pathname, user, locale]);
 
   const hasAnyUnread = hasNewMessage || hasNewClientChatMessage || hasNewReminder || hasNewTask;
 

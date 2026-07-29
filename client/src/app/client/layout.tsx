@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { clientChatApi } from '@/lib/api';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { createBackgroundTimer, sendDesktopNotification } from '@/lib/backgroundNotification';
 import { Loader2, LogOut, LayoutDashboard, Calendar, FileText, HelpCircle, User, Settings, Globe, MessageSquare, Menu } from 'lucide-react';
 
 export default function ClientPortalLayout({ children }: { children: React.ReactNode }) {
@@ -83,6 +84,10 @@ export default function ClientPortalLayout({ children }: { children: React.React
           const isNew = !lastRead || new Date(latestMsg.created_at) > new Date(lastRead);
           if (isNew && !prevUnreadChatRef.current) {
             playNotificationSound('message');
+            sendDesktopNotification(locale === 'ar' ? '💬 رسالة جديدة من فريق العمل' : '💬 New Message from Agency', {
+              body: locale === 'ar' ? 'وصلتك رسالة جديدة في المحادثة المباشرة.' : 'You have a new chat message from the agency.',
+              tag: 'client-portal-chat',
+            });
           }
           prevUnreadChatRef.current = isNew;
           setHasUnreadChat(isNew);
@@ -93,9 +98,9 @@ export default function ClientPortalLayout({ children }: { children: React.React
     };
 
     checkUnreadChat();
-    const interval = setInterval(checkUnreadChat, 10000);
-    return () => clearInterval(interval);
-  }, [pathname, user]);
+    const cleanupWorker = createBackgroundTimer(checkUnreadChat, 3000);
+    return () => cleanupWorker();
+  }, [pathname, user, locale]);
 
   const navLinks = [
     { label: t('portal.overview'), href: '/client', icon: LayoutDashboard },

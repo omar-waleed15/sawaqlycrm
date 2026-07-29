@@ -77,11 +77,16 @@ export default function TasksPage() {
     window.addEventListener('app-task-deleted', handleTaskDeleted);
     window.addEventListener('focus', handleFocus);
 
+    const interval = setInterval(() => {
+      loadTasks(false);
+    }, 3000);
+
     return () => {
       window.removeEventListener('app-task-created', handleTaskCreated);
       window.removeEventListener('app-task-updated', handleTaskUpdated);
       window.removeEventListener('app-task-deleted', handleTaskDeleted);
       window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, priorityFilter, activeTab, user]);

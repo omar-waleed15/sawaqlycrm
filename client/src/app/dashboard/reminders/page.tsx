@@ -107,13 +107,17 @@ export default function RemindersPage() {
 
   useEffect(() => {
     if (user) {
-      loadData();
+      loadData(true);
+      const interval = setInterval(() => {
+        loadData(false);
+      }, 3000);
+      return () => clearInterval(interval);
     }
   }, [user]);
 
-  const loadData = async () => {
+  const loadData = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const [remindersRes, usersRes] = await Promise.all([
         remindersApi.list(),
         usersApi.list(),
@@ -123,7 +127,7 @@ export default function RemindersPage() {
     } catch (err) {
       console.error('Failed to load reminders data', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
