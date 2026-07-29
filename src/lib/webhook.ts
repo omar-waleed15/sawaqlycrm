@@ -32,7 +32,7 @@ export interface WebhookPayload {
 }
 
 export async function sendWebhookNotification(payload: WebhookPayload): Promise<void> {
-  const targetUrl = process.env.N8N_WEBHOOK_URL || 'https://joepush7758.app.n8n.cloud/webhook-test/d530c082-fd34-4595-94f2-9ab3fd9983dd';
+  const targetUrl = process.env.N8N_WEBHOOK_URL || 'https://joepush7758.app.n8n.cloud/webhook/d530c082-fd34-4595-94f2-9ab3fd9983dd';
 
   if (!targetUrl) {
     console.log('[Webhook] N8N_WEBHOOK_URL is not set. Skipping notification dispatch.');
