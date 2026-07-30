@@ -9,7 +9,8 @@ const SALARY_SELECT = `
   *,
   user:profiles!salaries_user_id_fkey(id, name, email, role, avatar_url),
   installments:salary_installments(id, salary_id, amount, due_date, paid, note, created_at),
-  penalties:salary_penalties(id, salary_id, amount, notes, created_at)
+  penalties:salary_penalties(id, salary_id, amount, notes, created_at),
+  bonuses:salary_bonuses(id, salary_id, amount, notes, created_at)
 `;
 
 const attachAdvancesToSalaries = async (salaries: any[]) => {
@@ -362,6 +363,59 @@ router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOnly, async (req
     res.json({ message: 'Penalty deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete penalty' });
+  }
+});
+
+// POST /api/salaries/:id/bonuses — Add a bonus to a salary record (Owner only)
+router.post('/:id/bonuses', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { amount, notes } = req.body;
+
+  if (amount === undefined || isNaN(Number(amount))) {
+    res.status(400).json({ error: 'Amount is required and must be a number' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('salary_bonuses')
+      .insert({
+        salary_id: id,
+        amount: Number(amount),
+        notes: notes || null
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.status(201).json({ bonus: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create bonus' });
+  }
+});
+
+// DELETE /api/salaries/:id/bonuses/:bonusId — Delete a bonus (Owner only)
+router.delete('/:id/bonuses/:bonusId', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { bonusId } = req.params;
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('salary_bonuses')
+      .delete()
+      .eq('id', bonusId);
+
+    if (error) {
+      res.status(500).json({ error: error.message });
+      return;
+    }
+
+    res.json({ message: 'Bonus deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete bonus' });
   }
 });
 

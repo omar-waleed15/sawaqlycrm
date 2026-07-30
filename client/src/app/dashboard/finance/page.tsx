@@ -215,6 +215,12 @@ export default function FinanceDashboardPage() {
   const [submittingPenalty, setSubmittingPenalty] = useState(false);
   const [penaltyErrorMsg, setPenaltyErrorMsg] = useState('');
 
+  // Bonuses State variables
+  const [bonusModalOpen, setBonusModalOpen] = useState(false);
+  const [selectedSalaryForBonuses, setSelectedSalaryForBonuses] = useState<Salary | null>(null);
+  const [submittingBonus, setSubmittingBonus] = useState(false);
+  const [bonusErrorMsg, setBonusErrorMsg] = useState('');
+
   // Advances (سلفة) State variables
   const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
   const [selectedSalaryForAdvances, setSelectedSalaryForAdvances] = useState<Salary | null>(null);
@@ -1477,6 +1483,70 @@ export default function FinanceDashboardPage() {
       setPenaltyErrorMsg(err.message || 'Failed to delete penalty');
     } finally {
       setSubmittingPenalty(false);
+    }
+  };
+
+  const handleAddBonus = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedSalaryForBonuses) return;
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const amountVal = formData.get('amount') as string;
+    const notesVal = formData.get('notes') as string;
+
+    if (!amountVal || isNaN(Number(amountVal))) {
+      setBonusErrorMsg('Amount is required and must be a number');
+      return;
+    }
+
+    try {
+      setSubmittingBonus(true);
+      setBonusErrorMsg('');
+      const res = await salariesApi.createBonus(selectedSalaryForBonuses.id, {
+        amount: Number(amountVal),
+        notes: notesVal || undefined,
+      });
+
+      // Update local state reactively
+      const updatedBonuses = [...(selectedSalaryForBonuses.bonuses || []), res.bonus];
+      const updatedSalary = { ...selectedSalaryForBonuses, bonuses: updatedBonuses };
+      
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForBonuses.id ? updatedSalary : s));
+      setSelectedSalaryForBonuses(updatedSalary);
+      form.reset();
+      
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setBonusErrorMsg(err.message || 'Failed to add bonus');
+    } finally {
+      setSubmittingBonus(false);
+    }
+  };
+
+  const handleDeleteBonus = async (bonusId: string) => {
+    if (!selectedSalaryForBonuses) return;
+    if (!window.confirm('Are you sure you want to delete this bonus?')) return;
+
+    try {
+      setSubmittingBonus(true);
+      setBonusErrorMsg('');
+      await salariesApi.deleteBonus(selectedSalaryForBonuses.id, bonusId);
+
+      // Update local state reactively
+      const updatedBonuses = (selectedSalaryForBonuses.bonuses || []).filter(b => b.id !== bonusId);
+      const updatedSalary = { ...selectedSalaryForBonuses, bonuses: updatedBonuses };
+
+      setSalaries(prev => prev.map(s => s.id === selectedSalaryForBonuses.id ? updatedSalary : s));
+      setSelectedSalaryForBonuses(updatedSalary);
+      
+      // Refresh background data to update totals/analytics
+      loadExpensesAndSalaries(expenseMonthFilter);
+    } catch (err: any) {
+      setBonusErrorMsg(err.message || 'Failed to delete bonus');
+    } finally {
+      setSubmittingBonus(false);
     }
   };
 
@@ -3161,11 +3231,11 @@ export default function FinanceDashboardPage() {
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 p-2.5 rounded-lg border">
-                  <div>Total Salary Cost: <span className="font-bold text-foreground">{formatCurrency(salaries.reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
+                  <div>Total Salary Cost: <span className="font-bold text-foreground">{formatCurrency(salaries.reduce((sum, s) => sum + Math.max(0, s.amount + (s.bonuses?.reduce((bSum, b) => bSum + Number(b.amount), 0) || 0) - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                   <div className="hidden sm:block">•</div>
-                  <div>Paid: <span className="font-bold text-emerald-600">{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
+                  <div>Paid: <span className="font-bold text-emerald-600">{formatCurrency(salaries.filter(s => s.paid).reduce((sum, s) => sum + Math.max(0, s.amount + (s.bonuses?.reduce((bSum, b) => bSum + Number(b.amount), 0) || 0) - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                   <div className="hidden sm:block">•</div>
-                  <div>Unpaid: <span className="font-bold text-orange-600">{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + Math.max(0, s.amount - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
+                  <div>Unpaid: <span className="font-bold text-orange-600">{formatCurrency(salaries.filter(s => !s.paid).reduce((sum, s) => sum + Math.max(0, s.amount + (s.bonuses?.reduce((bSum, b) => bSum + Number(b.amount), 0) || 0) - (s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0) - (s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0)), 0), locale)}</span></div>
                 </div>
                 <div className="hidden sm:block flex-1" />
                 <button
@@ -3213,12 +3283,13 @@ export default function FinanceDashboardPage() {
                           </td>
                           <td style={{ padding: '16px 16px', fontWeight: 700, textAlign: 'start' }}>
                             <div>{formatCurrency(s.amount, locale)}</div>
-                            {((s.penalties && s.penalties.length > 0) || (s.advances && s.advances.length > 0)) && (
+                            {((s.bonuses && s.bonuses.length > 0) || (s.penalties && s.penalties.length > 0) || (s.advances && s.advances.length > 0)) && (
                               <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                                {s.bonuses && s.bonuses.length > 0 && <span style={{ color: '#10b981', display: 'block' }}>Bonuses: +{formatCurrency(s.bonuses.reduce((sum, b) => sum + Number(b.amount), 0), locale)}</span>}
                                 {s.penalties && s.penalties.length > 0 && <span style={{ color: '#e11d48', display: 'block' }}>Penalties: -{formatCurrency(s.penalties.reduce((sum, p) => sum + Number(p.amount), 0), locale)}</span>}
                                 {s.advances && s.advances.length > 0 && <span style={{ color: '#0284c7', display: 'block' }}>Advances: -{formatCurrency(s.advances.reduce((sum, a) => sum + Number(a.amount), 0), locale)}</span>}
                                 <span style={{ fontWeight: 700, color: 'var(--color-primary)', display: 'block', marginTop: 1 }}>
-                                  Net: {formatCurrency(Math.max(0, s.amount - (s.penalties?.reduce((sum, p) => sum + Number(p.amount), 0) || 0) - (s.advances?.reduce((sum, a) => sum + Number(a.amount), 0) || 0)), locale)}
+                                  Net: {formatCurrency(Math.max(0, s.amount + (s.bonuses?.reduce((sum, b) => sum + Number(b.amount), 0) || 0) - (s.penalties?.reduce((sum, p) => sum + Number(p.amount), 0) || 0) - (s.advances?.reduce((sum, a) => sum + Number(a.amount), 0) || 0)), locale)}
                                 </span>
                               </div>
                             )}
@@ -3316,9 +3387,10 @@ export default function FinanceDashboardPage() {
               {/* Mobile Cards List View */}
               <div className="flex flex-col gap-4 md:hidden">
                 {salaries.map(s => {
+                  const bonusSum = s.bonuses?.reduce((bSum, b) => bSum + Number(b.amount), 0) || 0;
                   const penaltySum = s.penalties?.reduce((pSum, p) => pSum + Number(p.amount), 0) || 0;
                   const advanceSum = s.advances?.reduce((aSum, a) => aSum + Number(a.amount), 0) || 0;
-                  const netAmount = Math.max(0, s.amount - penaltySum - advanceSum);
+                  const netAmount = Math.max(0, s.amount + bonusSum - penaltySum - advanceSum);
                   return (
                     <div key={s.id} className="p-4 rounded-xl border border-border bg-card shadow-xs text-start flex flex-col gap-3">
                       {/* Member Info Header */}
@@ -3352,8 +3424,9 @@ export default function FinanceDashboardPage() {
                           <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.amount')}</span>
                           <span className="font-bold text-foreground">
                             {formatCurrency(s.amount, locale)}
-                            {(penaltySum > 0 || advanceSum > 0) && (
+                            {(bonusSum > 0 || penaltySum > 0 || advanceSum > 0) && (
                               <span className="block text-[10px] text-muted-foreground font-semibold mt-0.5">
+                                {bonusSum > 0 && <span className="block text-emerald-600">Bonuses: +{formatCurrency(bonusSum, locale)}</span>}
                                 {penaltySum > 0 && <span className="block text-rose-500">Penalties: -{formatCurrency(penaltySum, locale)}</span>}
                                 {advanceSum > 0 && <span className="block text-sky-600">Advances: -{formatCurrency(advanceSum, locale)}</span>}
                                 <span className="block font-bold text-primary mt-0.5">Net: {formatCurrency(netAmount, locale)}</span>
@@ -4072,6 +4145,124 @@ export default function FinanceDashboardPage() {
         </div>
       </Modal>
 
+      {/* ── BONUSES MODAL ── */}
+      <Modal
+        isOpen={bonusModalOpen}
+        onClose={() => { setBonusModalOpen(false); setSelectedSalaryForBonuses(null); }}
+        title={`Bonuses & Incentives - ${selectedSalaryForBonuses?.user?.name || ''}`}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="text-start">
+          {bonusErrorMsg && (
+            <div className="form-error" style={{ padding: 10, background: '#ecfdf5', color: '#047857', fontSize: '0.8125rem', borderRadius: 'var(--radius-sm)' }}>
+              {bonusErrorMsg}
+            </div>
+          )}
+
+          <div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.875rem', fontWeight: 700 }}>Bonuses List</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              {selectedSalaryForBonuses?.bonuses && selectedSalaryForBonuses.bonuses.map(b => (
+                <div
+                  key={b.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    background: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  <div style={{ textAlign: 'start' }}>
+                    <span style={{ fontWeight: 700, color: '#10b981', marginRight: 8 }}>
+                      +{formatCurrency(b.amount, locale)}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginRight: 8 }}>
+                      ({b.created_at ? formatDate(b.created_at.substring(0, 10), locale) : ''})
+                    </span>
+                    {b.notes && (
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        {b.notes}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      color: '#e11d48',
+                      cursor: 'pointer',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      padding: '4px 8px'
+                    }}
+                    disabled={submittingBonus}
+                    onClick={() => handleDeleteBonus(b.id)}
+                  >
+                    {t('common.delete')}
+                  </button>
+                </div>
+              ))}
+              {(!selectedSalaryForBonuses?.bonuses || selectedSalaryForBonuses.bonuses.length === 0) && (
+                <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+                  No bonuses logged for this month.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+
+          <form onSubmit={handleAddBonus} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h4 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>Add Bonus / Incentive</h4>
+            
+            <div className="form-group text-start">
+              <label className="form-label">Bonus Amount ($) *</label>
+              <input
+                type="number"
+                name="amount"
+                className="form-input"
+                placeholder="e.g. 100"
+                required
+                min="1"
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div className="form-group text-start">
+              <label className="form-label">Notes / Reason (Optional)</label>
+              <input
+                type="text"
+                name="notes"
+                className="form-input"
+                placeholder="e.g. Top performance incentive"
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={submittingBonus}
+                onClick={() => { setBonusModalOpen(false); setSelectedSalaryForBonuses(null); }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                disabled={submittingBonus}
+              >
+                {submittingBonus ? t('clients.savingProgress') : '＋ Add Bonus'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
       {/* ── ADVANCES (سلفة) MODAL ── */}
       <Modal
         isOpen={advanceModalOpen}
@@ -4245,6 +4436,31 @@ export default function FinanceDashboardPage() {
           </button>
           {user?.role === 'owner' && (
             <>
+              <button
+                type="button"
+                style={{
+                  textAlign: 'start',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: '#10b981',
+                  cursor: 'pointer',
+                  width: '100%',
+                  transition: 'background-color 0.2s',
+                }}
+                className="hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                onClick={() => {
+                  setActiveSalaryActionId(null);
+                  setSelectedSalaryForBonuses(activeSalaryForMenu);
+                  setBonusModalOpen(true);
+                }}
+              >
+                🎁 Bonuses ({activeSalaryForMenu.bonuses?.length || 0})
+              </button>
+
               <button
                 type="button"
                 style={{

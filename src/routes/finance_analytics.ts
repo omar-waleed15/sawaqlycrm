@@ -15,7 +15,7 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
     const [contractsRes, expensesRes, salariesRes, clientsRes] = await Promise.all([
       supabaseAdmin.from('contracts').select('*, installments:contract_installments(*), client:clients(*)'),
       supabaseAdmin.from('expenses').select('*'),
-      supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount)'),
+      supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount), bonuses:salary_bonuses(amount)'),
       supabaseAdmin.from('clients').select('*').eq('pipeline_stage', 'won'),
     ]);
 
@@ -197,11 +197,12 @@ router.get('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Resp
       if (!salMonth) return;
 
       const penaltyTotal = sal.penalties ? sal.penalties.reduce((sum: number, p: any) => sum + Number(p.amount), 0) : 0;
+      const bonusTotal = sal.bonuses ? sal.bonuses.reduce((sum: number, b: any) => sum + Number(b.amount), 0) : 0;
       const advanceTotal = sal.advances ? sal.advances.reduce((sum: number, a: any) => sum + Number(a.amount), 0) : 0;
       const netDeductions = penaltyTotal + advanceTotal;
 
       if (sal.is_recurring) {
-        const netAmt = Math.max(0, amt - netDeductions);
+        const netAmt = Math.max(0, amt + bonusTotal - netDeductions);
         if (monthlyData[salMonth]) {
           monthlyData[salMonth].expenses += netAmt;
           monthlyData[salMonth].salaries += netAmt;

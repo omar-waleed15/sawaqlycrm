@@ -338,6 +338,10 @@ export const salariesApi = {
     request<{ penalty: import('@/types').SalaryPenalty }>(`/salaries/${salaryId}/penalties`, { method: 'POST', body: JSON.stringify(data) }),
   deletePenalty: (salaryId: string, id: string) =>
     request(`/salaries/${salaryId}/penalties/${id}`, { method: 'DELETE' }),
+  createBonus: (salaryId: string, data: { amount: number; notes?: string }) =>
+    request<{ bonus: import('@/types').SalaryBonus }>(`/salaries/${salaryId}/bonuses`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteBonus: (salaryId: string, id: string) =>
+    request(`/salaries/${salaryId}/bonuses/${id}`, { method: 'DELETE' }),
   createAdvance: (salaryId: string, data: { amount: number; notes?: string; date?: string }) =>
     request<{ advance: import('@/types').SalaryAdvance }>(`/salaries/${salaryId}/advances`, { method: 'POST', body: JSON.stringify(data) }),
   deleteAdvance: (salaryId: string, id: string) =>

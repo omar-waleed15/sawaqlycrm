@@ -218,6 +218,14 @@ export interface SalaryPenalty {
   created_at: string;
 }
 
+export interface SalaryBonus {
+  id: string;
+  salary_id: string;
+  amount: number;
+  notes?: string;
+  created_at: string;
+}
+
 export interface SalaryAdvance {
   id: string;
   salary_id: string;
@@ -239,6 +247,7 @@ export interface Salary {
   recurrence?: 'monthly' | 'yearly';
   installments?: SalaryInstallment[];
   penalties?: SalaryPenalty[];
+  bonuses?: SalaryBonus[];
   advances?: SalaryAdvance[];
   note?: string;
   created_by: string;

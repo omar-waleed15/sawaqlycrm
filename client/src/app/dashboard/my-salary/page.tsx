@@ -6,7 +6,7 @@ import { useLanguage } from '@/lib/i18n';
 import { salariesApi } from '@/lib/api';
 import { Salary } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { Wallet, AlertTriangle, HandCoins, CheckCircle2, Clock, Calendar as CalendarIcon, FileSpreadsheet } from 'lucide-react';
+import { Wallet, AlertTriangle, HandCoins, CheckCircle2, Clock, Calendar as CalendarIcon, FileSpreadsheet, Gift } from 'lucide-react';
 
 export default function MySalaryPage() {
   const { user } = useAuth();
@@ -44,6 +44,9 @@ export default function MySalaryPage() {
 
   // Derived Calculations
   const baseSalary = salary ? Number(salary.amount) : 0;
+  const bonusTotal = salary?.bonuses
+    ? salary.bonuses.reduce((sum, b) => sum + Number(b.amount), 0)
+    : 0;
   const penaltyTotal = salary?.penalties
     ? salary.penalties.reduce((sum, p) => sum + Number(p.amount), 0)
     : 0;
@@ -51,7 +54,7 @@ export default function MySalaryPage() {
     ? salary.advances.reduce((sum, a) => sum + Number(a.amount), 0)
     : 0;
   const totalDeductions = penaltyTotal + advanceTotal;
-  const netSalary = Math.max(0, baseSalary - totalDeductions);
+  const netSalary = Math.max(0, baseSalary + bonusTotal - totalDeductions);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-6xl space-y-6 text-start">
@@ -102,8 +105,8 @@ export default function MySalaryPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* 4 Core Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Core Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Card 1: Base Salary */}
             <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
@@ -124,7 +127,27 @@ export default function MySalaryPage() {
               </div>
             </div>
 
-            {/* Card 2: Penalties / Deductions */}
+            {/* Card 2: Bonuses & Incentives */}
+            <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  {t('mySalary.bonuses')}
+                </span>
+                <div className="size-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
+                  <Gift className="size-5" />
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  +{formatCurrency(bonusTotal, locale)}
+                </div>
+                <span className="text-[11px] text-muted-foreground font-medium mt-1 block">
+                  {salary.bonuses?.length || 0} logged bonuses
+                </span>
+              </div>
+            </div>
+
+            {/* Card 3: Penalties / Deductions */}
             <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -144,7 +167,7 @@ export default function MySalaryPage() {
               </div>
             </div>
 
-            {/* Card 3: Salary Advances */}
+            {/* Card 4: Salary Advances */}
             <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -164,7 +187,7 @@ export default function MySalaryPage() {
               </div>
             </div>
 
-            {/* Card 4: Net Payable Salary */}
+            {/* Card 5: Net Payable Salary */}
             <div className="bg-card border-2 border-primary/40 rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-3 bg-gradient-to-br from-primary/5 to-transparent">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-primary">
@@ -196,7 +219,47 @@ export default function MySalaryPage() {
           </div>
 
           {/* Breakdown Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Bonuses Log */}
+            <div className="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
+              <h3 className="font-bold text-base text-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Gift className="size-4 text-emerald-500" />
+                  {t('mySalary.bonusesHistory')}
+                </span>
+                <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-900/40">
+                  +{formatCurrency(bonusTotal, locale)}
+                </span>
+              </h3>
+
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {salary.bonuses && salary.bonuses.length > 0 ? (
+                  salary.bonuses.map((b) => (
+                    <div
+                      key={b.id}
+                      className="p-3 rounded-xl border border-border/80 bg-muted/20 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="font-semibold text-foreground">
+                          {b.notes || 'Bonus / Incentive'}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {b.created_at ? formatDate(b.created_at.substring(0, 10), locale) : '—'}
+                        </div>
+                      </div>
+                      <span className="font-extrabold text-emerald-600 text-sm shrink-0">
+                        +{formatCurrency(Number(b.amount), locale)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-muted-foreground italic">
+                    No bonuses logged for this month.
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Penalties Log */}
             <div className="bg-card border border-border rounded-2xl p-5 shadow-xs space-y-4">
               <h3 className="font-bold text-base text-foreground flex items-center justify-between">
