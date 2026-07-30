@@ -234,10 +234,14 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
       {/* Profile Header */}
       <div className="flex items-center gap-4 mb-8">
-        <Avatar className="size-14 ring-4 ring-[#1D61E7]/10 shadow-lg shrink-0">
-          <AvatarFallback className="bg-[#1D61E7] text-white font-extrabold text-lg">
-            {getInitials(member.name)}
-          </AvatarFallback>
+        <Avatar className="size-14 ring-4 ring-[#1D61E7]/10 shadow-lg shrink-0 overflow-hidden">
+          {member.avatar_url ? (
+            <img src={member.avatar_url} alt={member.name} className="size-full object-cover" />
+          ) : (
+            <AvatarFallback className="bg-[#1D61E7] text-white font-extrabold text-lg">
+              {getInitials(member.name)}
+            </AvatarFallback>
+          )}
         </Avatar>
         <div>
           <div className="flex items-center gap-2 flex-wrap">

@@ -304,13 +304,14 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
       {/* Footer */}
       <div className="px-3 py-4">
         <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 transition-colors">
-          <Avatar className="size-8 shrink-0">
-            {user?.avatar_url && (
-              <AvatarImage src={user.avatar_url} alt={user.name} className="object-cover animate-fade-in" />
+          <Avatar className="size-8 shrink-0 overflow-hidden">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt={user.name} className="size-full object-cover animate-fade-in" />
+            ) : (
+              <AvatarFallback className="bg-[#1D61E7] text-white text-[11px] font-bold">
+                {user?.name ? getInitials(user.name) : '?'}
+              </AvatarFallback>
             )}
-            <AvatarFallback className="bg-[#1D61E7] text-white text-[11px] font-bold">
-              {user?.name ? getInitials(user.name) : '?'}
-            </AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden">
             <div className="text-xs font-semibold text-[#0F172A] truncate">{user?.name || 'User'}</div>

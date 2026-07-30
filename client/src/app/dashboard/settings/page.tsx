@@ -330,9 +330,13 @@ export default function SettingsPage() {
                       <tr key={u.id} className="hover:bg-muted/5 transition-colors">
                         <td className="py-3.5 px-4 text-start">
                           <div className="flex items-center gap-3">
-                            <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                              {getInitials(u.name)}
-                            </div>
+                            {u.avatar_url ? (
+                              <img src={u.avatar_url} alt={u.name} className="size-8 rounded-full object-cover shrink-0 border border-border" />
+                            ) : (
+                              <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                {getInitials(u.name)}
+                              </div>
+                            )}
                             <span className="font-semibold text-sm text-foreground">{u.name}</span>
                           </div>
                         </td>
@@ -405,13 +409,14 @@ export default function SettingsPage() {
 
                 {/* Profile Photo Upload Section */}
                 <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-xl border border-dashed bg-muted/20">
-                  <Avatar className="size-20 shrink-0 border shadow-sm">
-                    {profileAvatarUrl && (
-                      <AvatarImage src={profileAvatarUrl} alt={profileName} className="object-cover" />
+                  <Avatar className="size-20 shrink-0 border shadow-sm overflow-hidden">
+                    {profileAvatarUrl ? (
+                      <img src={profileAvatarUrl} alt={profileName} className="size-full object-cover" />
+                    ) : (
+                      <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
+                        {profileName ? getInitials(profileName) : '?'}
+                      </AvatarFallback>
                     )}
-                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-2xl font-bold">
-                      {profileName ? getInitials(profileName) : '?'}
-                    </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex flex-col gap-2 text-center sm:text-start">

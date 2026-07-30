@@ -378,10 +378,14 @@ export default function TeamPage() {
                             <tr key={p.user.id} className="hover:bg-muted/5 transition-colors">
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-3">
-                                  <Avatar className="size-8">
-                                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
-                                      {getInitials(p.user.name)}
-                                    </AvatarFallback>
+                                  <Avatar className="size-8 overflow-hidden">
+                                    {p.user.avatar_url ? (
+                                      <img src={p.user.avatar_url} alt={p.user.name} className="size-full object-cover" />
+                                    ) : (
+                                      <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
+                                        {getInitials(p.user.name)}
+                                      </AvatarFallback>
+                                    )}
                                   </Avatar>
                                   <div className="text-start">
                                     <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
@@ -540,10 +544,14 @@ export default function TeamPage() {
                             <tr key={p.user.id} className="hover:bg-muted/5 transition-colors">
                               <td className="py-3 px-4 text-start">
                                 <div className="flex items-center gap-3">
-                                  <Avatar className="size-8">
-                                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
-                                      {getInitials(p.user.name)}
-                                    </AvatarFallback>
+                                  <Avatar className="size-8 overflow-hidden">
+                                    {p.user.avatar_url ? (
+                                      <img src={p.user.avatar_url} alt={p.user.name} className="size-full object-cover" />
+                                    ) : (
+                                      <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-xs">
+                                        {getInitials(p.user.name)}
+                                      </AvatarFallback>
+                                    )}
                                   </Avatar>
                                   <div className="text-start">
                                     <div className="font-semibold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
@@ -770,10 +778,14 @@ export default function TeamPage() {
             <Card key={member.id} className="hover:shadow-md transition-all duration-200">
               <CardContent className="pt-6 flex flex-col h-full gap-4">
                 <div className="flex gap-4 items-center">
-                  <Avatar className="size-12">
-                    <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-base">
-                      {getInitials(member.name)}
-                    </AvatarFallback>
+                  <Avatar className="size-12 overflow-hidden">
+                    {member.avatar_url ? (
+                      <img src={member.avatar_url} alt={member.name} className="size-full object-cover" />
+                    ) : (
+                      <AvatarFallback className="bg-[#1D61E7] text-white font-bold text-base">
+                        {getInitials(member.name)}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 overflow-hidden">
                     <div className="flex items-center gap-2 flex-wrap">
