@@ -133,7 +133,9 @@ export async function request<T>(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
       }
       throw new Error(data.error || `HTTP ${res.status}`);
@@ -186,7 +188,9 @@ function uploadFile(
           if (typeof window !== 'undefined') {
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
-            window.location.href = '/login';
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
           }
         }
         reject(new Error(data.error || `HTTP ${xhr.status}`));
