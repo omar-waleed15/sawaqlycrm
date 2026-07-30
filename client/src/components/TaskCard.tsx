@@ -50,8 +50,10 @@ function formatDate(dateStr?: string, locale: string = 'en'): string {
 
 function isOverdue(dateStr?: string, assignees?: TaskAssignee[]): boolean {
   if (!dateStr) return false;
-  const allCompleted = assignees?.every(a => a.status === 'completed');
-  if (allCompleted) return false;
+  if (assignees && assignees.length > 0) {
+    const allDoneOrSubmitted = assignees.every(a => a.status === 'completed' || a.status === 'submitted');
+    if (allDoneOrSubmitted) return false;
+  }
   return isDateOverdue(dateStr);
 }
 
@@ -78,6 +80,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
   const assignees = task.task_assignees || [];
   const overdue = isOverdue(task.due_date, assignees);
   const myAssignment = task.task_assignees?.find(a => a.user_id === user?.id);
+  const hasRevisionRequested = assignees.some(a => a.status === 'revision');
+  const isMyRevisionNeeded = myAssignment?.status === 'revision';
 
   // canAdminister checks: owner, team_leader, moderation, account_manager
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
@@ -288,6 +292,11 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                 </Badge>
               )}
               <PriorityBadge priority={task.priority} />
+              {hasRevisionRequested && (
+                <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
+                  🔄 {t('status.revision')}
+                </Badge>
+              )}
               {overdue && (
                 <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
                   ⚠️ {t('common.overdue')}
@@ -353,8 +362,22 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
           </div>
 
           {/* Secondary Widgets Section */}
-          {(isOwner && submittedCount > 0) || loggedTimeText ? (
+          {hasRevisionRequested || (isOwner && submittedCount > 0) || loggedTimeText ? (
             <div className="flex flex-col gap-2 mt-1">
+              {/* Revision banner for worker */}
+              {!isOwner && isMyRevisionNeeded && (
+                <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                  🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
+                </div>
+              )}
+
+              {/* Revision indicator for owner */}
+              {isOwner && hasRevisionRequested && (
+                <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                  🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
+                </div>
+              )}
+
               {/* Submission progress for admin */}
               {isOwner && submittedCount > 0 && (
                 <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">

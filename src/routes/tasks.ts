@@ -21,6 +21,7 @@ const TASK_SELECT = `
     rating,
     assigned_at,
     updated_at,
+    submitted_at,
     total_time_spent,
     timer_started_at,
     user:profiles(id, name, email, avatar_url, phone)
@@ -605,7 +606,12 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
         if (ownAssignment) {
           const assignUpdates: Record<string, unknown> = {};
           const allowedStatuses = ['todo', 'in_progress', 'submitted'];
-          if (status && allowedStatuses.includes(status)) assignUpdates.status = status;
+          if (status && allowedStatuses.includes(status)) {
+            assignUpdates.status = status;
+            if (status === 'submitted') {
+              assignUpdates.submitted_at = new Date().toISOString();
+            }
+          }
           if (submission_link !== undefined) assignUpdates.submission_link = submission_link;
           if (completion_note !== undefined) assignUpdates.completion_note = completion_note;
           assignUpdates.updated_at = new Date().toISOString();
@@ -643,7 +649,12 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       const { status, submission_link, completion_note } = req.body;
       const assignUpdates: Record<string, unknown> = {};
       const allowedStatuses = ['todo', 'in_progress', 'submitted'];
-      if (status && allowedStatuses.includes(status)) assignUpdates.status = status;
+      if (status && allowedStatuses.includes(status)) {
+        assignUpdates.status = status;
+        if (status === 'submitted') {
+          assignUpdates.submitted_at = new Date().toISOString();
+        }
+      }
       if (submission_link !== undefined) assignUpdates.submission_link = submission_link;
       if (completion_note !== undefined) assignUpdates.completion_note = completion_note;
       assignUpdates.updated_at = new Date().toISOString();
@@ -831,7 +842,7 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
 // PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
 router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
-  const { status, feedback, rating } = req.body;
+  const { status, feedback, rating, due_date } = req.body;
 
   if (req.user!.id === userId) {
     res.status(403).json({ error: 'Access denied. You cannot approve or review your own task assignment.' });
@@ -844,8 +855,22 @@ router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (r
   }
 
   try {
+    if (due_date) {
+      await supabaseAdmin
+        .from('tasks')
+        .update({ due_date, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    }
+
     const updates: Record<string, unknown> = {};
-    if (status !== undefined) updates.status = status;
+    if (status !== undefined) {
+      updates.status = status;
+      if (status === 'submitted') {
+        updates.submitted_at = new Date().toISOString();
+      } else if (status === 'revision') {
+        updates.submitted_at = null;
+      }
+    }
     if (feedback !== undefined) updates.feedback = feedback;
     if (rating !== undefined) {
       if (rating !== null && (typeof rating !== 'number' || rating < 1 || rating > 10)) {

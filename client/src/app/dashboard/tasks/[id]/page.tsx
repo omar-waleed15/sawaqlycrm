@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi, commentsApi } from '@/lib/api';
 import { Task, TaskAssignee, Comment, User } from '@/types';
-import { formatCairoDate, formatCairoDateTime, isDateOverdue, formatServerTimestamp } from '@/lib/dateUtils';
+import { formatCairoDate, formatCairoDateTime, isDateOverdue, isAssigneeSubmittedLate, formatServerTimestamp } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
 import { Button } from '@/components/ui/button';
@@ -115,6 +115,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   // Admin review state
   const [revisionFeedback, setRevisionFeedback] = useState<Record<string, string>>({});
+  const [revisionDueDate, setRevisionDueDate] = useState<Record<string, string>>({});
+  const [revisionDueTime, setRevisionDueTime] = useState<Record<string, string>>({});
   const [submittingReview, setSubmittingReview] = useState<Record<string, boolean>>({});
   const [activeRevisionUserId, setActiveRevisionUserId] = useState<string | null>(null);
   const [activeApprovalUserId, setActiveApprovalUserId] = useState<string | null>(null);
@@ -296,11 +298,20 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     }
     const feedback = revisionFeedback[userId] || '';
     if (!feedback.trim()) return;
+
+    let newDueDateStr: string | undefined = undefined;
+    if (revisionDueDate[userId]) {
+      const datePart = revisionDueDate[userId];
+      const timePart = revisionDueTime[userId] || '17:00';
+      newDueDateStr = `${datePart}T${timePart}:00`;
+    }
+
     setSubmittingReview(prev => ({ ...prev, [userId]: true }));
     try {
       const data = await tasksApi.updateAssignee(id, userId, {
         status: 'revision',
         feedback: feedback.trim(),
+        due_date: newDueDateStr,
       });
       setTask(data.task);
       setActiveRevisionUserId(null);
@@ -349,7 +360,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   if (!task) return null;
 
   const assignees = task.task_assignees || [];
-  const isOverdue = task.due_date && isDateOverdue(task.due_date) && assignees.some(a => a.status !== 'completed');
+  const isOverdue = task.due_date && isDateOverdue(task.due_date) && (assignees.length === 0 || assignees.some(a => a.status !== 'completed' && a.status !== 'submitted'));
 
   // Compute summary
   const totalAssignees = assignees.length;
@@ -875,8 +886,19 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
                             <StatusBadge status={a.status} />
+                            {a.status === 'submitted' && (
+                              isAssigneeSubmittedLate(task.due_date, a.submitted_at) ? (
+                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                  ⚠️ {locale === 'ar' ? 'تُسلّم بعد الموعد' : 'Submitted Late'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                  ✨ {locale === 'ar' ? 'في انتظار المراجعة (في الموعد)' : 'Submitted On Time (Pending Review)'}
+                                </span>
+                              )
+                            )}
                           </div>
                         </div>
 
@@ -946,6 +968,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   onClick={() => {
                                     setActiveRevisionUserId(a.user_id);
                                     setActiveApprovalUserId(null);
+                                    if (task.due_date) {
+                                      const parts = task.due_date.split('T');
+                                      setRevisionDueDate(prev => ({ ...prev, [a.user_id]: parts[0] }));
+                                      setRevisionDueTime(prev => ({ ...prev, [a.user_id]: parts[1] ? parts[1].substring(0, 5) : '17:00' }));
+                                    }
                                   }}
                                   disabled={isSubmitting}
                                 >
@@ -977,6 +1004,33 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   rows={2}
                                   className="text-xs"
                                 />
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                                  <div className="flex flex-col gap-1">
+                                    <Label htmlFor={`rev-date-${a.user_id}`} className="text-[11px] font-bold text-orange-800">
+                                      📅 {locale === 'ar' ? 'تاريخ الاستلام الجديد' : 'New Revision Due Date'}
+                                    </Label>
+                                    <Input
+                                      id={`rev-date-${a.user_id}`}
+                                      type="date"
+                                      className="h-8 text-xs bg-background"
+                                      value={revisionDueDate[a.user_id] || ''}
+                                      onChange={e => setRevisionDueDate(prev => ({ ...prev, [a.user_id]: e.target.value }))}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <Label htmlFor={`rev-time-${a.user_id}`} className="text-[11px] font-bold text-orange-800">
+                                      ⏰ {locale === 'ar' ? 'وقت التسليم الجديد' : 'New Revision Due Time'}
+                                    </Label>
+                                    <Input
+                                      id={`rev-time-${a.user_id}`}
+                                      type="time"
+                                      className="h-8 text-xs bg-background"
+                                      value={revisionDueTime[a.user_id] || '17:00'}
+                                      onChange={e => setRevisionDueTime(prev => ({ ...prev, [a.user_id]: e.target.value }))}
+                                    />
+                                  </div>
+                                </div>
                                 <div className="flex gap-2 justify-end">
                                   <Button
                                     variant="ghost"

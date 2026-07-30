@@ -30,13 +30,15 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 
+import { isDateOverdue } from '@/lib/dateUtils';
+
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function isOverdue(dateStr?: string, status?: string): boolean {
-  if (!dateStr || status === 'completed') return false;
-  return new Date(dateStr) < new Date(new Date().toDateString());
+  if (!dateStr || status === 'completed' || status === 'submitted') return false;
+  return isDateOverdue(dateStr);
 }
 
 function getMemberAssignment(task: Task, memberId: string): TaskAssignee | undefined {

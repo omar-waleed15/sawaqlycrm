@@ -25,6 +25,7 @@ export interface TaskAssignee {
   rating?: number;
   assigned_at: string;
   updated_at: string;
+  submitted_at?: string | null;
   total_time_spent: number;
   timer_started_at?: string | null;
 }

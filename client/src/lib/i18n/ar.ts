@@ -94,7 +94,7 @@ export const ar: Record<string, string> = {
   'status.todo': 'قيد الانتظار',
   'status.in_progress': 'قيد التنفيذ',
   'status.submitted': 'تم التسليم',
-  'status.revision': 'يحتاج مراجعة',
+  'status.revision': 'تعديل مطلوب',
   'status.completed': 'مكتمل',
 
   // ── الأدوار ─────────────────────────────────────────────────────────

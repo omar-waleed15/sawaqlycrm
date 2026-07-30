@@ -146,9 +146,42 @@ export function formatCairoDateTime(
 
 export function isDateOverdue(dateStr?: string): boolean {
   if (!dateStr) return false;
-  const formattedDueDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const { year, month, day, hour, minute } = getDateParts(dateStr);
+
+  const now = new Date();
+
+  // If a specific time (hour or minute != 0) was set for the due date:
+  if (hour !== 0 || minute !== 0) {
+    const dueDateObj = new Date(year, month - 1, day, hour, minute, 59);
+    return now > dueDateObj;
+  }
+
+  // If no specific time was set (00:00:00), the due date spans the entire day.
+  // It is overdue if today's date has passed the due date (i.e. starting the next day).
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formattedDueDate = `${year}-${pad(month)}-${pad(day)}`;
   const todayStr = getCairoTodayString();
   return formattedDueDate < todayStr;
+}
+
+export function isAssigneeOverdue(dueDateStr?: string, status?: string, submittedAt?: string | null): boolean {
+  if (!dueDateStr) return false;
+  if (status === 'completed' || status === 'submitted') return false;
+  return isDateOverdue(dueDateStr);
+}
+
+export function isAssigneeSubmittedLate(dueDateStr?: string, submittedAt?: string | null): boolean {
+  if (!dueDateStr || !submittedAt) return false;
+  const { year: dy, month: dm, day: dd, hour: dh, minute: dmin } = getDateParts(dueDateStr);
+
+  const dueObj = (dh === 0 && dmin === 0)
+    ? new Date(dy, dm - 1, dd, 23, 59, 59)
+    : new Date(dy, dm - 1, dd, dh, dmin, 59);
+
+  const { year: sy, month: sm, day: sd, hour: sh, minute: smin, second: ss } = getDateParts(submittedAt);
+  const submittedObj = new Date(sy, sm - 1, sd, sh, smin, ss);
+
+  return submittedObj > dueObj;
 }
 
 export function getCairoTodayPlusNDays(days: number): string {
