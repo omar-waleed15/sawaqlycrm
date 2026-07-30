@@ -26,6 +26,34 @@ function sanitizePayloadDates(obj: any): any {
   return result;
 }
 
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+async function attemptTokenRefresh(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data.access_token && data.refresh_token) {
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -66,8 +94,42 @@ export async function request<T>(
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const isAuthLogin = endpoint.startsWith('/auth/login');
-      if (!isAuthLogin && (res.status === 401 || data.error === 'Invalid or expired token')) {
+      const isAuthEndpoint = endpoint.startsWith('/auth/login') || endpoint.startsWith('/auth/refresh');
+      if (!isAuthEndpoint && (res.status === 401 || data.error === 'Invalid or expired token')) {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          refreshPromise = attemptTokenRefresh().finally(() => {
+            isRefreshing = false;
+            refreshPromise = null;
+          });
+        }
+
+        const refreshSuccess = await (refreshPromise || Promise.resolve(false));
+
+        if (refreshSuccess) {
+          const newToken = getToken();
+          const newHeaders = { ...headers };
+          if (newToken) {
+            newHeaders['Authorization'] = `Bearer ${newToken}`;
+          }
+
+          const retryRes = await fetch(`${API_BASE}${endpoint}`, {
+            cache: 'no-store',
+            ...options,
+            body,
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              ...newHeaders,
+            },
+          });
+
+          const retryData = await retryRes.json().catch(() => ({}));
+          if (retryRes.ok) {
+            return retryData as T;
+          }
+        }
+
         if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
@@ -142,6 +204,11 @@ export const authApi = {
     request<{ access_token: string; refresh_token: string; user: import('@/types').User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+  refresh: (refreshToken: string) =>
+    request<{ access_token: string; refresh_token: string; user: import('@/types').User }>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
     }),
   me: () => request<{ user: import('@/types').User }>('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
