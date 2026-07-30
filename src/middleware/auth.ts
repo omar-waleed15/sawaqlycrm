@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
     email: string;
     name: string;
     role: string;
+    avatar_url?: string | null;
     phone?: string | null;
   };
 }
@@ -51,6 +52,7 @@ export const authMiddleware = async (
       email: profile.email,
       name: profile.name,
       role: profile.role,
+      avatar_url: profile.avatar_url,
       phone: profile.phone,
     };
 
