@@ -91,15 +91,37 @@ export default function SettingsPage() {
     try {
       const response = await usersApi.uploadAvatar(file);
       setProfileAvatarUrl(response.publicUrl);
+      if (response.user) {
+        setUser(response.user);
+      } else {
+        // Fallback: update profile with the new avatar URL
+        const updated = await usersApi.updateProfile({ avatar_url: response.publicUrl });
+        setUser(updated.user);
+      }
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 3000);
     } catch (err: any) {
       setProfileError(err.message || 'Failed to upload photo');
     } finally {
       setUploadingAvatar(false);
+      e.target.value = '';
     }
   };
 
-  const handleRemoveAvatar = () => {
-    setProfileAvatarUrl('');
+  const handleRemoveAvatar = async () => {
+    setUploadingAvatar(true);
+    setProfileError('');
+    try {
+      const response = await usersApi.updateProfile({ avatar_url: null });
+      setProfileAvatarUrl('');
+      setUser(response.user);
+      setProfileSuccess(true);
+      setTimeout(() => setProfileSuccess(false), 3000);
+    } catch (err: any) {
+      setProfileError(err.message || 'Failed to remove photo');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {

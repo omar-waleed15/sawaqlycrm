@@ -356,7 +356,20 @@ router.post('/profile/avatar', authMiddleware, upload.single('avatar'), async (r
       .from('attachments')
       .getPublicUrl(storagePath);
 
-    res.json({ publicUrl: urlData.publicUrl });
+    // Update profile in DB with new avatar_url
+    const { data: updatedUser, error: updateDbError } = await supabaseAdmin
+      .from('profiles')
+      .update({ avatar_url: urlData.publicUrl })
+      .eq('id', req.user.id)
+      .select()
+      .single();
+
+    if (updateDbError) {
+      res.status(500).json({ error: updateDbError.message });
+      return;
+    }
+
+    res.json({ publicUrl: urlData.publicUrl, user: updatedUser });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to upload avatar' });
   }

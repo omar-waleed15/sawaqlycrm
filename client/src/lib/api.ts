@@ -160,7 +160,7 @@ export const usersApi = {
   uploadAvatar: (file: File) => {
     const formData = new FormData();
     formData.append('avatar', file);
-    return uploadFile('/users/profile/avatar', formData) as Promise<{ publicUrl: string }>;
+    return uploadFile('/users/profile/avatar', formData) as Promise<{ publicUrl: string; user?: import('@/types').User }>;
   },
   performance: (startDate?: string, endDate?: string) => {
     const params = new URLSearchParams();
