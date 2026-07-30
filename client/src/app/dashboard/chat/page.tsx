@@ -181,10 +181,14 @@ export default function GlobalChatPage() {
                     className={`flex items-start gap-2.5 ${isMe ? 'flex-row-reverse' : ''}`}
                   >
                     {/* User Avatar */}
-                    <Avatar className="size-9 shrink-0 border border-border">
-                      <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-bold">
-                        {msg.user ? getInitials(msg.user.name) : '?'}
-                      </AvatarFallback>
+                    <Avatar className="size-9 shrink-0 border border-border overflow-hidden">
+                      {msg.user?.avatar_url ? (
+                        <img src={msg.user.avatar_url} alt={msg.user.name} className="size-full object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-xs font-bold">
+                          {msg.user ? getInitials(msg.user.name) : '?'}
+                        </AvatarFallback>
+                      )}
                     </Avatar>
 
                     {/* Message Details */}
