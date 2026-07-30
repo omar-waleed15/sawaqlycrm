@@ -121,7 +121,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   };
 
   useEffect(() => {
-    if (user && user.role !== 'owner') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
       router.replace('/dashboard');
       return;
     }
@@ -153,7 +153,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     }
   }, [targetMonth, memberId, member]);
 
-  if (user?.role !== 'owner') return null;
+  if (!user || (user.role !== 'owner' && user.role !== 'team_leader')) return null;
 
   const targetVal = targetTasks === '' ? 0 : Number(targetTasks);
   const achievementRate = targetVal > 0 ? Math.round((completedTasks / targetVal) * 100) : 0;

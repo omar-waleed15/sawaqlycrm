@@ -51,7 +51,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/reminders', labelKey: 'nav.reminders',     icon: StickyNote,      allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/chat',     labelKey: 'nav.globalChat',    icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/client-chat', labelKey: 'nav.clientChat',  icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'account_manager'] },
-  { href: '/dashboard/team',     labelKey: 'nav.team',          icon: Users,           allowedRoles: ['owner'] },
+  { href: '/dashboard/team',     labelKey: 'nav.team',          icon: Users,           allowedRoles: ['owner', 'team_leader'] },
   { href: '/dashboard/finance',  labelKey: 'nav.finance',       icon: Briefcase,       allowedRoles: ['owner'] },
   { href: '/dashboard/my-salary', labelKey: 'nav.mySalary',     icon: Wallet,          allowedRoles: ['team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'] },
   { href: '/dashboard/clients',  labelKey: 'nav.clients',       icon: Users,           allowedRoles: ['owner', 'team_leader'] },

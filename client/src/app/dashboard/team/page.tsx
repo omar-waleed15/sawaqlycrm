@@ -73,8 +73,8 @@ export default function TeamPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Redirect if not owner
-    if (user && user.role !== 'owner') {
+    // Redirect if not owner or team_leader
+    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
       router.replace('/dashboard');
       return;
     }
@@ -619,7 +619,7 @@ export default function TeamPage() {
     );
   };
 
-  if (user?.role !== 'owner') return null;
+  if (!user || (user.role !== 'owner' && user.role !== 'team_leader')) return null;
 
   return (
     <div className="page-container fade-in">
@@ -629,36 +629,38 @@ export default function TeamPage() {
           <h1 className="page-header-title">{t('team.title')}</h1>
           <p className="page-header-subtitle">{t('team.subtitle')}</p>
         </div>
-        {activeTab === 'directory' && (
+        {user.role === 'owner' && activeTab === 'directory' && (
           <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="gap-1.5">
             <Plus className="size-4" /> {t('team.addMember')}
           </Button>
         )}
       </div>
 
-      {/* Tabs switcher */}
-      <div className="flex border-b border-border mb-3 gap-6">
-        <button
-          onClick={() => setActiveTab('directory')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'directory'
-              ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          👥 {t('team.directory')}
-        </button>
-        <button
-          onClick={() => setActiveTab('performance')}
-          className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'performance'
-              ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          📈 {t('team.performance')}
-        </button>
-      </div>
+      {/* Tabs switcher (Only visible for owner) */}
+      {user.role === 'owner' && (
+        <div className="flex border-b border-border mb-3 gap-6">
+          <button
+            onClick={() => setActiveTab('directory')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'directory'
+                ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            👥 {t('team.directory')}
+          </button>
+          <button
+            onClick={() => setActiveTab('performance')}
+            className={`pb-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'performance'
+                ? 'border-[#1D61E7] text-[#1D61E7] dark:border-[#1D61E7] dark:text-[#1D61E7]'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            📈 {t('team.performance')}
+          </button>
+        </div>
+      )}
 
       {activeTab === 'directory' ? (
         <>
@@ -817,23 +819,27 @@ export default function TeamPage() {
                         <ExternalLink className="size-3" /> {t('team.tasks')}
                       </Button>
                     )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openEditModal(member)}
-                      className="h-8 text-xs"
-                    >
-                      {t('common.edit')}
-                    </Button>
-                    {member.id !== user?.id && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteUser(member.id, member.name)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
+                    {user?.role === 'owner' && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openEditModal(member)}
+                          className="h-8 text-xs"
+                        >
+                          {t('common.edit')}
+                        </Button>
+                        {member.id !== user?.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteUser(member.id, member.name)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
