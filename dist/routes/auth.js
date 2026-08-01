@@ -48,6 +48,47 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Login failed' });
     }
 });
+// POST /api/auth/refresh — Renew expired access token using refresh_token
+router.post('/refresh', async (req, res) => {
+    const { refresh_token } = req.body;
+    if (!refresh_token) {
+        res.status(400).json({ error: 'Refresh token is required' });
+        return;
+    }
+    try {
+        const tempClient = (0, supabase_1.createTempClient)();
+        const { data, error } = await tempClient.auth.refreshSession({ refresh_token });
+        if (error || !data.user || !data.session) {
+            res.status(401).json({ error: 'Invalid or expired refresh token' });
+            return;
+        }
+        // Fetch user profile
+        const { data: profile, error: profileError } = await supabase_1.supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+        if (profileError || !profile) {
+            res.status(404).json({ error: 'User profile not found' });
+            return;
+        }
+        res.json({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            user: {
+                id: profile.id,
+                name: profile.name,
+                email: profile.email,
+                role: profile.role,
+                avatar_url: profile.avatar_url,
+                phone: profile.phone,
+            },
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to refresh token' });
+    }
+});
 // GET /api/auth/me
 router.get('/me', auth_1.authMiddleware, async (req, res) => {
     res.json({ user: req.user });

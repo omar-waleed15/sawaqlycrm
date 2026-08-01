@@ -27,6 +27,7 @@ const client_chat_1 = __importDefault(require("./routes/client_chat"));
 const notes_1 = __importDefault(require("./routes/notes"));
 const campaigns_1 = __importDefault(require("./routes/campaigns"));
 const roles_1 = __importDefault(require("./routes/roles"));
+const client_onboarding_1 = __importDefault(require("./routes/client_onboarding"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
@@ -66,6 +67,7 @@ app.use('/api/client-chat', client_chat_1.default);
 app.use('/api/notes', notes_1.default);
 app.use('/api/campaigns', campaigns_1.default);
 app.use('/api/roles', roles_1.default);
+app.use('/api/client-onboarding', client_onboarding_1.default);
 // 404 handler
 app.use((_req, res) => {
     res.status(404).json({ error: 'Route not found' });

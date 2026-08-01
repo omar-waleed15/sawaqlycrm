@@ -9,7 +9,7 @@ const auth_1 = require("../middleware/auth");
 const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
 const dashboardUserOnly = (req, res, next) => {
-    if (!req.user || req.user.role === 'client' || req.user.role === 'sales' || req.user.role === 'member' || req.user.role === 'graphic_designer' || req.user.role === 'video_editor' || req.user.role === 'reel_maker') {
+    if (!req.user || req.user.role === 'client') {
         res.status(403).json({ error: 'Access denied. Authorized roles only.' });
         return;
     }

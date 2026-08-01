@@ -9,6 +9,7 @@ const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const multer_1 = __importDefault(require("multer"));
 const deliverables_1 = require("../lib/deliverables");
+const report_deliverables_1 = require("../lib/report_deliverables");
 const router = (0, express_1.Router)();
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
@@ -380,44 +381,74 @@ router.delete('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSa
 // ═══════════════════════════════════════════════════════════════════════════
 // REPORTS CRUD
 // ═══════════════════════════════════════════════════════════════════════════
+// GET /api/closed-clients/:id/reports/monthly-counts — Get real-time Content Hub counts for a specific month
+router.get('/:id/reports/monthly-counts', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
+    const clientId = String(req.params.id);
+    const month = String(req.query.month || new Date().toISOString().substring(0, 7));
+    try {
+        const counts = await (0, report_deliverables_1.calculateMonthlyDeliverables)(clientId, month);
+        res.json({ month, counts });
+    }
+    catch (err) {
+        res.status(500).json({ error: 'Failed to calculate monthly content counts' });
+    }
+});
 router.get('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
-    const { id } = req.params;
+    const clientId = String(req.params.id);
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('client_reports')
             .select('*')
-            .eq('client_id', id)
+            .eq('client_id', clientId)
             .order('report_month', { ascending: false });
         if (error) {
             res.status(500).json({ error: error.message });
             return;
         }
-        res.json({ reports: data });
+        const reportsWithAutoCounts = await Promise.all((data || []).map(async (rep) => {
+            const ym = rep.report_month ? String(rep.report_month).substring(0, 7) : '';
+            const dynamicCounts = await (0, report_deliverables_1.calculateMonthlyDeliverables)(clientId, ym);
+            return {
+                ...rep,
+                num_posts: (rep.num_posts !== undefined && rep.num_posts !== 0) ? rep.num_posts : dynamicCounts.num_posts,
+                num_reels: (rep.num_reels !== undefined && rep.num_reels !== 0) ? rep.num_reels : dynamicCounts.num_reels,
+                num_stories: (rep.num_stories !== undefined && rep.num_stories !== 0) ? rep.num_stories : dynamicCounts.num_stories,
+                num_photos: (rep.num_photos !== undefined && rep.num_photos !== 0) ? rep.num_photos : dynamicCounts.num_photos,
+                dynamic_counts: dynamicCounts,
+            };
+        }));
+        res.json({ reports: reportsWithAutoCounts });
     }
     catch (err) {
         res.status(500).json({ error: 'Failed to fetch reports' });
     }
 });
 router.post('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
-    const { id } = req.params;
+    const clientId = String(req.params.id);
     const { report_month, views, interactions, messages, num_posts, num_reels, num_stories, num_photos, notes } = req.body;
     if (!report_month) {
         res.status(400).json({ error: 'Report month is required' });
         return;
     }
     try {
+        const ym = String(report_month).substring(0, 7);
+        const autoCounts = await (0, report_deliverables_1.calculateMonthlyDeliverables)(clientId, ym);
+        const finalPosts = (num_posts !== undefined && num_posts !== null && num_posts !== '') ? Number(num_posts) : autoCounts.num_posts;
+        const finalReels = (num_reels !== undefined && num_reels !== null && num_reels !== '') ? Number(num_reels) : autoCounts.num_reels;
+        const finalStories = (num_stories !== undefined && num_stories !== null && num_stories !== '') ? Number(num_stories) : autoCounts.num_stories;
+        const finalPhotos = (num_photos !== undefined && num_photos !== null && num_photos !== '') ? Number(num_photos) : autoCounts.num_photos;
         const { data, error } = await supabase_1.supabaseAdmin
             .from('client_reports')
             .upsert({
-            client_id: id,
+            client_id: clientId,
             report_month,
-            views: views ?? 0,
-            interactions: interactions ?? 0,
-            messages: messages ?? 0,
-            num_posts: num_posts ?? 0,
-            num_reels: num_reels ?? 0,
-            num_stories: num_stories ?? 0,
-            num_photos: num_photos ?? 0,
+            views: views ? Number(views) : 0,
+            interactions: interactions ? Number(interactions) : 0,
+            messages: messages ? Number(messages) : 0,
+            num_posts: finalPosts,
+            num_reels: finalReels,
+            num_stories: finalStories,
+            num_photos: finalPhotos,
             notes: notes || null,
             updated_at: new Date().toISOString(),
         }, { onConflict: 'client_id,report_month' })

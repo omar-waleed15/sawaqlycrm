@@ -9,7 +9,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
     const { taskId } = req.params;
     try {
         // Verify member has access to this task
-        if (req.user.role !== 'owner' && req.user.role !== 'team_leader') {
+        if (!['owner', 'team_leader', 'moderation', 'account_manager'].includes(req.user.role)) {
             const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
                 .select('id')
@@ -46,7 +46,7 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
     }
     try {
         // Verify member has access to this task
-        if (req.user.role !== 'owner' && req.user.role !== 'team_leader') {
+        if (!['owner', 'team_leader', 'moderation', 'account_manager'].includes(req.user.role)) {
             const { data: assignee, error: assigneeError } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
                 .select('id')

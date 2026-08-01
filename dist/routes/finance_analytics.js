@@ -14,7 +14,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
         const [contractsRes, expensesRes, salariesRes, clientsRes] = await Promise.all([
             supabase_1.supabaseAdmin.from('contracts').select('*, installments:contract_installments(*), client:clients(*)'),
             supabase_1.supabaseAdmin.from('expenses').select('*'),
-            supabase_1.supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount), advances:salary_advances(amount)'),
+            supabase_1.supabaseAdmin.from('salaries').select('*, user:profiles!salaries_user_id_fkey(id, name, email, role), penalties:salary_penalties(amount), bonuses:salary_bonuses(amount)'),
             supabase_1.supabaseAdmin.from('clients').select('*').eq('pipeline_stage', 'won'),
         ]);
         if (contractsRes.error || expensesRes.error || salariesRes.error || clientsRes.error) {
@@ -28,20 +28,31 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
             res.status(500).json({ error: firstError || 'Failed to fetch analytics data' });
             return;
         }
-        // Fetch salary installments separately to avoid schema cache issues
+        // Fetch salary installments & advances separately to avoid schema cache issues
         const allSalaries = salariesRes.data || [];
         const salaryIds = allSalaries.map((s) => s.id);
         let salaryInstallmentsMap = {};
         if (salaryIds.length > 0) {
-            const { data: instData, error: instError } = await supabase_1.supabaseAdmin
-                .from('salary_installments')
-                .select('*')
-                .in('salary_id', salaryIds);
-            if (!instError) {
-                (instData || []).forEach((inst) => {
+            const [{ data: instData }, { data: advData }] = await Promise.all([
+                supabase_1.supabaseAdmin.from('salary_installments').select('*').in('salary_id', salaryIds),
+                supabase_1.supabaseAdmin.from('salary_advances').select('salary_id, amount').in('salary_id', salaryIds),
+            ]);
+            if (instData) {
+                instData.forEach((inst) => {
                     if (!salaryInstallmentsMap[inst.salary_id])
                         salaryInstallmentsMap[inst.salary_id] = [];
                     salaryInstallmentsMap[inst.salary_id].push(inst);
+                });
+            }
+            if (advData) {
+                const advMap = {};
+                advData.forEach((adv) => {
+                    if (!advMap[adv.salary_id])
+                        advMap[adv.salary_id] = [];
+                    advMap[adv.salary_id].push(adv);
+                });
+                allSalaries.forEach((s) => {
+                    s.advances = advMap[s.id] || [];
                 });
             }
         }
@@ -175,10 +186,11 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res
             if (!salMonth)
                 return;
             const penaltyTotal = sal.penalties ? sal.penalties.reduce((sum, p) => sum + Number(p.amount), 0) : 0;
+            const bonusTotal = sal.bonuses ? sal.bonuses.reduce((sum, b) => sum + Number(b.amount), 0) : 0;
             const advanceTotal = sal.advances ? sal.advances.reduce((sum, a) => sum + Number(a.amount), 0) : 0;
             const netDeductions = penaltyTotal + advanceTotal;
             if (sal.is_recurring) {
-                const netAmt = Math.max(0, amt - netDeductions);
+                const netAmt = Math.max(0, amt + bonusTotal - netDeductions);
                 if (monthlyData[salMonth]) {
                     monthlyData[salMonth].expenses += netAmt;
                     monthlyData[salMonth].salaries += netAmt;

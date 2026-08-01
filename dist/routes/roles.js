@@ -8,6 +8,7 @@ const ALL_SYSTEM_ROLES = [
     'team_leader',
     'sales',
     'member',
+    'developer',
     'graphic_designer',
     'video_editor',
     'reel_maker',

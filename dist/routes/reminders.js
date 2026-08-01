@@ -1,10 +1,65 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const supabase_1 = require("../lib/supabase");
 const auth_1 = require("../middleware/auth");
 const webhook_1 = require("../lib/webhook");
+const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+});
+// POST /api/reminders/upload — Upload attachment file for reminder
+router.post('/upload', auth_1.authMiddleware, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+    }
+    try {
+        const file = req.file;
+        const fileExt = file.originalname.split('.').pop() || 'bin';
+        const filePath = `reminders/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+        let publicUrl = '';
+        const { error: uploadErr } = await supabase_1.supabaseAdmin.storage
+            .from('documents')
+            .upload(filePath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+        });
+        if (uploadErr) {
+            const { error: fallbackErr } = await supabase_1.supabaseAdmin.storage
+                .from('chat-attachments')
+                .upload(filePath, file.buffer, {
+                contentType: file.mimetype,
+                upsert: true,
+            });
+            if (fallbackErr) {
+                publicUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+            }
+            else {
+                const { data: urlData } = supabase_1.supabaseAdmin.storage.from('chat-attachments').getPublicUrl(filePath);
+                publicUrl = urlData.publicUrl;
+            }
+        }
+        else {
+            const { data: urlData } = supabase_1.supabaseAdmin.storage.from('documents').getPublicUrl(filePath);
+            publicUrl = urlData.publicUrl;
+        }
+        res.json({
+            url: publicUrl,
+            name: file.originalname,
+            type: file.mimetype.startsWith('image/') ? 'image' : 'file',
+            size: file.size,
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to upload attachment' });
+    }
+});
 // GET /api/reminders — List all reminders related to the current user (sent or received)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     try {
@@ -34,7 +89,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
 });
 // POST /api/reminders — Create new reminders (supports single receiver_id or receiver_ids array)
 router.post('/', auth_1.authMiddleware, async (req, res) => {
-    const { receiver_id, receiver_ids, content } = req.body;
+    const { receiver_id, receiver_ids, content, attachments, review_link } = req.body;
     const senderId = req.user?.id;
     if (!senderId) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -56,6 +111,8 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
             sender_id: senderId,
             receiver_id: rId,
             content: content.trim(),
+            attachments: Array.isArray(attachments) ? attachments : [],
+            review_link: review_link ? String(review_link).trim() : null,
         }));
         const { data, error } = await supabase_1.supabaseAdmin
             .from('reminders')
@@ -70,6 +127,7 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
             return;
         }
         // Dispatch webhook notifications in the background
+        console.log(`[Webhook Debug] Reminder created, entries count: ${data?.length || 0}`);
         if (data && data.length > 0) {
             const sender = {
                 id: req.user.id,
@@ -77,6 +135,7 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
                 email: req.user.email,
             };
             for (const r of data) {
+                console.log(`[Webhook Debug] Reminder entry:`, JSON.stringify({ id: r.id, has_receiver: !!r.receiver, receiver_name: r.receiver?.name || 'N/A' }));
                 if (r.receiver) {
                     (0, webhook_1.sendWebhookNotification)({
                         type: 'reminder',
@@ -92,9 +151,15 @@ router.post('/', auth_1.authMiddleware, async (req, res) => {
                             email: r.receiver.email,
                             phone: r.receiver.phone,
                         },
-                    }).catch(err => console.error('Failed to dispatch webhook:', err));
+                    }).catch(err => console.error('[Webhook Debug] Failed to dispatch reminder webhook:', err));
+                }
+                else {
+                    console.warn(`[Webhook Debug] Skipped: r.receiver is null for reminder id=${r.id}`);
                 }
             }
+        }
+        else {
+            console.warn(`[Webhook Debug] No reminder data returned, skipping webhook dispatch.`);
         }
         res.status(201).json({ reminders: data || [] });
     }

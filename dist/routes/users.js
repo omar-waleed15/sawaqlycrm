@@ -15,7 +15,7 @@ const upload = (0, multer_1.default)({
 });
 // GET /api/users — List all team members (owner, team leader, sales, moderation, account_manager, content_creator)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
-    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied.' });
         return;
     }
@@ -49,7 +49,7 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         // 2. Fetch task assignees within the date window
         let assigneesQuery = supabase_1.supabaseAdmin
             .from('task_assignees')
-            .select('user_id, status, rating, assigned_at, total_time_spent');
+            .select('user_id, status, rating, assigned_at, total_time_spent, task:tasks(estimated_time_minutes)');
         if (sDate)
             assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
         if (eDate)
@@ -88,7 +88,7 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
             .from('sales_targets')
             .select('user_id, target_amount')
             .eq('month', currentMonthStr);
-        const [{ data: profiles, error: profilesErr }, { data: assignees, error: assigneesErr }, { data: clients, error: clientsErr }, { data: calls, error: callsErr }, { data: contracts, error: contractsErr }, { data: targets, error: targetsErr }, { data: salesTargets, error: salesTargetsErr }] = await Promise.all([
+        const [{ data: profiles, error: profilesErr }, { data: assigneesRes, error: assigneesErr }, { data: clients, error: clientsErr }, { data: calls, error: callsErr }, { data: contracts, error: contractsErr }, { data: targets, error: targetsErr }, { data: salesTargets, error: salesTargetsErr }] = await Promise.all([
             profilesPromise,
             assigneesQuery,
             clientsQuery,
@@ -99,8 +99,24 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         ]);
         if (profilesErr)
             throw profilesErr;
-        if (assigneesErr)
-            throw assigneesErr;
+        let assignees = [];
+        if (assigneesErr) {
+            console.warn('Assignees query with estimated_time_minutes failed, falling back:', assigneesErr.message);
+            let fallbackQuery = supabase_1.supabaseAdmin
+                .from('task_assignees')
+                .select('user_id, status, rating, assigned_at, total_time_spent');
+            if (sDate)
+                fallbackQuery = fallbackQuery.gte('assigned_at', sDate);
+            if (eDate)
+                fallbackQuery = fallbackQuery.lte('assigned_at', eDate);
+            const { data: fbData, error: fbErr } = await fallbackQuery;
+            if (fbErr)
+                throw fbErr;
+            assignees = fbData || [];
+        }
+        else {
+            assignees = assigneesRes || [];
+        }
         if (clientsErr)
             throw clientsErr;
         if (callsErr)
@@ -129,6 +145,30 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
             const averageCompletionTime = completedAssignments.length > 0
                 ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
                 : null;
+            // Time variance & on-time stats for completed tasks with an estimated time limit
+            const completedWithEstimate = completedAssignments.filter((a) => a.task && a.task.estimated_time_minutes != null);
+            let onTimeCount = 0;
+            let overtimeTasksCount = 0;
+            let netTimeVarianceSeconds = null;
+            if (completedWithEstimate.length > 0) {
+                let totalVariance = 0;
+                completedWithEstimate.forEach((a) => {
+                    const estimatedSec = (a.task.estimated_time_minutes || 0) * 60;
+                    const actualSec = a.total_time_spent || 0;
+                    const diffSec = estimatedSec - actualSec; // >0 means time saved, <0 means time wasted
+                    totalVariance += diffSec;
+                    if (actualSec <= estimatedSec) {
+                        onTimeCount++;
+                    }
+                    else {
+                        overtimeTasksCount++;
+                    }
+                });
+                netTimeVarianceSeconds = totalVariance;
+            }
+            const onTimeRate = completedWithEstimate.length > 0
+                ? Math.round((onTimeCount / completedWithEstimate.length) * 100)
+                : null;
             // Aggregate sales stats
             const userLeads = (clients || []).filter(c => c.sales_rep_id === user.id);
             const leadsManaged = userLeads.length;
@@ -148,6 +188,9 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
                     completionRate,
                     averageRating,
                     averageCompletionTime,
+                    onTimeRate,
+                    netTimeVarianceSeconds,
+                    overtimeTasksCount,
                     taskTarget: targetMap.get(user.id) || null
                 },
                 salesStats: {
@@ -168,14 +211,57 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         res.status(500).json({ error: err.message || 'Failed to fetch performance data' });
     }
 });
-// PUT /api/users/profile — Update currently authenticated user's profile
+// PUT /api/users/profile — Update currently authenticated user's profile & security credentials
 router.put('/profile', auth_1.authMiddleware, async (req, res) => {
     if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }
-    const { name, avatar_url, phone } = req.body;
+    const { name, avatar_url, phone, email, password, currentPassword } = req.body;
     try {
+        // Fetch current user from Supabase Auth Admin
+        const { data: authUserData, error: getUserError } = await supabase_1.supabaseAdmin.auth.admin.getUserById(req.user.id);
+        if (getUserError || !authUserData?.user) {
+            res.status(404).json({ error: 'User account not found in Auth system' });
+            return;
+        }
+        const currentAuthEmail = authUserData.user.email || '';
+        // 1. If changing credentials, verify current password if provided
+        if (currentPassword) {
+            const tempClient = (0, supabase_1.createTempClient)();
+            const { error: verifyError } = await tempClient.auth.signInWithPassword({
+                email: currentAuthEmail,
+                password: currentPassword,
+            });
+            if (verifyError) {
+                res.status(400).json({ error: 'Current password is incorrect' });
+                return;
+            }
+        }
+        // 2. Update Supabase Auth if email or password is being changed
+        const authUpdates = {};
+        if (email && email.trim() !== '') {
+            const targetEmail = email.trim();
+            if (targetEmail.toLowerCase() !== currentAuthEmail.toLowerCase()) {
+                authUpdates.email = targetEmail;
+                authUpdates.email_confirm = true;
+            }
+        }
+        if (password) {
+            if (password.length < 6) {
+                res.status(400).json({ error: 'Password must be at least 6 characters' });
+                return;
+            }
+            authUpdates.password = password;
+        }
+        if (Object.keys(authUpdates).length > 0) {
+            const { error: authError } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(req.user.id, authUpdates);
+            if (authError) {
+                res.status(400).json({ error: authError.message });
+                return;
+            }
+        }
+        // 3. Update profiles table
         const updates = {};
         if (name !== undefined)
             updates.name = name;
@@ -183,21 +269,33 @@ router.put('/profile', auth_1.authMiddleware, async (req, res) => {
             updates.avatar_url = avatar_url;
         if (phone !== undefined)
             updates.phone = phone || null;
-        if (Object.keys(updates).length === 0) {
-            res.status(400).json({ error: 'No fields to update' });
-            return;
+        if (email && email.trim() !== '')
+            updates.email = email.trim();
+        if (Object.keys(updates).length > 0) {
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .update(updates)
+                .eq('id', req.user.id)
+                .select()
+                .single();
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            res.json({ user: data });
         }
-        const { data, error } = await supabase_1.supabaseAdmin
-            .from('profiles')
-            .update(updates)
-            .eq('id', req.user.id)
-            .select()
-            .single();
-        if (error) {
-            res.status(500).json({ error: error.message });
-            return;
+        else {
+            const { data, error } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .select('*')
+                .eq('id', req.user.id)
+                .single();
+            if (error) {
+                res.status(500).json({ error: error.message });
+                return;
+            }
+            res.json({ user: data });
         }
-        res.json({ user: data });
     }
     catch (err) {
         res.status(500).json({ error: err.message || 'Failed to update profile' });
@@ -232,7 +330,18 @@ router.post('/profile/avatar', auth_1.authMiddleware, upload.single('avatar'), a
         const { data: urlData } = supabase_1.supabaseAdmin.storage
             .from('attachments')
             .getPublicUrl(storagePath);
-        res.json({ publicUrl: urlData.publicUrl });
+        // Update profile in DB with new avatar_url
+        const { data: updatedUser, error: updateDbError } = await supabase_1.supabaseAdmin
+            .from('profiles')
+            .update({ avatar_url: urlData.publicUrl })
+            .eq('id', req.user.id)
+            .select()
+            .single();
+        if (updateDbError) {
+            res.status(500).json({ error: updateDbError.message });
+            return;
+        }
+        res.json({ publicUrl: urlData.publicUrl, user: updatedUser });
     }
     catch (err) {
         res.status(500).json({ error: err.message || 'Failed to upload avatar' });
@@ -245,7 +354,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
         res.status(400).json({ error: 'Name, email, and password are required' });
         return;
     }
-    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'];
+    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'];
     const userRole = validRoles.includes(role) ? role : 'member';
     try {
         // Create user in Supabase Auth
@@ -311,7 +420,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         const updates = {};
         if (name)
             updates.name = name;
-        if (role && ['owner', 'team_leader', 'sales', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role))
+        if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role))
             updates.role = role;
         if (email)
             updates.email = email;

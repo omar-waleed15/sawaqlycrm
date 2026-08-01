@@ -297,7 +297,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
 
 // POST /api/tasks — Create a new task (owner, team leader or sales)
 router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, project_id, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
+  const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
@@ -327,7 +327,6 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
       content_type: content_type || null,
       content_description: content_description || null,
       client_id: client_id || null,
-      project_id: project_id || null,
       is_deliverable: is_deliverable ?? false,
       deliverable_type: deliverable_type || null,
       deliverable_month: deliverable_month || null,
@@ -340,8 +339,17 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
       .select('*')
       .single();
 
-    if (taskError && taskError.message?.includes('estimated_time_minutes')) {
-      delete insertData.estimated_time_minutes;
+    while (taskError && (taskError.message?.includes('schema cache') || taskError.message?.includes('estimated_time_minutes'))) {
+      if (taskError.message?.includes('schema cache')) {
+        const match = taskError.message.match(/Could not find the '([^']+)' column/);
+        if (match && match[1] && match[1] in insertData) {
+          delete insertData[match[1]];
+        } else {
+          break;
+        }
+      } else if (taskError.message?.includes('estimated_time_minutes')) {
+        delete insertData.estimated_time_minutes;
+      }
       const fallback = await supabaseAdmin
         .from('tasks')
         .insert(insertData)
@@ -515,7 +523,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
 
     if (admin) {
       // Admin: update shared task fields
-      const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, project_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
+      const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
       if (due_date) {
         const createdStr = existing.created_at ? new Date(existing.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
@@ -535,7 +543,6 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       if (content_type !== undefined) updates.content_type = content_type;
       if (content_description !== undefined) updates.content_description = content_description;
       if (client_id !== undefined) updates.client_id = client_id || null;
-      if (project_id !== undefined) updates.project_id = project_id || null;
       if (is_deliverable !== undefined) updates.is_deliverable = is_deliverable;
       if (deliverable_type !== undefined) updates.deliverable_type = deliverable_type;
       if (deliverable_month !== undefined) updates.deliverable_month = deliverable_month;
@@ -554,8 +561,17 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
         .update(updates)
         .eq('id', id);
 
-      if (updateError && updateError.message?.includes('estimated_time_minutes')) {
-        delete updates.estimated_time_minutes;
+      while (updateError && (updateError.message?.includes('schema cache') || updateError.message?.includes('estimated_time_minutes'))) {
+        if (updateError.message?.includes('schema cache')) {
+          const match = updateError.message.match(/Could not find the '([^']+)' column/);
+          if (match && match[1] && match[1] in updates) {
+            delete updates[match[1]];
+          } else {
+            break;
+          }
+        } else if (updateError.message?.includes('estimated_time_minutes')) {
+          delete updates.estimated_time_minutes;
+        }
         const fallback = await supabaseAdmin
           .from('tasks')
           .update(updates)
