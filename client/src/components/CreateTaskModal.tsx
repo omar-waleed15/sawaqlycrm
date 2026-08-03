@@ -24,9 +24,10 @@ interface CreateTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (newTask: Task) => void;
+  defaultClientId?: string;
 }
 
-export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTaskModalProps) {
+export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultClientId }: CreateTaskModalProps) {
   const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,6 +37,8 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [dueDate, setDueDate] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [estimatedMinutes, setEstimatedMinutes] = useState('');
   const [clientId, setClientId] = useState('');
   const [linkInputs, setLinkInputs] = useState<string[]>(['']);
   const [isDeliverable, setIsDeliverable] = useState(false);
@@ -59,7 +62,9 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
       setDescription('');
       setPriority('medium');
       setDueDate('');
-      setClientId('');
+      setEstimatedHours('');
+      setEstimatedMinutes('');
+      setClientId(defaultClientId || '');
       setLinkInputs(['']);
       setIsDeliverable(false);
       setAssigneeIds([]);
@@ -97,11 +102,14 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
 
     try {
       const validLinks = linkInputs.map(l => l.trim()).filter(l => l.length > 0);
+      const totalEstMins = (Number(estimatedHours || 0) * 60) + Number(estimatedMinutes || 0);
+
       const data = await tasksApi.create({
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
         due_date: dueDate ? parseCairoDateTimeToISO(dueDate) : undefined,
+        estimated_time_minutes: totalEstMins > 0 ? totalEstMins : undefined,
         drive_link: validLinks.length > 0 ? validLinks.join('\n') : undefined,
         client_id: clientId || undefined,
         is_deliverable: isDeliverable,
@@ -203,6 +211,39 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
               onChange={e => setDueDate(e.target.value)}
               className="h-9 text-xs"
             />
+          </div>
+        </div>
+
+        {/* Estimated Time Limit */}
+        <div className="flex flex-col gap-1 p-3 rounded-lg border border-border bg-muted/20">
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            ⏱️ {t('createTask.estimatedTime')}
+          </Label>
+          <div className="grid grid-cols-2 gap-3 mt-1">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0"
+                max="500"
+                placeholder="0"
+                value={estimatedHours}
+                onChange={e => setEstimatedHours(e.target.value)}
+                className="h-9 text-xs bg-background"
+              />
+              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t('createTask.estimatedHours')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="0"
+                max="59"
+                placeholder="0"
+                value={estimatedMinutes}
+                onChange={e => setEstimatedMinutes(e.target.value)}
+                className="h-9 text-xs bg-background"
+              />
+              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t('createTask.estimatedMinutes')}</span>
+            </div>
           </div>
         </div>
 

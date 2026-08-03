@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { Task, Client } from '@/types';
 import { useLanguage } from '@/lib/i18n';
 import { tasksApi } from '@/lib/api';
 import TaskCard from '@/components/TaskCard';
+import CreateTaskModal from '@/components/CreateTaskModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -32,6 +32,7 @@ export default function ClosedClientTasks({ clientId, client }: ClosedClientTask
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -81,11 +82,9 @@ export default function ClosedClientTasks({ clientId, client }: ClosedClientTask
           <h3 className="text-base font-semibold text-foreground">{t('closedClients.tab.tasks')}</h3>
           <p className="text-sm text-muted-foreground">Manage and track tasks assigned to this client</p>
         </div>
-        <Link href={`/dashboard/tasks/create?client_id=${clientId}`}>
-          <Button size="sm" className="w-full sm:w-auto">
-            <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('tasks.createTask')}
-          </Button>
-        </Link>
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => setIsTaskModalOpen(true)}>
+          <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" /> {t('tasks.createTask')}
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -144,6 +143,14 @@ export default function ClosedClientTasks({ clientId, client }: ClosedClientTask
           ))}
         </div>
       )}
+
+      {/* Unified Create Task Modal */}
+      <CreateTaskModal
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        defaultClientId={clientId}
+        onSuccess={loadTasks}
+      />
     </div>
   );
 }
