@@ -521,7 +521,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                   <div className="flex-1 min-w-0 text-start">
                                     <div className="text-xs font-bold truncate group-hover:text-indigo-600 transition-colors leading-tight">{att.filename}</div>
                                     <div className="text-[9px] text-muted-foreground mt-0.5">
-                                      {att.size < 1024 ? att.size + ' B' : att.size < 1024 * 1024 ? (att.size / 1024).toFixed(1) + ' KB' : (att.size / (1024 * 1024)).toFixed(1) + ' MB'}
+                                      {(() => {
+                                        if (!att.size || isNaN(Number(att.size)) || Number(att.size) <= 0) return 'File';
+                                        const sz = Number(att.size);
+                                        if (sz < 1024) return sz + ' B';
+                                        if (sz < 1024 * 1024) return (sz / 1024).toFixed(1) + ' KB';
+                                        return (sz / (1024 * 1024)).toFixed(1) + ' MB';
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
