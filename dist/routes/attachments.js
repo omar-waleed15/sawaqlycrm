@@ -9,10 +9,10 @@ const auth_1 = require("../middleware/auth");
 const roleCheck_1 = require("../middleware/roleCheck");
 const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)({ mergeParams: true });
-// Use memory storage - we'll upload directly to Supabase Storage
+// Use memory storage - we'll upload directly to Supabase Storage (supporting direct mobile videos up to 250MB)
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+    limits: { fileSize: 250 * 1024 * 1024 }, // 250MB limit for high-res device/mobile video clips
 });
 // POST /api/tasks/:taskId/attachments — Upload attachment (owner only)
 router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSales, upload.single('file'), async (req, res) => {

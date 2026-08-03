@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Loader2, Plus, X, Paperclip, FileImage, FileText, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, X, Paperclip, FileImage, FileText, FileVideo, Trash2 } from 'lucide-react';
 
 import { useFormDraft } from '@/lib/useFormDraft';
 
@@ -277,11 +277,11 @@ export default function CreateTaskPage() {
                 >
                   <Paperclip className="size-6 text-muted-foreground" />
                   <span className="text-sm font-medium text-muted-foreground">{t('createTask.browseFiles')}</span>
-                  <span className="text-[10px] text-muted-foreground">PNG, JPG, PDF — max 20MB</span>
+                  <span className="text-[10px] text-muted-foreground">PNG, JPG, Videos (MP4, MOV...), PDF — max 250MB</span>
                   <input
                     id="file-upload"
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/*,video/*,.pdf,.doc,.docx,.mp4,.mov,.webm,.mkv,.avi,.3gp"
                     multiple
                     className="hidden"
                     onChange={handleFileSelect}
@@ -291,22 +291,27 @@ export default function CreateTaskPage() {
                 {pendingFiles.length > 0 && (
                   <div className="flex flex-col gap-2 mt-3">
                     <span className="text-xs font-semibold text-muted-foreground">{t('createTask.selectedFiles')}</span>
-                    {pendingFiles.map((file, i) => (
-                      <div key={`${file.name}-${i}`} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
-                        {file.type.startsWith('image/') ? (
-                          <FileImage className="size-4 text-[#1D61E7] shrink-0" />
-                        ) : (
-                          <FileText className="size-4 text-rose-500 shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{file.name}</div>
-                          <div className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</div>
+                    {pendingFiles.map((file, i) => {
+                      const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(file.name);
+                      return (
+                        <div key={`${file.name}-${i}`} className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                          {isVideo ? (
+                            <FileVideo className="size-4 text-purple-600 shrink-0" />
+                          ) : file.type.startsWith('image/') ? (
+                            <FileImage className="size-4 text-[#1D61E7] shrink-0" />
+                          ) : (
+                            <FileText className="size-4 text-rose-500 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{file.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</div>
+                          </div>
+                          <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                            <Trash2 className="size-3.5" />
+                          </button>
                         </div>
-                        <button type="button" onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

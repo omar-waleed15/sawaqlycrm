@@ -487,69 +487,90 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         📎 {t('taskDetail.attachments') || 'Attachments'} ({task.attachments.length})
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {task.attachments.map(att => (
-                          <div
-                            key={att.id}
-                            className="flex items-center justify-between gap-2.5 rounded-lg border border-border/80 bg-muted/30 p-2 hover:bg-muted/75 transition-colors group min-w-0"
-                          >
+                        {task.attachments.map(att => {
+                          const isVideo = att.mimetype?.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(att.filename || '');
+                          return (
                             <div
-                              onClick={() => att.public_url && window.open(att.public_url, '_blank')}
-                              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                              key={att.id}
+                              className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/30 p-2.5 hover:bg-muted/75 transition-colors group min-w-0"
                             >
-                              {att.mimetype?.startsWith('image/') ? (
-                                <div className="size-9 rounded-md overflow-hidden bg-muted border border-border shrink-0">
-                                  {att.public_url && (
-                                    <img
-                                      src={att.public_url}
-                                      alt={att.filename || 'Attachment'}
-                                      className="size-full object-cover"
-                                    />
+                              <div className="flex items-center justify-between gap-2.5 min-w-0">
+                                <div
+                                  onClick={() => att.public_url && window.open(att.public_url, '_blank')}
+                                  className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                                >
+                                  {isVideo ? (
+                                    <div className="size-9 rounded-md bg-purple-50 dark:bg-purple-950/40 border border-purple-200/50 flex items-center justify-center shrink-0 text-purple-600">
+                                      <span className="text-sm">🎬</span>
+                                    </div>
+                                  ) : att.mimetype?.startsWith('image/') ? (
+                                    <div className="size-9 rounded-md overflow-hidden bg-muted border border-border shrink-0">
+                                      {att.public_url && (
+                                        <img
+                                          src={att.public_url}
+                                          alt={att.filename || 'Attachment'}
+                                          className="size-full object-cover"
+                                        />
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="size-9 rounded-md bg-rose-50 border border-rose-200/50 flex items-center justify-center shrink-0">
+                                      <span className="text-sm">📄</span>
+                                    </div>
                                   )}
+                                  <div className="flex-1 min-w-0 text-start">
+                                    <div className="text-xs font-bold truncate group-hover:text-indigo-600 transition-colors leading-tight">{att.filename}</div>
+                                    <div className="text-[9px] text-muted-foreground mt-0.5">
+                                      {att.size < 1024 ? att.size + ' B' : att.size < 1024 * 1024 ? (att.size / 1024).toFixed(1) + ' KB' : (att.size / (1024 * 1024)).toFixed(1) + ' MB'}
+                                    </div>
+                                  </div>
                                 </div>
-                              ) : (
-                                <div className="size-9 rounded-md bg-rose-50 border border-rose-200/50 flex items-center justify-center shrink-0">
-                                  <span className="text-sm">📄</span>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0 text-start">
-                                <div className="text-xs font-bold truncate group-hover:text-indigo-600 transition-colors leading-tight">{att.filename}</div>
-                                <div className="text-[9px] text-muted-foreground mt-0.5">
-                                  {att.size < 1024 ? att.size + ' B' : att.size < 1024 * 1024 ? (att.size / 1024).toFixed(1) + ' KB' : (att.size / (1024 * 1024)).toFixed(1) + ' MB'}
+
+                                <div className="shrink-0">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger
+                                      render={
+                                        <Button variant="ghost" size="icon" className="size-7 rounded-md hover:bg-muted-foreground/10 shrink-0">
+                                          <MoreVertical className="size-3.5 text-muted-foreground" />
+                                        </Button>
+                                      }
+                                    />
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => att.public_url && window.open(att.public_url, '_blank')}>
+                                        <ExternalLink className="size-3 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
+                                        {t('common.open') || 'Open'}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
+                                        if (!att.public_url) return;
+                                        const link = document.createElement('a');
+                                        link.href = att.public_url;
+                                        link.setAttribute('download', att.filename || 'file');
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        link.remove();
+                                      }}>
+                                        <Download className="size-3 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
+                                        {t('common.download') || 'Download'}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
                               </div>
-                            </div>
 
-                            <div className="shrink-0">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  render={
-                                    <Button variant="ghost" size="icon" className="size-7 rounded-md hover:bg-muted-foreground/10 shrink-0">
-                                      <MoreVertical className="size-3.5 text-muted-foreground" />
-                                    </Button>
-                                  }
-                                />
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => att.public_url && window.open(att.public_url, '_blank')}>
-                                    <ExternalLink className="size-3 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
-                                    {t('common.open') || 'Open'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => {
-                                    if (!att.public_url) return;
-                                    const link = document.createElement('a');
-                                    link.href = att.public_url;
-                                    link.setAttribute('download', att.filename || 'file');
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                  }}>
-                                    <Download className="size-3 mr-2 rtl:ml-2 rtl:mr-0 text-muted-foreground" />
-                                    {t('common.download') || 'Download'}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {/* Inline video player preview for video attachments */}
+                              {isVideo && att.public_url && (
+                                <div className="mt-1 rounded-md overflow-hidden bg-black/90 border border-border/80">
+                                  <video
+                                    src={att.public_url}
+                                    controls
+                                    preload="metadata"
+                                    className="w-full max-h-52 object-contain"
+                                  />
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

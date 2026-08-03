@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { parseCairoDateTimeToISO, getCairoTodayString } from '@/lib/dateUtils';
-import { Loader2, Plus, X, Paperclip, CheckCircle2, Rocket, Trash2 } from 'lucide-react';
+import { Loader2, Plus, X, Paperclip, CheckCircle2, Rocket, Trash2, Video } from 'lucide-react';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -321,14 +321,15 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
           <div className="flex items-center justify-between">
             <Label htmlFor="task-files" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
               <Paperclip className="size-3 text-indigo-500" />
-              {locale === 'ar' ? 'مرفقات الملفات' : 'File Attachments'}
+              {locale === 'ar' ? 'مرفقات الملفات / فيديوهات' : 'File / Video Attachments'}
             </Label>
             <label htmlFor="task-files" className="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-700">
-              + {locale === 'ar' ? 'إضافة ملفات' : 'Add Files'}
+              + {locale === 'ar' ? 'إضافة ملفات / فيديوهات' : 'Add Files / Videos'}
             </label>
             <input
               id="task-files"
               type="file"
+              accept="image/*,video/*,.pdf,.doc,.docx,.mp4,.mov,.webm,.mkv,.avi,.3gp"
               multiple
               className="hidden"
               onChange={handleFileChange}
@@ -337,14 +338,18 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
 
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 p-2 bg-muted/30 border rounded-lg max-h-[80px] overflow-y-auto">
-              {pendingFiles.map((file, idx) => (
-                <Badge key={idx} variant="outline" className="text-[10px] gap-1 py-0.5 bg-background">
-                  <span className="truncate max-w-[120px]">{file.name}</span>
-                  <button type="button" onClick={() => removePendingFile(idx)} className="hover:text-destructive">
-                    <X className="size-3" />
-                  </button>
-                </Badge>
-              ))}
+              {pendingFiles.map((file, idx) => {
+                const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(file.name);
+                return (
+                  <Badge key={idx} variant="outline" className="text-[10px] gap-1 py-0.5 bg-background">
+                    {isVideo ? <Video className="size-3 text-purple-600 shrink-0" /> : <Paperclip className="size-3 text-indigo-500 shrink-0" />}
+                    <span className="truncate max-w-[120px]">{file.name}</span>
+                    <button type="button" onClick={() => removePendingFile(idx)} className="hover:text-destructive">
+                      <X className="size-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
             </div>
           )}
         </div>

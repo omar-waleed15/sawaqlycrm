@@ -6,10 +6,10 @@ import multer from 'multer';
 
 const router = Router({ mergeParams: true });
 
-// Use memory storage - we'll upload directly to Supabase Storage
+// Use memory storage - we'll upload directly to Supabase Storage (supporting direct mobile videos up to 250MB)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
+  limits: { fileSize: 250 * 1024 * 1024 }, // 250MB limit for high-res device/mobile video clips
 });
 
 // POST /api/tasks/:taskId/attachments — Upload attachment (owner only)
