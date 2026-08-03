@@ -57,20 +57,35 @@ router.get('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respons
     const firstDayOfMonth = `${month}-01`;
     console.log('[Salaries GET] Querying month:', firstDayOfMonth);
 
-    const { data, error } = await supabaseAdmin
+    // Fetch all salaries ordered by creation date
+    const { data: allSalaries, error } = await supabaseAdmin
       .from('salaries')
       .select(SALARY_SELECT)
-      .eq('month', firstDayOfMonth)
       .order('created_at', { ascending: false });
 
-    console.log('[Salaries GET] Result count:', data?.length, '| Error:', error?.message);
+    console.log('[Salaries GET] Total count:', allSalaries?.length, '| Error:', error?.message);
 
     if (error) {
       res.status(500).json({ error: error.message });
       return;
     }
 
-    const enriched = await attachAdvancesToSalaries(data || []);
+    // Map each user to their salary statement: prefer exact month match, otherwise fall back to latest recurring record
+    const userSalaryMap: Record<string, any> = {};
+
+    (allSalaries || []).forEach(s => {
+      const isExactMonth = s.month && s.month.startsWith(month);
+      const existing = userSalaryMap[s.user_id];
+
+      if (!existing) {
+        userSalaryMap[s.user_id] = s;
+      } else if (isExactMonth && (!existing.month || !existing.month.startsWith(month))) {
+        userSalaryMap[s.user_id] = s;
+      }
+    });
+
+    const resultSalaries = Object.values(userSalaryMap);
+    const enriched = await attachAdvancesToSalaries(resultSalaries);
     res.json({ salaries: enriched });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch salaries' });
@@ -90,8 +105,8 @@ router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response)
 
     const firstDayOfMonth = `${month}-01`;
 
-    // Fetch salary record for current user & month
-    const { data: salary, error } = await supabaseAdmin
+    // 1. Try to fetch exact salary record for current user & requested month
+    const { data: exactSalary, error } = await supabaseAdmin
       .from('salaries')
       .select(SALARY_SELECT)
       .eq('user_id', userId)
@@ -101,6 +116,23 @@ router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response)
     if (error) {
       res.status(500).json({ error: error.message });
       return;
+    }
+
+    let salary = exactSalary;
+
+    // 2. If no exact record exists for this month, fall back to employee's latest recurring salary record from Supabase
+    if (!salary) {
+      const { data: latestSalary } = await supabaseAdmin
+        .from('salaries')
+        .select(SALARY_SELECT)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestSalary) {
+        salary = latestSalary;
+      }
     }
 
     if (salary) {
@@ -117,6 +149,10 @@ router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response)
     const availableMonths = (monthsData || [])
       .map((s: any) => s.month ? s.month.substring(0, 7) : null)
       .filter((m: string | null): m is string => Boolean(m));
+
+    if (month && !availableMonths.includes(month)) {
+      availableMonths.unshift(month);
+    }
 
     const uniqueMonths = Array.from(new Set(availableMonths));
 
