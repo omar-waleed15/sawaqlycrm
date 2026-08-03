@@ -617,15 +617,15 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               )}
 
               {/* Timer & Work Submission Card */}
-              <Card className="border-slate-200 overflow-hidden shadow-xs">
-                <div className="bg-[#1D61E7]/5 px-5 py-3 border-b flex items-center justify-between gap-4 flex-wrap">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#1D61E7] flex items-center gap-1.5">
+              <Card className="overflow-hidden shadow-xs">
+                <CardHeader className="bg-muted/30 px-5 py-3 border-b flex flex-row items-center justify-between gap-4 flex-wrap space-y-0">
+                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     ⚡ {t('taskDetail.actionHub') || 'Task Actions & Workspace'}
-                  </span>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase bg-muted/60 border rounded-full px-2.5 py-0.5 select-none">
-                    Status: {t('status.' + myAssignment.status)}
-                  </span>
-                </div>
+                  </CardTitle>
+                  <Badge variant="outline" className="text-[10px] font-bold uppercase select-none">
+                    {t('status.' + myAssignment.status)}
+                  </Badge>
+                </CardHeader>
                 <CardContent className="p-5 flex flex-col gap-5 text-start">
                   
                   {/* Timer Section (Only shown if task is in progress) */}
@@ -636,10 +636,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     const overrunMins = isOvertime ? Math.round((currentSec - estimatedSec) / 60) : 0;
 
                     return (
-                      <div className={`rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all ${
+                      <div className={`rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4 transition-all ${
                         isOvertime
-                          ? 'bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-400 dark:border-rose-800 shadow-sm'
-                          : 'bg-muted/30 border border-border/60'
+                          ? 'bg-rose-50/80 dark:bg-rose-950/40 border-2 border-rose-400 dark:border-rose-800 shadow-xs'
+                          : 'bg-muted/40 border border-border/60'
                       }`}>
                         <div className="flex flex-col text-center sm:text-start">
                           <div className="flex items-center gap-2 justify-center sm:justify-start">
@@ -676,7 +676,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                               <Button
                                 onClick={handleStopTimer}
                                 disabled={timerLoading}
-                                className="bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 size-9 sm:w-auto sm:px-4 rounded-lg shadow-xs"
+                                variant="outline"
+                                className="border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-bold gap-1.5 size-9 sm:w-auto sm:px-4 rounded-lg"
                               >
                                 ⏸️ <span className="hidden sm:inline">{t('taskDetail.pauseTimer')}</span>
                               </Button>
@@ -685,7 +686,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             <Button
                               onClick={handleStartTimer}
                               disabled={timerLoading}
-                              className="bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
+                              className="font-bold gap-1.5 w-full sm:w-auto sm:px-4 rounded-lg shadow-xs"
                             >
                               ▶️ {t('taskDetail.startTimer')}
                             </Button>
@@ -701,7 +702,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       <p className="text-xs text-muted-foreground leading-normal">
                         {t('taskDetail.todoStartDesc') || 'You are assigned to this task. Click start to begin work and log your time.'}
                       </p>
-                      <Button onClick={handleStartTask} disabled={statusUpdating} className="w-fit bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 shadow-xs">
+                      <Button onClick={handleStartTask} disabled={statusUpdating} className="w-fit font-bold gap-1.5 shadow-xs">
                         {statusUpdating ? <Loader2 className="size-4 animate-spin" /> : '⚡'} {t('taskDetail.startWorking')}
                       </Button>
                     </div>
@@ -713,7 +714,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       <p className="text-xs text-muted-foreground leading-normal">
                         {t('taskDetail.revisionResumeDesc') || 'This task requires revisions. Click resume to start logging time again.'}
                       </p>
-                      <Button onClick={handleResumeWork} disabled={statusUpdating} className="w-fit bg-[#1D61E7] hover:bg-[#1553c7] text-white font-bold gap-1.5 shadow-xs">
+                      <Button onClick={handleResumeWork} disabled={statusUpdating} className="w-fit font-bold gap-1.5 shadow-xs">
                         <RotateCcw className="size-4" /> {t('taskDetail.resumeWorking')}
                       </Button>
                     </div>
@@ -795,11 +796,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   {/* Submitted Pending Status */}
                   {myAssignment.status === 'submitted' && (
                     <div className="flex flex-col gap-3 py-1">
-                      <p className="text-xs text-[#1D61E7] bg-[#1D61E7]/5 border border-[#1D61E7]/10 rounded-lg p-3 leading-relaxed">
+                      <p className="text-xs text-primary bg-primary/5 border border-primary/10 rounded-lg p-3 leading-relaxed">
                         {t('taskDetail.submittedPendingDesc') || 'Your work has been submitted. Admins will review it soon.'}
                       </p>
                       <div className="flex flex-col gap-2">
-                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1 w-fit">
+                        <div className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1 w-fit">
                           ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                         </div>
                         {parseSubmissionLinks(myAssignment.submission_link).length > 0 && (
@@ -807,7 +808,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             <span className="text-[10px] font-bold text-muted-foreground uppercase">📎 {locale === 'ar' ? 'روابط التسليم الخاص بك:' : 'Your Submission Links:'}</span>
                             <div className="flex flex-col gap-1">
                               {parseSubmissionLinks(myAssignment.submission_link).map((link, idx) => (
-                                <a key={idx} href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noopener noreferrer" className="text-xs text-[#1D61E7] underline font-semibold flex items-center gap-1 hover:text-[#1553c7] break-all">
+                                <a key={idx} href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline break-all">
                                   🔗 {parseSubmissionLinks(myAssignment.submission_link).length > 1 ? `${idx + 1}. ` : ''}{link} ↗
                                 </a>
                               ))}
@@ -832,11 +833,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                       </p>
                       <div className="flex gap-2 flex-wrap items-center">
                         {myAssignment.rating !== undefined && myAssignment.rating !== null && (
-                          <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+                          <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
                             ⭐ {t('taskDetail.rating')}: {myAssignment.rating}/10
                           </div>
                         )}
-                        <div className="text-[10px] font-bold text-[#1D61E7] bg-[#1D61E7]/10 border border-[#1D61E7]/20 rounded-full px-2.5 py-1">
+                        <div className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1">
                           ⏱️ {t('taskDetail.loggedTime')}: {formatDuration(myAssignment.total_time_spent || 0)}
                         </div>
                       </div>
@@ -856,11 +857,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           {/* 4b. ADMIN REVIEW SUBMISSIONS PANEL */}
           {assignees.length > 0 && canAdminister && (
             <Card className="overflow-hidden shadow-xs">
-              <div className="bg-muted/30 px-5 py-3 border-b">
+              <CardHeader className="bg-muted/30 px-5 py-3 border-b space-y-0">
                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   📥 {t('taskDetail.submissionsProgress') || 'Assignee Submissions & Reviews'}
                 </CardTitle>
-              </div>
+              </CardHeader>
               <CardContent className="p-5 flex flex-col gap-4 text-start">
                 <div className="flex flex-col gap-4 divide-y divide-border/60">
                   {assignees.map((a, index) => {
@@ -874,7 +875,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <Avatar className="size-8 shrink-0">
-                              <AvatarFallback className="bg-[#1D61E7] text-white text-[10px] font-bold">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
                                 {a.user ? getInitials(a.user.name) : '?'}
                               </AvatarFallback>
                             </Avatar>
@@ -898,7 +899,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
                                   if (estimatedSec > 0) {
                                     return (
-                                      <span className={isAssigneeOvertime ? "text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1" : "text-[#1D61E7]"}>
+                                      <span className={isAssigneeOvertime ? "text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1" : "text-primary font-medium"}>
                                         <span>⏱️ {formatDuration(assigneeSec)} / {formatDuration(estimatedSec)}</span>
                                         {isAssigneeOvertime && (
                                           <span className="text-[9px] bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 px-1 py-0.2 rounded font-extrabold normal-case">
@@ -908,7 +909,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                       </span>
                                     );
                                   }
-                                  return <span className="text-[#1D61E7]">⏱️ {formatDuration(assigneeSec)}</span>;
+                                  return <span className="text-primary font-medium">⏱️ {formatDuration(assigneeSec)}</span>;
                                 })()}
                               </div>
                             </div>
@@ -931,7 +932,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
                         {/* Submission details */}
                         {hasSubmitted ? (
-                          <div className="bg-muted/40 border border-border/40 rounded-xl p-3.5 flex flex-col gap-2.5 ml-10">
+                          <div className="bg-muted/40 border border-border/40 rounded-lg p-3.5 flex flex-col gap-2.5 ml-10 rtl:ml-0 rtl:mr-10">
                             {parseSubmissionLinks(a.submission_link).length > 0 && (
                               <div className="flex flex-col gap-1 text-xs">
                                 <span className="text-muted-foreground font-bold">{t('taskDetail.submissionLinkLabel') || 'Submission Links:'}</span>
@@ -942,7 +943,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                                       href={link.startsWith('http') ? link : `https://${link}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-[#1D61E7] underline font-medium truncate max-w-[340px] hover:text-[#1553c7] flex items-center gap-1"
+                                      className="text-primary font-semibold truncate max-w-[340px] hover:underline flex items-center gap-1"
                                     >
                                       🔗 {parseSubmissionLinks(a.submission_link).length > 1 ? `${idx + 1}. ` : ''}{link} ↗
                                     </a>
