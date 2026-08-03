@@ -214,12 +214,12 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultCli
           </div>
         </div>
 
-        {/* Estimated Time Limit */}
-        <div className="flex flex-col gap-1 p-3 rounded-lg border border-border bg-muted/20">
+        {/* Estimated Time Field */}
+        <div className="flex flex-col gap-1">
           <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
             ⏱️ {t('createTask.estimatedTime')}
           </Label>
-          <div className="grid grid-cols-2 gap-3 mt-1">
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-2">
               <Input
                 type="number"
@@ -228,9 +228,9 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultCli
                 placeholder="0"
                 value={estimatedHours}
                 onChange={e => setEstimatedHours(e.target.value)}
-                className="h-9 text-xs bg-background"
+                className="h-9 text-xs"
               />
-              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t('createTask.estimatedHours')}</span>
+              <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">{t('createTask.estimatedHours')}</span>
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -240,9 +240,9 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultCli
                 placeholder="0"
                 value={estimatedMinutes}
                 onChange={e => setEstimatedMinutes(e.target.value)}
-                className="h-9 text-xs bg-background"
+                className="h-9 text-xs"
               />
-              <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t('createTask.estimatedMinutes')}</span>
+              <span className="text-xs text-muted-foreground font-semibold whitespace-nowrap">{t('createTask.estimatedMinutes')}</span>
             </div>
           </div>
         </div>
