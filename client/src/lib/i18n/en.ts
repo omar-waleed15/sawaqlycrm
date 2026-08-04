@@ -69,10 +69,16 @@ export const en: Record<string, string> = {
   'salesCalendar.filterRep': 'Filter Sales Rep',
   'salesCalendar.allReps': 'All Sales Reps',
 
-  // ── Language ────────────────────────────────────────────────────────
+  // ── Language & Theme ────────────────────────────────────────────────
   'lang.switch': 'Language',
   'lang.en': 'English',
   'lang.ar': 'العربية',
+  'theme.title': 'Appearance',
+  'theme.subtitle': 'Customize how Sawaqly CRM looks on your device',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+  'theme.system': 'System',
+  'theme.toggle': 'Toggle Theme',
 
   // ── Auth / Login ────────────────────────────────────────────────────
   'login.welcomeBack': 'Welcome back',

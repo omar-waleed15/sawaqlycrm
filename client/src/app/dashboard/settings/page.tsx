@@ -11,8 +11,10 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PriorityBadge, StatusBadge } from '@/components/Badges';
-import { Loader2, CheckCircle2, Search, Key, ShieldCheck, Lock, Mail } from 'lucide-react';
+import { Loader2, CheckCircle2, Search, Key, ShieldCheck, Lock, Mail, Sun, Moon, Laptop } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
+import { useTheme } from '@/lib/theme';
+import { cn } from '@/lib/utils';
 import { usersApi } from '@/lib/api';
 import { User } from '@/types';
 import Modal from '@/components/Modal';
@@ -21,6 +23,7 @@ export default function SettingsPage() {
   const { user, setUser } = useAuth();
   const router = useRouter();
   const { t } = useLanguage();
+  const { theme, setTheme } = useTheme();
 
   const [agencyName, setAgencyName] = useState('Sawaqly Marketing Agency');
   const [supportEmail, setSupportEmail] = useState('support@sawaqly.com');
@@ -615,7 +618,7 @@ export default function SettingsPage() {
         </div>
 
         {/* User Info / Role Info Sidebar */}
-        <div className="text-start">
+        <div className="text-start flex flex-col gap-6">
           <Card>
             <CardHeader className="border-b">
               <CardTitle className="text-base">{t('settings.profile')}</CardTitle>
@@ -638,6 +641,59 @@ export default function SettingsPage() {
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   <span className="size-1.5 rounded-full bg-green-500 mr-1 rtl:ml-1" /> Active Account
                 </Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Appearance & Theme Settings Card */}
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle className="text-base">{t('theme.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-5 flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground">{t('theme.subtitle')}</p>
+              <div className="grid grid-cols-3 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-xs font-semibold transition-all",
+                    theme === 'light'
+                      ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-500 shadow-xs"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Sun className="size-4" />
+                  <span>{t('theme.light')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-xs font-semibold transition-all",
+                    theme === 'dark'
+                      ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-500 shadow-xs"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Moon className="size-4" />
+                  <span>{t('theme.dark')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('system')}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border text-xs font-semibold transition-all",
+                    theme === 'system'
+                      ? "border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-500 shadow-xs"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Laptop className="size-4" />
+                  <span>{t('theme.system')}</span>
+                </button>
               </div>
             </CardContent>
           </Card>

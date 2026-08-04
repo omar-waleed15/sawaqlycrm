@@ -282,23 +282,23 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
             {/* Top Left: content type & priority badges */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {task.is_archived && (
-                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200 font-semibold py-0 px-1.5 h-5 flex items-center justify-center">
+                <Badge variant="outline" className="text-[10px] bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 font-semibold py-0 px-1.5 h-5 flex items-center justify-center">
                   🗄️ {t('taskDetail.archivedBadge')}
                 </Badge>
               )}
               {task.content_type && (
-                <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
+                <Badge variant="outline" className="text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900/60 uppercase tracking-wide font-medium py-0 px-1.5 h-5 flex items-center justify-center">
                   📦 {t(`contentType.${task.content_type}`)}
                 </Badge>
               )}
               <PriorityBadge priority={task.priority} />
               {hasRevisionRequested && (
-                <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
+                <Badge variant="outline" className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-900/60 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
                   🔄 {t('status.revision')}
                 </Badge>
               )}
               {overdue && (
-                <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
+                <Badge variant="outline" className="text-[10px] bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/60 font-bold py-0 px-1.5 h-5 flex items-center justify-center uppercase tracking-wide">
                   ⚠️ {t('common.overdue')}
                 </Badge>
               )}
