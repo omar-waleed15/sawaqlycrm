@@ -124,7 +124,7 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAcc
     }
 });
 // POST /api/clients — Create a new client
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
     if (!name) {
         res.status(400).json({ error: 'Client name is required' });
@@ -236,7 +236,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOr
     }
 });
 // DELETE /api/clients/:id — Delete a client
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin

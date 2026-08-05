@@ -287,7 +287,7 @@ export default function ClosedClientsPage() {
           <h1 className="page-header-title">{t('closedClients.title')}</h1>
           <p className="page-header-subtitle">{t('closedClients.subtitle')}</p>
         </div>
-        {['owner', 'team_leader', 'account_manager'].includes(user.role) && (
+        {['owner', 'team_leader', 'account_manager', 'content_creator'].includes(user.role) && (
           <Button onClick={() => router.push('/dashboard/closed-clients/new/onboarding')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
             <Plus className="size-4 mr-1.5 rtl:ml-1.5 rtl:mr-0" />
             {t('clients.addClient')}
@@ -368,7 +368,7 @@ export default function ClosedClientsPage() {
                     </span>
 
                     {/* Actions Menu */}
-                    {['owner', 'team_leader', 'account_manager'].includes(user.role) && (
+                    {['owner', 'team_leader', 'account_manager', 'content_creator'].includes(user.role) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={

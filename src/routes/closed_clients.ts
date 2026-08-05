@@ -69,7 +69,7 @@ router.get('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerO
   }
 });
 
-router.post('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { question, answer, sort_order } = req.body;
 
@@ -92,7 +92,7 @@ router.post('/:id/faq', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager
   }
 });
 
-router.put('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { faqId } = req.params;
   const { question, answer, sort_order } = req.body;
 
@@ -116,7 +116,7 @@ router.put('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountM
   }
 });
 
-router.delete('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id/faq/:faqId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { faqId } = req.params;
   try {
     const { error } = await supabaseAdmin.from('client_faq').delete().eq('id', faqId);
@@ -147,7 +147,7 @@ router.get('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAccou
   }
 });
 
-router.post('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { title, description, content_type, status, scheduled_date, drive_link, notes } = req.body;
 
@@ -176,7 +176,7 @@ router.post('/:id/content-plans', authMiddleware, ownerOrSalesOrTeamLeaderOrAcco
   }
 });
 
-router.put('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { planId } = req.params;
   const { title, description, content_type, status, scheduled_date, drive_link, notes } = req.body;
 
@@ -204,7 +204,7 @@ router.put('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLeade
   }
 });
 
-router.delete('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id/content-plans/:planId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { planId } = req.params;
   try {
     const { error } = await supabaseAdmin.from('client_content_plans').delete().eq('id', planId);
@@ -235,7 +235,7 @@ router.get('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManage
   }
 });
 
-router.post('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { title, description, color, status, drive_link, attachment_url, attachment_name } = req.body;
 
@@ -264,7 +264,7 @@ router.post('/:id/ideas', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManag
   }
 });
 
-router.put('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { ideaId } = req.params;
   const { title, description, color, status, drive_link, attachment_url, attachment_name } = req.body;
 
@@ -293,7 +293,7 @@ router.put('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccou
 });
 
 // POST /api/closed-clients/:id/ideas/upload — Upload attachment for idea
-router.post('/:id/ideas/upload', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, upload.single('file'), async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/ideas/upload', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, upload.single('file'), async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   if (!req.file) {
@@ -332,7 +332,7 @@ router.post('/:id/ideas/upload', authMiddleware, ownerOrSalesOrTeamLeaderOrAccou
   }
 });
 
-router.delete('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id/ideas/:ideaId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { ideaId } = req.params;
   try {
     const { error } = await supabaseAdmin.from('client_ideas').delete().eq('id', ideaId);
@@ -391,7 +391,7 @@ router.get('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountMana
   }
 });
 
-router.post('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const clientId = String(req.params.id);
   const { report_month, views, interactions, messages, num_posts, num_reels, num_stories, num_photos, notes } = req.body;
 
@@ -431,7 +431,7 @@ router.post('/:id/reports', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountMan
   }
 });
 
-router.put('/:id/reports/:reportId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id/reports/:reportId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { reportId } = req.params;
   const { report_month, views, interactions, messages, num_posts, num_reels, num_stories, num_photos, notes } = req.body;
 
@@ -461,7 +461,7 @@ router.put('/:id/reports/:reportId', authMiddleware, ownerOrSalesOrTeamLeaderOrA
   }
 });
 
-router.delete('/:id/reports/:reportId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id/reports/:reportId', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { reportId } = req.params;
   try {
     const { error } = await supabaseAdmin.from('client_reports').delete().eq('id', reportId);

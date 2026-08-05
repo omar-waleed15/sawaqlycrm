@@ -146,7 +146,7 @@ router.get('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModera
 });
 
 // POST /api/clients — Create a new client
-router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, company, email, phone, status, pipeline_stage, start_date, address, content_plan_link, num_posts, num_reels, num_stories, num_photos, other_deliverables, done_posts, done_reels, done_stories, done_photos, done_other, deliverables_schedule, user_id, sales_rep_id } = req.body;
 
   if (!name) {
@@ -244,7 +244,7 @@ router.put('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrMod
 });
 
 // DELETE /api/clients/:id — Delete a client
-router.delete('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManager, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id', authMiddleware, ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   try {

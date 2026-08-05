@@ -76,7 +76,7 @@ router.get('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLead
         res.status(500).json({ error: 'Failed to fetch FAQ' });
     }
 });
-router.post('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.post('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     const { question, answer, sort_order } = req.body;
     if (!question || !answer) {
@@ -99,7 +99,7 @@ router.post('/:id/faq', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLea
         res.status(500).json({ error: 'Failed to create FAQ' });
     }
 });
-router.put('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.put('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { faqId } = req.params;
     const { question, answer, sort_order } = req.body;
     const updates = { updated_at: new Date().toISOString() };
@@ -126,7 +126,7 @@ router.put('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrT
         res.status(500).json({ error: 'Failed to update FAQ' });
     }
 });
-router.delete('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.delete('/:id/faq/:faqId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { faqId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin.from('client_faq').delete().eq('id', faqId);
@@ -161,7 +161,7 @@ router.get('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSales
         res.status(500).json({ error: 'Failed to fetch content plans' });
     }
 });
-router.post('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.post('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     const { title, description, content_type, status, scheduled_date, drive_link, notes } = req.body;
     if (!title) {
@@ -193,7 +193,7 @@ router.post('/:id/content-plans', auth_1.authMiddleware, roleCheck_1.ownerOrSale
         res.status(500).json({ error: 'Failed to create content plan' });
     }
 });
-router.put('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.put('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { planId } = req.params;
     const { title, description, content_type, status, scheduled_date, drive_link, notes } = req.body;
     const updates = { updated_at: new Date().toISOString() };
@@ -228,7 +228,7 @@ router.put('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.owne
         res.status(500).json({ error: 'Failed to update content plan' });
     }
 });
-router.delete('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.delete('/:id/content-plans/:planId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { planId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin.from('client_content_plans').delete().eq('id', planId);
@@ -263,7 +263,7 @@ router.get('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLe
         res.status(500).json({ error: 'Failed to fetch ideas' });
     }
 });
-router.post('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.post('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { id } = req.params;
     const { title, description, color, status, drive_link, attachment_url, attachment_name } = req.body;
     if (!title) {
@@ -295,7 +295,7 @@ router.post('/:id/ideas', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamL
         res.status(500).json({ error: 'Failed to create idea' });
     }
 });
-router.put('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.put('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { ideaId } = req.params;
     const { title, description, color, status, drive_link, attachment_url, attachment_name } = req.body;
     const updates = { updated_at: new Date().toISOString() };
@@ -331,7 +331,7 @@ router.put('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSales
     }
 });
 // POST /api/closed-clients/:id/ideas/upload — Upload attachment for idea
-router.post('/:id/ideas/upload', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, upload.single('file'), async (req, res) => {
+router.post('/:id/ideas/upload', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, upload.single('file'), async (req, res) => {
     const { id } = req.params;
     if (!req.file) {
         res.status(400).json({ error: 'No file provided' });
@@ -364,7 +364,7 @@ router.post('/:id/ideas/upload', auth_1.authMiddleware, roleCheck_1.ownerOrSales
         res.status(500).json({ error: 'Failed to upload idea attachment' });
     }
 });
-router.delete('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.delete('/:id/ideas/:ideaId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { ideaId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin.from('client_ideas').delete().eq('id', ideaId);
@@ -423,7 +423,7 @@ router.get('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeam
         res.status(500).json({ error: 'Failed to fetch reports' });
     }
 });
-router.post('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.post('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const clientId = String(req.params.id);
     const { report_month, views, interactions, messages, num_posts, num_reels, num_stories, num_photos, notes } = req.body;
     if (!report_month) {
@@ -464,7 +464,7 @@ router.post('/:id/reports', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTea
         res.status(500).json({ error: 'Failed to create report' });
     }
 });
-router.put('/:id/reports/:reportId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.put('/:id/reports/:reportId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { reportId } = req.params;
     const { report_month, views, interactions, messages, num_posts, num_reels, num_stories, num_photos, notes } = req.body;
     const updates = { updated_at: new Date().toISOString() };
@@ -503,7 +503,7 @@ router.put('/:id/reports/:reportId', auth_1.authMiddleware, roleCheck_1.ownerOrS
         res.status(500).json({ error: 'Failed to update report' });
     }
 });
-router.delete('/:id/reports/:reportId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManager, async (req, res) => {
+router.delete('/:id/reports/:reportId', auth_1.authMiddleware, roleCheck_1.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator, async (req, res) => {
     const { reportId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin.from('client_reports').delete().eq('id', reportId);
