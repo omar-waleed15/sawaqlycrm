@@ -688,6 +688,7 @@ export interface OnboardingCompetitorItem {
 
 export interface OnboardingCompetitorAnalysis {
   competitors?: OnboardingCompetitorItem[];
+  competitor_names?: string;
   analysis?: {
     strengths?: string;
     weaknesses?: string;
@@ -717,9 +718,9 @@ export interface OnboardingSocialMediaAudit {
 }
 
 export interface OnboardingContentStrategy {
-  brand_voice?: string[];
+  brand_voice?: string[] | string;
   content_pillars?: string[];
-  content_style?: string[];
+  content_style?: string[] | string;
   things_to_avoid?: string;
   creative_notes?: string;
 }

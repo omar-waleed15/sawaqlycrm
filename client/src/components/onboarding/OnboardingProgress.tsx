@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Building2, Image as ImageIcon, Search, Target, Users2, BarChart2, Lightbulb } from 'lucide-react';
+import { Check, FileText, Layers } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 
 export interface StepInfo {
@@ -11,13 +11,8 @@ export interface StepInfo {
 }
 
 export const ONBOARDING_STEPS: StepInfo[] = [
-  { number: 1, titleKey: 'onboarding.step1.title', shortTitleKey: 'onboarding.step1.title', icon: Building2 },
-  { number: 2, titleKey: 'onboarding.step2.title', shortTitleKey: 'onboarding.step2.title', icon: ImageIcon },
-  { number: 3, titleKey: 'onboarding.step3.title', shortTitleKey: 'onboarding.step3.title', icon: Search },
-  { number: 4, titleKey: 'onboarding.step4.title', shortTitleKey: 'onboarding.step4.title', icon: Target },
-  { number: 5, titleKey: 'onboarding.step5.title', shortTitleKey: 'onboarding.step5.title', icon: Users2 },
-  { number: 6, titleKey: 'onboarding.step6.title', shortTitleKey: 'onboarding.step6.title', icon: BarChart2 },
-  { number: 7, titleKey: 'onboarding.step7.title', shortTitleKey: 'onboarding.step7.title', icon: Lightbulb },
+  { number: 1, titleKey: 'onboarding.step1.briefTitle', shortTitleKey: 'onboarding.step1.briefTitle', icon: FileText },
+  { number: 2, titleKey: 'onboarding.step2.advancedTitle', shortTitleKey: 'onboarding.step2.advancedTitle', icon: Layers },
 ];
 
 interface OnboardingProgressProps {

@@ -8,13 +8,8 @@ import { useLanguage } from '@/lib/i18n';
 import { clientsApi, clientOnboardingApi } from '@/lib/api';
 import { Client, ClientOnboarding } from '@/types';
 import OnboardingProgress, { ONBOARDING_STEPS } from '@/components/onboarding/OnboardingProgress';
-import Step1ClientOverview from '@/components/onboarding/Step1ClientOverview';
-import Step2BrandAssets from '@/components/onboarding/Step2BrandAssets';
-import Step3BusinessDiscovery from '@/components/onboarding/Step3BusinessDiscovery';
-import Step4TargetAudience from '@/components/onboarding/Step4TargetAudience';
-import Step5CompetitorAnalysis from '@/components/onboarding/Step5CompetitorAnalysis';
-import Step6SocialMediaAudit from '@/components/onboarding/Step6SocialMediaAudit';
-import Step7ContentStrategy from '@/components/onboarding/Step7ContentStrategy';
+import Step1ClientBrief from '@/components/onboarding/Step1ClientBrief';
+import Step2AdvancedData from '@/components/onboarding/Step2AdvancedData';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -92,10 +87,18 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
     try {
       setLoading(true);
       const res = await clientOnboardingApi.get(activeClientId);
-      setClient(res.client);
+      const bName = res.onboarding?.client_overview?.business_name?.trim();
+
+      if (res.client) {
+        if (bName && (res.client.name === 'New Client' || res.client.name === 'عميل جديد' || !res.client.name)) {
+          res.client.name = bName;
+          res.client.company = bName;
+        }
+        setClient(res.client);
+      }
       setOnboarding(res.onboarding);
-      setCurrentStep(res.onboarding.current_step || 1);
-      setCompletedSteps(res.onboarding.completed_steps || []);
+      setCurrentStep(res.onboarding?.current_step || 1);
+      setCompletedSteps(res.onboarding?.completed_steps || []);
     } catch (err: any) {
       console.error('Failed to load onboarding:', err);
       setErrorMsg(err.message || 'Failed to load client directory');
@@ -115,15 +118,16 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
 
     try {
       let targetId = activeClientId;
+      const overview = dataToSave.client_overview || {};
+      const businessName = overview.business_name?.trim();
 
       // Handle NEW client creation first if client ID is 'new'
       if (targetId === 'new') {
-        const overview = dataToSave.client_overview || {};
-        const businessName = overview.business_name?.trim() || (locale === 'ar' ? 'عميل جديد' : 'New Client');
+        const defaultName = businessName || (locale === 'ar' ? 'عميل جديد' : 'New Client');
 
         const createdRes = await clientsApi.create({
-          name: businessName,
-          company: businessName,
+          name: defaultName,
+          company: defaultName,
           email: overview.owner_email || overview.primary_contact_email || overview.email || '',
           phone: overview.owner_phone || overview.primary_contact_phone || overview.phone || '',
           address: overview.address || '',
@@ -139,6 +143,19 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
           window.history.replaceState({}, '', `/dashboard/closed-clients/${targetId}/onboarding`);
         } else {
           throw new Error('Failed to create new client record');
+        }
+      } else if (businessName && client && (client.name !== businessName || client.company !== businessName)) {
+        // Sync name & company to the main `clients` database table
+        try {
+          const updatedClientRes = await clientsApi.update(targetId, {
+            name: businessName,
+            company: businessName,
+          });
+          if (updatedClientRes?.client) {
+            setClient(updatedClientRes.client);
+          }
+        } catch (updateErr) {
+          console.error('Failed to update client name in clients table:', updateErr);
         }
       }
 
@@ -263,7 +280,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  {client.company || client.name || (locale === 'ar' ? 'إعداد عميل جديد' : 'New Client Setup')}
+                  {onboarding.client_overview?.business_name?.trim() || client.company || client.name || (locale === 'ar' ? 'إعداد عميل جديد' : 'New Client Setup')}
                 </h1>
                 <Badge variant="outline" className="text-xs font-semibold capitalize">
                   {onboarding.client_overview?.company_status || client.status || 'Active Client'}
@@ -321,52 +338,16 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
         {/* Dynamic Step View */}
         <div className="transition-all duration-300">
           {currentStep === 1 && (
-            <Step1ClientOverview
-              data={onboarding.client_overview || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, client_overview: data })}
+            <Step1ClientBrief
+              onboarding={onboarding}
+              onChange={(updated) => triggerAutoSave(updated)}
             />
           )}
 
           {currentStep === 2 && (
-            <Step2BrandAssets
-              clientId={activeClientId}
-              data={onboarding.brand_assets || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, brand_assets: data })}
-            />
-          )}
-
-          {currentStep === 3 && (
-            <Step3BusinessDiscovery
-              data={onboarding.business_discovery || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, business_discovery: data })}
-            />
-          )}
-
-          {currentStep === 4 && (
-            <Step4TargetAudience
-              data={onboarding.target_audience || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, target_audience: data })}
-            />
-          )}
-
-          {currentStep === 5 && (
-            <Step5CompetitorAnalysis
-              data={onboarding.competitor_analysis || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, competitor_analysis: data })}
-            />
-          )}
-
-          {currentStep === 6 && (
-            <Step6SocialMediaAudit
-              data={onboarding.social_media_audit || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, social_media_audit: data })}
-            />
-          )}
-
-          {currentStep === 7 && (
-            <Step7ContentStrategy
-              data={onboarding.content_strategy || {}}
-              onChange={(data) => triggerAutoSave({ ...onboarding, content_strategy: data })}
+            <Step2AdvancedData
+              onboarding={onboarding}
+              onChange={(updated) => triggerAutoSave(updated)}
             />
           )}
         </div>
@@ -399,7 +380,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
             <Button
               type="button"
               onClick={async () => {
-                await saveOnboarding(onboarding, 7);
+                await saveOnboarding(onboarding, 2);
                 router.push(activeClientId === 'new' ? '/dashboard/closed-clients' : `/dashboard/closed-clients/${activeClientId}`);
               }}
               className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-6 shadow-sm"

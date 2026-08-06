@@ -11,10 +11,10 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
 });
 
-// Step field mapping for partial step updates
+// Step field mapping for partial step updates (Step 1: Brief, Step 2: Advanced Data)
 const STEP_KEY_MAP: Record<number, string> = {
-  1: 'client_overview',
-  2: 'brand_assets',
+  1: 'brief',
+  2: 'advanced',
   3: 'business_discovery',
   4: 'target_audience',
   5: 'competitor_analysis',

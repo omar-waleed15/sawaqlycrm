@@ -1318,11 +1318,16 @@ export const en: Record<string, string> = {
   'onboarding.complete': 'Complete Onboarding',
   'onboarding.stepOf': 'Step {current} of {total}',
 
-  // Steps Headings
-  'onboarding.step1.title': 'Client Overview',
-  'onboarding.step1.desc': 'Business info, owner contact, and official channels',
-  'onboarding.step2.title': 'Brand Assets',
-  'onboarding.step2.desc': 'Logo, typography, color palette, and marketing materials',
+  // Steps Headings (2-Step Structure)
+  'onboarding.step1.briefTitle': 'Client Brief',
+  'onboarding.step1.briefDesc': 'Core strategic brief details (Business info, objectives, TOV, audience, USP)',
+  'onboarding.step2.advancedTitle': 'Advanced Brand Data',
+  'onboarding.step2.advancedDesc': 'Complete brand onboarding assets, contact, competitor audit, and in-depth strategy',
+
+  'onboarding.step1.title': 'Client Brief',
+  'onboarding.step1.desc': 'Core strategic brief fields',
+  'onboarding.step2.title': 'Advanced Brand Data',
+  'onboarding.step2.desc': 'Assets, competitor audit, and in-depth strategy',
   'onboarding.step3.title': 'Business Discovery',
   'onboarding.step3.desc': 'Products, services, objectives, and pain points',
   'onboarding.step4.title': 'Target Audience',

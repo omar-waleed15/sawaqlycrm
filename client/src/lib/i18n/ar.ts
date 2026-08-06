@@ -1318,11 +1318,16 @@ export const ar: Record<string, string> = {
   'onboarding.complete': 'إكمال الدليل والإنهاء',
   'onboarding.stepOf': 'الخطوة {current} من {total}',
 
-  // Steps Headings
-  'onboarding.step1.title': 'ملف ومعلومات العميل',
-  'onboarding.step1.desc': 'بيانات النشاط التجاري وصاحب العمل والحسابات الرسمية',
-  'onboarding.step2.title': 'الأصول والملفات البصرية',
-  'onboarding.step2.desc': 'الشعار والألوان والخطوط والمواد التسويقية',
+  // Steps Headings (2-Step Structure)
+  'onboarding.step1.briefTitle': 'موجز العميل (Brief)',
+  'onboarding.step1.briefDesc': 'البيانات الأساسية والموجز التنفيذي للعميل (معلومات النشاط، الأهداف، نبرة الصوت، الجمهور، USP)',
+  'onboarding.step2.advancedTitle': 'البيانات المتقدمة للعلامة التجارية',
+  'onboarding.step2.advancedDesc': 'الملفات والأصول البصرية، وسائل التواصل، تدقيق المنافسين، واستراتيجية المحتوى التفصيلية',
+
+  'onboarding.step1.title': 'موجز العميل (Brief)',
+  'onboarding.step1.desc': 'البيانات الأساسية والموجز التنفيذي',
+  'onboarding.step2.title': 'البيانات المتقدمة للعلامة التجارية',
+  'onboarding.step2.desc': 'الأصول وتدقيق المنافسين واستراتيجية المحتوى',
   'onboarding.step3.title': 'استكشاف وتقييم البزنس',
   'onboarding.step3.desc': 'طبيعة النشاط، المنتجات والخدمات، الأهداف، والتحديات',
   'onboarding.step4.title': 'الجمهور المستهدف وشخصية المشتري',

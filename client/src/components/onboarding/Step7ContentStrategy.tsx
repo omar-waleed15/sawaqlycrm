@@ -68,6 +68,18 @@ export default function Step7ContentStrategy({ data = {}, onChange }: Step7Props
     });
   };
 
+  const brandVoiceArray = Array.isArray(data.brand_voice)
+    ? data.brand_voice
+    : typeof data.brand_voice === 'string'
+    ? data.brand_voice.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const contentStyleArray = Array.isArray(data.content_style)
+    ? data.content_style
+    : typeof data.content_style === 'string'
+    ? data.content_style.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
   return (
     <div className="space-y-6">
       {/* 1. Brand Voice */}
@@ -81,7 +93,7 @@ export default function Step7ContentStrategy({ data = {}, onChange }: Step7Props
           <Label className="text-xs font-semibold">{t('onboarding.s7.selectVoice')}</Label>
           <ChipSelect
             options={BRAND_VOICE_OPTIONS}
-            selected={data.brand_voice || []}
+            selected={brandVoiceArray}
             onChange={(selected) => updateField('brand_voice', selected)}
           />
         </div>
@@ -115,7 +127,7 @@ export default function Step7ContentStrategy({ data = {}, onChange }: Step7Props
           <Label className="text-xs font-semibold">{t('onboarding.s7.selectStyles')}</Label>
           <ChipSelect
             options={CONTENT_STYLE_OPTIONS}
-            selected={data.content_style || []}
+            selected={contentStyleArray}
             onChange={(selected) => updateField('content_style', selected)}
           />
         </div>
