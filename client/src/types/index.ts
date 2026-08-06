@@ -172,8 +172,6 @@ export interface Contract {
   id: string;
   client_id: string;
   client?: Client;
-  project_id?: string;
-  project?: Project;
   name: string;
   amount: number;
   is_recurring: boolean;

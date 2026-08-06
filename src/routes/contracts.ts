@@ -18,16 +18,11 @@ router.get('/finance-stats', authMiddleware, ownerOrSales, async (_req: AuthRequ
       return;
     }
 
-    // 2. Active Projects
-    const { count: activeProjects, error: projectsError } = await supabaseAdmin
-      .from('projects')
+    // 2. Count active contracts
+    const { count: activeContractsCount } = await supabaseAdmin
+      .from('contracts')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'active');
-
-    if (projectsError) {
-      res.status(500).json({ error: projectsError.message });
-      return;
-    }
 
     // 3. Get all active RECURRING contracts for MRR (Monthly Recurring Revenue) calculations
     const { data: activeContracts, error: contractsError } = await supabaseAdmin
@@ -112,7 +107,7 @@ router.get('/finance-stats', authMiddleware, ownerOrSales, async (_req: AuthRequ
     res.json({
       stats: {
         totalClients: totalClients || 0,
-        activeProjects: activeProjects || 0,
+        activeProjects: activeContractsCount || 0,
         monthlyRevenue: Math.round(monthlyRevenue * 100) / 100, // round to 2 decimals
         upcomingRenewalsCount: upcomingRenewalsCount || 0,
         totalExpensesThisMonth: Math.round(totalExpensesThisMonth * 100) / 100,
@@ -124,7 +119,7 @@ router.get('/finance-stats', authMiddleware, ownerOrSales, async (_req: AuthRequ
   }
 });
 
-// GET /api/contracts — List all contracts (with client, project, and installment details)
+// GET /api/contracts — List all contracts (with client and installment details)
 router.get('/', authMiddleware, ownerOrSales, async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { data, error } = await supabaseAdmin
@@ -132,7 +127,6 @@ router.get('/', authMiddleware, ownerOrSales, async (_req: AuthRequest, res: Res
       .select(`
         *,
         client:clients(id, name, company, email, phone, status),
-        project:projects(id, name, status, budget),
         installments:contract_installments(id, amount, due_date, paid, note, created_at)
       `)
       .order('created_at', { ascending: false });
@@ -158,7 +152,7 @@ router.get('/', authMiddleware, ownerOrSales, async (_req: AuthRequest, res: Res
 
 // POST /api/contracts — Create a new contract
 router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { client_id, project_id, name, amount, is_recurring, billing_cycle, status, start_date, renewal_date, installments } = req.body;
+  const { client_id, name, amount, is_recurring, billing_cycle, status, start_date, renewal_date, installments } = req.body;
 
   if (!name || !client_id || !amount || !billing_cycle) {
     res.status(400).json({ error: 'Contract name, Client, Amount, and Billing Cycle are required' });
@@ -170,7 +164,6 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
       .from('contracts')
       .insert({
         client_id,
-        project_id: project_id || null,
         name,
         amount: Number(amount),
         is_recurring: is_recurring !== false,
@@ -205,7 +198,6 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
       .select(`
         *,
         client:clients(id, name, company, email, phone, status),
-        project:projects(id, name, status, budget),
         installments:contract_installments(id, amount, due_date, paid, note, created_at)
       `)
       .eq('id', data.id)
@@ -220,12 +212,11 @@ router.post('/', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Res
 // PUT /api/contracts/:id — Update a contract
 router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const { client_id, project_id, name, amount, is_recurring, billing_cycle, status, start_date, renewal_date, installments } = req.body;
+  const { client_id, name, amount, is_recurring, billing_cycle, status, start_date, renewal_date, installments } = req.body;
 
   try {
     const updates: Record<string, any> = {};
     if (client_id !== undefined) updates.client_id = client_id;
-    if (project_id !== undefined) updates.project_id = project_id || null;
     if (name !== undefined) updates.name = name;
     if (amount !== undefined) updates.amount = Number(amount);
     if (is_recurring !== undefined) updates.is_recurring = is_recurring;
@@ -269,7 +260,6 @@ router.put('/:id', authMiddleware, ownerOrSales, async (req: AuthRequest, res: R
       .select(`
         *,
         client:clients(id, name, company, email, phone, status),
-        project:projects(id, name, status, budget),
         installments:contract_installments(id, amount, due_date, paid, note, created_at)
       `)
       .eq('id', data.id)

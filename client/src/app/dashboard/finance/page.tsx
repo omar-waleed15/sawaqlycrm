@@ -325,7 +325,6 @@ export default function FinanceDashboardPage() {
   // Contract form states
   const [contractForm, setContractForm] = useState({
     client_id: '',
-    project_id: '',
     name: '',
     amount: '',
     is_recurring: true,
@@ -1037,7 +1036,6 @@ export default function FinanceDashboardPage() {
     if (contract) {
       setContractForm({
         client_id: contract.client_id,
-        project_id: contract.project_id || '',
         name: contract.name,
         amount: contract.amount.toString(),
         is_recurring: contract.is_recurring,
@@ -1067,7 +1065,6 @@ export default function FinanceDashboardPage() {
     } else {
       setContractForm({
         client_id: clients.filter(c => c.pipeline_stage === 'won')[0]?.id || '',
-        project_id: '',
         name: '',
         amount: '',
         is_recurring: true,
@@ -1162,7 +1159,6 @@ export default function FinanceDashboardPage() {
     try {
       const data = {
         ...contractForm,
-        project_id: contractForm.project_id || undefined,
         amount: Number(contractForm.amount),
         billing_cycle: contractForm.is_recurring ? contractForm.billing_cycle : 'one_time',
         start_date: contractForm.start_date || undefined,
@@ -2675,7 +2671,6 @@ export default function FinanceDashboardPage() {
                 <tr style={{ borderBottom: '2px solid var(--color-border)', textAlign: 'start', color: 'var(--color-text-muted)' }}>
                   <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.contractName')}</th>
                   <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('taskDetail.client')}</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('taskDetail.project')}</th>
                   <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.amount')}</th>
                   <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.category')}</th>
                   <th style={{ padding: '12px 16px', textAlign: 'start' }}>{t('finance.billingCycle')}</th>
@@ -2692,9 +2687,6 @@ export default function FinanceDashboardPage() {
                       <tr style={{ borderBottom: '1px solid var(--color-border)', transition: 'background-color 0.2s' }}>
                         <td style={{ padding: '16px 16px', fontWeight: 600, textAlign: 'start' }}>{c.name}</td>
                         <td style={{ padding: '16px 16px', textAlign: 'start' }}>{c.client?.name}</td>
-                        <td style={{ padding: '16px 16px', color: c.project ? 'var(--color-text-primary)' : 'var(--color-text-muted)', textAlign: 'start' }}>
-                          {c.project ? c.project.name : 'None / Retainer'}
-                        </td>
                         <td style={{ padding: '16px 16px', fontWeight: 700, color: 'var(--color-primary)', textAlign: 'start' }}>{formatCurrency(c.amount, locale)}</td>
                         <td style={{ padding: '16px 16px', textAlign: 'start' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2857,10 +2849,6 @@ export default function FinanceDashboardPage() {
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('taskDetail.project')}</span>
-                      <span className="font-semibold text-foreground truncate">{c.project ? c.project.name : 'None / Retainer'}</span>
-                    </div>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-muted-foreground font-semibold text-[10px] uppercase tracking-wider">{t('finance.amount')}</span>
                       <span className="font-bold text-[#1D61E7]">{formatCurrency(c.amount, locale)}</span>
@@ -3604,22 +3592,10 @@ export default function FinanceDashboardPage() {
 
           <div className="form-group text-start">
             <label className="form-label">{t('clients.selectClient')} *</label>
-            <select className="form-select" value={contractForm.client_id} onChange={e => setContractForm({ ...contractForm, client_id: e.target.value, project_id: '' })} required>
+            <select className="form-select" value={contractForm.client_id} onChange={e => setContractForm({ ...contractForm, client_id: e.target.value })} required>
               {clients.filter(c => c.pipeline_stage === 'won').map(c => (
                 <option key={c.id} value={c.id}>{c.name} {c.company ? `(${c.company})` : ''}</option>
               ))}
-            </select>
-          </div>
-
-          <div className="form-group text-start">
-            <label className="form-label">Link to Project (Optional)</label>
-            <select className="form-select" value={contractForm.project_id} onChange={e => setContractForm({ ...contractForm, project_id: e.target.value })}>
-              <option value="">None (General Agency Retainer)</option>
-              {projects
-                .filter(p => p.client_id === contractForm.client_id)
-                .map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
             </select>
           </div>
 

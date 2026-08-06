@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS public.projects (
 CREATE TABLE IF NOT EXISTS public.contracts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id uuid REFERENCES public.clients(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL,
   name text NOT NULL,
   amount numeric NOT NULL,
   is_recurring boolean NOT NULL DEFAULT true,
@@ -44,21 +43,15 @@ CREATE TABLE IF NOT EXISTS public.contracts (
 
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contracts ENABLE ROW LEVEL SECURITY;
 
 -- 5. Drop Policies if they exist (to allow safe re-runs)
 DROP POLICY IF EXISTS "Owners can do everything on clients" ON public.clients;
-DROP POLICY IF EXISTS "Owners can do everything on projects" ON public.projects;
 DROP POLICY IF EXISTS "Owners can do everything on contracts" ON public.contracts;
 
 -- 6. Create Admin/Owner CRUD Policies (Only admins can access these tables)
 CREATE POLICY "Owners can do everything on clients"
   ON public.clients FOR ALL
-  USING (public.is_owner());
-
-CREATE POLICY "Owners can do everything on projects"
-  ON public.projects FOR ALL
   USING (public.is_owner());
 
 CREATE POLICY "Owners can do everything on contracts"
