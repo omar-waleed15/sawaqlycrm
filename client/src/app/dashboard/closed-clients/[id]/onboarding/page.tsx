@@ -58,6 +58,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
+  const hasLoadedOnce = useRef(false);
 
   // Fetch initial onboarding & client data
   const loadData = useCallback(async () => {
@@ -81,6 +82,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
         },
       });
       setLoading(false);
+      hasLoadedOnce.current = true;
       return;
     }
 
@@ -97,7 +99,10 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
         setClient(res.client);
       }
       setOnboarding(res.onboarding);
-      setCurrentStep(res.onboarding?.current_step || 1);
+      if (!hasLoadedOnce.current) {
+        setCurrentStep(res.onboarding?.current_step || 1);
+        hasLoadedOnce.current = true;
+      }
       setCompletedSteps(res.onboarding?.completed_steps || []);
     } catch (err: any) {
       console.error('Failed to load onboarding:', err);
@@ -112,7 +117,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
   }, [loadData]);
 
   // Execute Save
-  const saveOnboarding = async (dataToSave = onboarding, stepToMark = currentStep) => {
+  const saveOnboarding = async (dataToSave = onboarding, stepToMark = currentStep, targetStep = currentStep) => {
     if (!dataToSave) return;
     setSaving(true);
 
@@ -165,7 +170,7 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
       const payload: Partial<ClientOnboarding> = {
         ...dataToSave,
         client_id: targetId,
-        current_step: currentStep,
+        current_step: targetStep,
         completed_steps: updatedCompleted,
       };
 
@@ -204,33 +209,33 @@ export default function ClosedClientOnboardingPage({ params }: PageProps) {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
-      saveOnboarding(updatedData, currentStep);
+      saveOnboarding(updatedData, currentStep, currentStep);
     }, 1200);
   };
 
   // Navigation handlers
   const handleNext = async () => {
-    await saveOnboarding(onboarding, currentStep);
     if (currentStep < ONBOARDING_STEPS.length) {
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      await saveOnboarding(onboarding, currentStep, nextStep);
     }
   };
 
   const handlePrev = async () => {
-    await saveOnboarding(onboarding, currentStep);
     if (currentStep > 1) {
       const prevStep = currentStep - 1;
       setCurrentStep(prevStep);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      await saveOnboarding(onboarding, currentStep, prevStep);
     }
   };
 
   const handleStepClick = async (stepNum: number) => {
-    await saveOnboarding(onboarding, currentStep);
     setCurrentStep(stepNum);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    await saveOnboarding(onboarding, currentStep, stepNum);
   };
 
   if (loading) {
