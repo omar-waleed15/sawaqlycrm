@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator = exports.ownerOrTeamLeaderOrContentCreator = exports.ownerOrTeamLeaderOrSales = exports.ownerOrSalesOrTeamLeaderOrAccountManager = exports.ownerOrSales = exports.ownerOrTeamLeader = exports.ownerOnly = void 0;
+exports.ownerOrSalesOrTeamLeaderOrAccountManagerOrModeratorOrContentCreator = exports.ownerOrTeamLeaderOrContentCreator = exports.ownerOrTeamLeaderOrSalesOrContentCreator = exports.ownerOrTeamLeaderOrSales = exports.ownerOrSalesOrTeamLeaderOrAccountManager = exports.ownerOrSales = exports.ownerOrTeamLeader = exports.ownerOnly = void 0;
 const ownerOnly = (req, res, next) => {
     if (!req.user || req.user.role !== 'owner') {
         res.status(403).json({ error: 'Access denied. Owner only.' });
@@ -41,6 +41,14 @@ const ownerOrTeamLeaderOrSales = (req, res, next) => {
     next();
 };
 exports.ownerOrTeamLeaderOrSales = ownerOrTeamLeaderOrSales;
+const ownerOrTeamLeaderOrSalesOrContentCreator = (req, res, next) => {
+    if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+        res.status(403).json({ error: 'Access denied. Authorized roles only.' });
+        return;
+    }
+    next();
+};
+exports.ownerOrTeamLeaderOrSalesOrContentCreator = ownerOrTeamLeaderOrSalesOrContentCreator;
 const ownerOrTeamLeaderOrContentCreator = (req, res, next) => {
     if (!req.user || !['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied. Authorized roles only.' });

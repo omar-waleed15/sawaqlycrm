@@ -61,6 +61,18 @@ export const ownerOrTeamLeaderOrSales = (
   next();
 };
 
+export const ownerOrTeamLeaderOrSalesOrContentCreator = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user || !['owner', 'team_leader', 'sales', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+    res.status(403).json({ error: 'Access denied. Authorized roles only.' });
+    return;
+  }
+  next();
+};
+
 export const ownerOrTeamLeaderOrContentCreator = (
   req: AuthRequest,
   res: Response,

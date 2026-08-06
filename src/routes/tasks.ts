@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOnly, ownerOrTeamLeader, ownerOrTeamLeaderOrSales } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrTeamLeader, ownerOrTeamLeaderOrSales, ownerOrTeamLeaderOrSalesOrContentCreator } from '../middleware/roleCheck';
 import { sendWebhookNotification } from '../lib/webhook';
 
 const router = Router();
@@ -38,9 +38,8 @@ function isTaskAdmin(role: string): boolean {
 // Helper: check if user is allowed to administer/review a specific task
 async function canAdministerTask(userId: string, role: string, taskId: string): Promise<boolean> {
   const isAdminRole = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
-  if (!isAdminRole) return false;
 
-  // An admin/TL/moderator cannot administer or approve a task if they are assigned to it as a worker
+  // An admin/TL/moderator/creator cannot administer or approve a task if they are assigned to it as a worker
   const { data: assignment } = await supabaseAdmin
     .from('task_assignees')
     .select('id')
@@ -52,7 +51,16 @@ async function canAdministerTask(userId: string, role: string, taskId: string): 
     return false; // Assigned worker cannot administer/approve their own task
   }
 
-  return true;
+  if (isAdminRole) return true;
+
+  // Task creator can administer/review tasks they created
+  const { data: task } = await supabaseAdmin
+    .from('tasks')
+    .select('creator_id')
+    .eq('id', taskId)
+    .maybeSingle();
+
+  return task ? task.creator_id === userId : false;
 }
 
 // Helper: get computed task status based on assignees status
@@ -295,8 +303,8 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
   }
 });
 
-// POST /api/tasks — Create a new task (owner, team leader or sales)
-router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/tasks — Create a new task (owner, team leader, sales, or content creator)
+router.post('/', authMiddleware, ownerOrTeamLeaderOrSalesOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { title, description, priority, due_date, assignee_ids, drive_link, content_type, content_description, client_id, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
   if (!title) {
@@ -309,6 +317,20 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSales, async (req: AuthReque
     const dueDateStr = String(due_date).split('T')[0];
     if (dueDateStr < todayStr) {
       res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
+      return;
+    }
+  }
+
+  // Content creators can only assign tasks to Content Creator Interns
+  if (req.user!.role === 'content_creator' && Array.isArray(assignee_ids) && assignee_ids.length > 0) {
+    const { data: assigneeProfiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, role')
+      .in('id', assignee_ids);
+
+    const invalidAssignees = (assigneeProfiles || []).filter((p: any) => p.role !== 'content_creator_intern');
+    if (invalidAssignees.length > 0) {
+      res.status(403).json({ error: 'Content Creators can only assign tasks to Content Creator Interns' });
       return;
     }
   }
@@ -747,8 +769,8 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
   }
 });
 
-// POST /api/tasks/:id/assignees — Add an assignee to a task (admin/TL only)
-router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/tasks/:id/assignees — Add an assignee to a task (admin/TL/creator)
+router.post('/:id/assignees', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { user_id } = req.body;
 
@@ -822,8 +844,8 @@ router.post('/:id/assignees', authMiddleware, ownerOrTeamLeader, async (req: Aut
   }
 });
 
-// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin/TL only)
-router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/tasks/:id/assignees/:userId — Remove an assignee (admin/TL/creator)
+router.delete('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
 
   if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {
@@ -855,8 +877,8 @@ router.delete('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async
   }
 });
 
-// PUT /api/tasks/:id/assignees/:userId — Admin updates a specific assignee's data
-router.put('/:id/assignees/:userId', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+// PUT /api/tasks/:id/assignees/:userId — Admin/Creator updates a specific assignee's data
+router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id, userId } = req.params;
   const { status, feedback, rating, due_date } = req.body;
 

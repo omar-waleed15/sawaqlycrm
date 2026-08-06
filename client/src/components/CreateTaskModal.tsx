@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { User, Client, Task } from '@/types';
 import { tasksApi, usersApi, closedClientsApi, attachmentsApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ interface CreateTaskModalProps {
 }
 
 export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultClientId }: CreateTaskModalProps) {
+  const { user } = useAuth();
   const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,11 +77,15 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, defaultCli
         usersApi.list().catch(() => ({ users: [] })),
         closedClientsApi.list().catch(() => ({ clients: [] })),
       ]).then(([usersRes, clientsRes]) => {
-        setTeamMembers((usersRes.users || []).filter((u: User) => u.role !== 'client'));
+        let list = (usersRes.users || []).filter((u: User) => u.role !== 'client');
+        if (user?.role === 'content_creator') {
+          list = list.filter((u: User) => u.role === 'content_creator_intern');
+        }
+        setTeamMembers(list);
         setClients(clientsRes.clients || []);
       });
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -154,7 +154,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   // Find the current user's assignment (for members)
   const myAssignment = task?.task_assignees?.find(a => a.user_id === user?.id);
 
-  const canAdminister = (user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager') && !myAssignment;
+  const canAdminister = (isOwner || task?.creator_id === user?.id) && !myAssignment;
 
   const loadTask = async () => {
     try {

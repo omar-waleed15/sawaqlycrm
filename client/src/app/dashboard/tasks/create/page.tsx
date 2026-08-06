@@ -67,11 +67,17 @@ export default function CreateTaskPage() {
   const [linkInputs, setLinkInputs] = useState<string[]>(['']);
 
   useEffect(() => {
-    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
+    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager' && user?.role !== 'content_creator') {
       router.replace('/dashboard');
       return;
     }
-    usersApi.list().then(data => setMembers((data.users || []).filter((u: any) => u.role !== 'client'))).catch(console.error);
+    usersApi.list().then(data => {
+      let list = (data.users || []).filter((u: any) => u.role !== 'client');
+      if (user?.role === 'content_creator') {
+        list = list.filter((u: any) => u.role === 'content_creator_intern');
+      }
+      setMembers(list);
+    }).catch(console.error);
     closedClientsApi.list().then(data => setClients(data.clients)).catch(console.error);
   }, [user, router]);
 

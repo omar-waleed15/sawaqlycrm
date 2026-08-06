@@ -31,10 +31,11 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'completed' | 'archived'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>('active');
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+  const canCreate = isOwner || user?.role === 'content_creator';
 
   useEffect(() => {
     if (activeTab === 'archived' && user?.role === 'moderation') {
@@ -113,7 +114,9 @@ export default function TasksPage() {
       .finally(() => setLoading(false));
   };
 
-
+  const isInternTask = (t: Task) =>
+    t.task_assignees?.some(a => a.user?.role === 'content_creator_intern') ||
+    (t.creator_id === user?.id && user?.role === 'content_creator');
 
   const displayedTasks = activeTab === 'active'
     ? sortActiveTasks(tasks.filter(t => t.status !== 'completed'), user?.id)
@@ -121,12 +124,15 @@ export default function TasksPage() {
       ? tasks.filter(t => t.status === 'completed')
       : activeTab === 'my_tasks'
         ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)), user?.id)
-        : tasks;
+        : activeTab === 'intern_tasks'
+          ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && isInternTask(t)), user?.id)
+          : tasks;
 
   const filteredDisplayed = displayedTasks;
 
   const completedCount = tasks.filter(t => t.status === 'completed').length;
   const myTasksCount = tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
+  const internTasksCount = tasks.filter(t => t.status !== 'completed' && isInternTask(t)).length;
 
   return (
     <div className="page-container fade-in">
@@ -137,7 +143,7 @@ export default function TasksPage() {
             {isOwner ? t('tasks.subtitle') : t('tasks.mySubtitle')}
           </p>
         </div>
-        {isOwner && (
+        {canCreate && (
           <Button onClick={() => setCreateModalOpen(true)}>
             <Plus className="size-4" />
             {t('tasks.createTask')}
@@ -172,6 +178,21 @@ export default function TasksPage() {
             )}
           </button>
         )}
+        {(isOwner || user?.role === 'content_creator') && (
+          <button
+            onClick={() => { setActiveTab('intern_tasks'); setStatusFilter(''); }}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'intern_tasks'
+                ? 'border-[#1D61E7] text-[#1D61E7]'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🎓 {t('tasks.internTasksTab')}
+            {internTasksCount > 0 && (
+              <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{internTasksCount}</Badge>
+            )}
+          </button>
+        )}
         <button
           onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
@@ -197,8 +218,6 @@ export default function TasksPage() {
         )}
       </div>
 
-
-
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
         {activeTab !== 'completed' && (
@@ -207,12 +226,12 @@ export default function TasksPage() {
               <SelectValue placeholder={t('tasks.allStatuses')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">{(activeTab === 'active' || activeTab === 'my_tasks') ? t('tasks.allActiveStatuses') : t('tasks.allStatuses')}</SelectItem>
+              <SelectItem value="">{(activeTab === 'active' || activeTab === 'my_tasks' || activeTab === 'intern_tasks') ? t('tasks.allActiveStatuses') : t('tasks.allStatuses')}</SelectItem>
               <SelectItem value="todo">📝 {t('status.todo')}</SelectItem>
               <SelectItem value="in_progress">⚡ {t('status.in_progress')}</SelectItem>
               <SelectItem value="submitted">📤 {t('status.submitted')}</SelectItem>
               <SelectItem value="revision">🔄 {t('status.revision')}</SelectItem>
-              {activeTab !== 'active' && activeTab !== 'my_tasks' && (
+              {activeTab !== 'active' && activeTab !== 'my_tasks' && activeTab !== 'intern_tasks' && (
                 <SelectItem value="completed">✅ {t('status.completed')}</SelectItem>
               )}
             </SelectContent>
@@ -265,8 +284,8 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">{activeTab === 'archived' ? '🗄️' : activeTab === 'completed' ? '✅' : activeTab === 'my_tasks' ? '👤' : '🔍'}</div>
-          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : activeTab === 'completed' ? t('tasks.noCompletedTasks') : activeTab === 'my_tasks' ? t('tasks.noMyTasks') : t('tasks.noTasks')}</div>
+          <div className="empty-state-icon">{activeTab === 'archived' ? '🗄️' : activeTab === 'completed' ? '✅' : activeTab === 'my_tasks' ? '👤' : activeTab === 'intern_tasks' ? '🎓' : '🔍'}</div>
+          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : activeTab === 'completed' ? t('tasks.noCompletedTasks') : activeTab === 'my_tasks' ? t('tasks.noMyTasks') : activeTab === 'intern_tasks' ? t('tasks.noInternTasks') : t('tasks.noTasks')}</div>
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
               ? t('tasks.adjustFilters')
@@ -274,13 +293,15 @@ export default function TasksPage() {
                 ? t('tasks.noCompletedDesc')
                 : activeTab === 'my_tasks'
                   ? t('tasks.noMyTasksDesc')
-                  : isOwner
-                    ? activeTab === 'archived'
-                      ? t('tasks.noArchivedTasks')
-                      : t('tasks.noActiveOwner')
-                    : t('tasks.noActiveMember')}
+                  : activeTab === 'intern_tasks'
+                    ? t('tasks.noInternTasksDesc')
+                    : isOwner
+                      ? activeTab === 'archived'
+                        ? t('tasks.noArchivedTasks')
+                        : t('tasks.noActiveOwner')
+                      : t('tasks.noActiveMember')}
           </div>
-          {isOwner && !statusFilter && !priorityFilter && activeTab === 'active' && (
+          {canCreate && !statusFilter && !priorityFilter && (activeTab === 'active' || activeTab === 'intern_tasks') && (
             <Button onClick={() => setCreateModalOpen(true)}>
               <Plus className="size-4" /> {t('tasks.createTask')}
             </Button>
