@@ -15,7 +15,7 @@ const upload = (0, multer_1.default)({
 });
 // GET /api/users — List all team members (owner, team leader, sales, moderation, account_manager, content_creator)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
-    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied.' });
         return;
     }
@@ -354,7 +354,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
         res.status(400).json({ error: 'Name, email, and password are required' });
         return;
     }
-    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'];
+    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern'];
     const userRole = validRoles.includes(role) ? role : 'member';
     try {
         // Create user in Supabase Auth
@@ -420,7 +420,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         const updates = {};
         if (name)
             updates.name = name;
-        if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator'].includes(role))
+        if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern'].includes(role))
             updates.role = role;
         if (email)
             updates.email = email;

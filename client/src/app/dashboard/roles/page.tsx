@@ -30,6 +30,7 @@ const ROLE_EMOJIS: Record<string, string> = {
   moderation: '🛡️',
   account_manager: '📋',
   content_creator: '🎥',
+  content_creator_intern: '🎥',
 };
 
 type SectionKey = 'general_roles' | 'job_description' | 'job_roles' | 'non_negotiables';

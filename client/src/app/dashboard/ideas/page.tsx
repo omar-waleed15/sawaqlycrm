@@ -75,7 +75,7 @@ export default function IdeasPage() {
 
   // Redirect unauthorized users
   useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'moderation' && user.role !== 'account_manager' && user.role !== 'content_creator') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'moderation' && user.role !== 'account_manager' && user.role !== 'content_creator' && user.role !== 'content_creator_intern') {
       router.replace('/dashboard');
     }
   }, [user, router]);

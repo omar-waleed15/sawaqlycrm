@@ -800,6 +800,7 @@ export default function TeamPage() {
                          member.role === 'moderation' ? t('role.moderation') :
                          member.role === 'account_manager' ? t('role.account_manager') :
                          member.role === 'content_creator' ? (t('role.content_creator') || 'Content Creator') :
+                         member.role === 'content_creator_intern' ? (t('role.content_creator_intern') || 'Content Creator Intern') :
                          member.role === 'graphic_designer' ? (t('role.graphic_designer') || 'Graphic Designer') :
                          member.role === 'video_editor' ? (t('role.video_editor') || 'Video Editor') :
                          member.role === 'reel_maker' ? (t('role.reel_maker') || 'Reel Maker') :
@@ -947,6 +948,7 @@ export default function TeamPage() {
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
+                <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
               </SelectContent>
             </Select>
@@ -1031,6 +1033,7 @@ export default function TeamPage() {
                 <SelectItem value="moderation">{t('role.moderation')}</SelectItem>
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
+                <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
                 <SelectItem value="client">{t('role.client')}</SelectItem>
               </SelectContent>

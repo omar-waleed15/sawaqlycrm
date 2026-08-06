@@ -15,6 +15,7 @@ const ALL_SYSTEM_ROLES = [
     'moderation',
     'account_manager',
     'content_creator',
+    'content_creator_intern',
 ];
 // GET /api/roles — List role descriptions
 // Owner sees all roles; other members see only their own role

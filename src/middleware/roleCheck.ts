@@ -66,7 +66,7 @@ export const ownerOrTeamLeaderOrContentCreator = (
   res: Response,
   next: NextFunction
 ): void => {
-  if (!req.user || !['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator'].includes(req.user.role)) {
+  if (!req.user || !['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'].includes(req.user.role)) {
     res.status(403).json({ error: 'Access denied. Authorized roles only.' });
     return;
   }
