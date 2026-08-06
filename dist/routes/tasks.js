@@ -9,7 +9,7 @@ const router = (0, express_1.Router)();
 // Helper: build task select query with assignees joined
 const TASK_SELECT = `
   *,
-  creator:profiles!tasks_creator_id_fkey(id, name, email, avatar_url, phone),
+  creator:profiles!tasks_creator_id_fkey(id, name, email, role, avatar_url, phone),
   client:clients(id, name, company),
   task_assignees(
     id,
@@ -24,7 +24,7 @@ const TASK_SELECT = `
     submitted_at,
     total_time_spent,
     timer_started_at,
-    user:profiles(id, name, email, avatar_url, phone)
+    user:profiles(id, name, email, role, avatar_url, phone)
   ),
   attachments(id),
   comments(id)
@@ -59,8 +59,8 @@ async function canAdministerTask(userId, role, taskId) {
 // Helper: get computed task status based on assignees status
 function getTaskStatus(task, userId, role) {
     const assignees = task.task_assignees || [];
-    if (isTaskAdmin(role)) {
-        // Admin/TL/Manager/Moderator sees the aggregate status of the task
+    if (isTaskAdmin(role) || task.creator_id === userId) {
+        // Admin/TL/Manager/Moderator/Creator sees the aggregate status of the task
         if (assignees.length === 0) {
             return 'todo';
         }
@@ -93,7 +93,7 @@ function enrichTask(task, userId, role) {
         status: getTaskStatus(task, userId, role)
     };
 }
-// GET /api/tasks — Get tasks (owner: all, member: assigned only)
+// GET /api/tasks — Get tasks (owner: all, member: assigned/created)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
     try {
         const { status, priority, assignee_id, archived, client_id } = req.query;
@@ -129,7 +129,7 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             res.json({ tasks });
         }
         else {
-            // Member: only see tasks they're assigned to (excluding archived tasks)
+            // Member: see tasks assigned to them OR (if content_creator) created by them
             const { data: assignments, error: aErr } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
                 .select('task_id')
@@ -138,17 +138,27 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 res.status(500).json({ error: aErr.message });
                 return;
             }
-            const taskIds = (assignments || []).map((a) => a.task_id);
-            if (taskIds.length === 0) {
-                res.json({ tasks: [] });
-                return;
-            }
+            const assignedTaskIds = (assignments || []).map((a) => a.task_id);
             let query = supabase_1.supabaseAdmin
                 .from('tasks')
                 .select(TASK_SELECT)
-                .in('id', taskIds)
                 .eq('is_archived', false)
                 .order('created_at', { ascending: false });
+            if (userRole === 'content_creator') {
+                if (assignedTaskIds.length > 0) {
+                    query = query.or(`id.in.(${assignedTaskIds.join(',')}),creator_id.eq.${req.user.id}`);
+                }
+                else {
+                    query = query.eq('creator_id', req.user.id);
+                }
+            }
+            else {
+                if (assignedTaskIds.length === 0) {
+                    res.json({ tasks: [] });
+                    return;
+                }
+                query = query.in('id', assignedTaskIds);
+            }
             if (priority)
                 query = query.eq('priority', priority);
             if (client_id)
@@ -159,9 +169,13 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 return;
             }
             let tasks = data || [];
+            // Filter by assignee_id if provided
+            if (assignee_id) {
+                tasks = tasks.filter((t) => t.task_assignees?.some((a) => a.user_id === assignee_id));
+            }
             // Enrich tasks with computed status
             tasks = tasks.map((t) => enrichTask(t, req.user.id, userRole));
-            // Filter by status (which is the member's own status)
+            // Filter by status (check computed status)
             if (status) {
                 tasks = tasks.filter((t) => t.status === status);
             }

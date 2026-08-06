@@ -116,6 +116,7 @@ export default function TasksPage() {
 
   const isInternTask = (t: Task) =>
     t.task_assignees?.some(a => a.user?.role === 'content_creator_intern') ||
+    t.creator?.role === 'content_creator_intern' ||
     (t.creator_id === user?.id && user?.role === 'content_creator');
 
   const displayedTasks = activeTab === 'active'
@@ -178,7 +179,7 @@ export default function TasksPage() {
             )}
           </button>
         )}
-        {(isOwner || user?.role === 'content_creator') && (
+        {(isOwner || user?.role === 'content_creator' || user?.role === 'content_creator_intern') && (
           <button
             onClick={() => { setActiveTab('intern_tasks'); setStatusFilter(''); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
