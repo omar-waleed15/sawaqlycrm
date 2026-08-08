@@ -120,7 +120,7 @@ export default function TasksPage() {
     (t.creator_id === user?.id && user?.role === 'content_creator');
 
   const displayedTasks = activeTab === 'active'
-    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed'), user?.id)
+    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && !isInternTask(t)), user?.id)
     : activeTab === 'completed'
       ? tasks.filter(t => t.status === 'completed')
       : activeTab === 'my_tasks'
