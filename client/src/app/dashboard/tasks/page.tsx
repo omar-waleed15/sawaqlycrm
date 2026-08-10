@@ -31,13 +31,20 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>('active');
+  const isInternUser = user?.role === 'content_creator_intern';
+  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>(
+    user?.role === 'content_creator_intern' ? 'intern_tasks' : 'active'
+  );
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
   const canCreate = isOwner || user?.role === 'content_creator';
 
   useEffect(() => {
+    if (user?.role === 'content_creator_intern' && activeTab !== 'intern_tasks' && activeTab !== 'completed') {
+      setActiveTab('intern_tasks');
+      return;
+    }
     if (activeTab === 'archived' && user?.role === 'moderation') {
       setActiveTab('active');
       return;
@@ -115,9 +122,9 @@ export default function TasksPage() {
   };
 
   const isInternTask = (t: Task) =>
-    t.task_assignees?.some(a => a.user?.role === 'content_creator_intern') ||
+    t.task_assignees?.some(a => a.user?.role === 'content_creator_intern' || (user?.role === 'content_creator_intern' && a.user_id === user?.id)) ||
     t.creator?.role === 'content_creator_intern' ||
-    (t.creator_id === user?.id && user?.role === 'content_creator');
+    (t.creator_id === user?.id && (user?.role === 'content_creator' || user?.role === 'content_creator_intern'));
 
   const displayedTasks = activeTab === 'active'
     ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && !isInternTask(t)), user?.id)
@@ -154,16 +161,18 @@ export default function TasksPage() {
 
       {/* Tabs */}
       <div className="flex gap-0 border-b border-border mb-3">
-        <button
-          onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'active'
-              ? 'border-[#1D61E7] text-[#1D61E7]'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          📋 {t('tasks.activeTasks')}
-        </button>
+        {!isInternUser && (
+          <button
+            onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'active'
+                ? 'border-[#1D61E7] text-[#1D61E7]'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            📋 {t('tasks.activeTasks')}
+          </button>
+        )}
         {isOwner && (
           <button
             onClick={() => { setActiveTab('my_tasks'); setStatusFilter(''); }}
