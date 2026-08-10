@@ -9,6 +9,7 @@ import { Task } from '@/types';
 import { sortActiveTasks } from '@/lib/taskSortUtils';
 import TaskCard from '@/components/TaskCard';
 import CreateTaskModal from '@/components/CreateTaskModal';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,7 +33,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const isInternUser = user?.role === 'content_creator_intern';
-  const [activeTab, setActiveTab] = useState<'active' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>(
+  const [activeTab, setActiveTab] = useState<'active' | 'pending_review' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>(
     user?.role === 'content_creator_intern' ? 'intern_tasks' : 'active'
   );
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -41,7 +42,7 @@ export default function TasksPage() {
   const canCreate = isOwner || user?.role === 'content_creator';
 
   useEffect(() => {
-    if (user?.role === 'content_creator_intern' && activeTab !== 'intern_tasks' && activeTab !== 'completed') {
+    if (user?.role === 'content_creator_intern' && activeTab !== 'intern_tasks' && activeTab !== 'pending_review' && activeTab !== 'completed') {
       setActiveTab('intern_tasks');
       return;
     }
@@ -110,6 +111,9 @@ export default function TasksPage() {
     if (activeTab === 'completed' && !statusFilter) {
       params.status = 'completed';
     }
+    if (activeTab === 'pending_review' && !statusFilter) {
+      params.status = 'submitted';
+    }
     if (activeTab === 'my_tasks' && user?.id) {
       params.assignee_id = user.id;
     }
@@ -127,20 +131,23 @@ export default function TasksPage() {
     (t.creator_id === user?.id && (user?.role === 'content_creator' || user?.role === 'content_creator_intern'));
 
   const displayedTasks = activeTab === 'active'
-    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && !isInternTask(t)), user?.id)
-    : activeTab === 'completed'
-      ? tasks.filter(t => t.status === 'completed')
-      : activeTab === 'my_tasks'
-        ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)), user?.id)
-        : activeTab === 'intern_tasks'
-          ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && isInternTask(t)), user?.id)
-          : tasks;
+    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && !isInternTask(t)), user?.id)
+    : activeTab === 'pending_review'
+      ? sortActiveTasks(tasks.filter(t => t.status === 'submitted' && (isInternUser ? isInternTask(t) : true)), user?.id)
+      : activeTab === 'completed'
+        ? tasks.filter(t => t.status === 'completed' && (isInternUser ? isInternTask(t) : true))
+        : activeTab === 'my_tasks'
+          ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)), user?.id)
+          : activeTab === 'intern_tasks'
+            ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && isInternTask(t)), user?.id)
+            : tasks;
 
   const filteredDisplayed = displayedTasks;
 
-  const completedCount = tasks.filter(t => t.status === 'completed').length;
+  const completedCount = tasks.filter(t => t.status === 'completed' && (isInternUser ? isInternTask(t) : true)).length;
   const myTasksCount = tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
-  const internTasksCount = tasks.filter(t => t.status !== 'completed' && isInternTask(t)).length;
+  const internTasksCount = tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && isInternTask(t)).length;
+  const pendingReviewCount = tasks.filter(t => t.status === 'submitted' && !t.is_archived && (isInternUser ? isInternTask(t) : true)).length;
 
   return (
     <div className="page-container fade-in">
@@ -160,77 +167,138 @@ export default function TasksPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0 border-b border-border mb-3">
-        {!isInternUser && (
-          <button
-            onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'active'
-                ? 'border-[#1D61E7] text-[#1D61E7]'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            📋 {t('tasks.activeTasks')}
-          </button>
-        )}
-        {isOwner && (
-          <button
-            onClick={() => { setActiveTab('my_tasks'); setStatusFilter(''); }}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'my_tasks'
-                ? 'border-[#1D61E7] text-[#1D61E7]'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            👤 {t('tasks.myTasksTab')}
-            {myTasksCount > 0 && (
-              <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{myTasksCount}</Badge>
-            )}
-          </button>
-        )}
-        {(isOwner || user?.role === 'content_creator' || user?.role === 'content_creator_intern') && (
-          <button
-            onClick={() => { setActiveTab('intern_tasks'); setStatusFilter(''); }}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'intern_tasks'
-                ? 'border-[#1D61E7] text-[#1D61E7]'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            🎓 {t('tasks.internTasksTab')}
-            {internTasksCount > 0 && (
-              <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{internTasksCount}</Badge>
-            )}
-          </button>
-        )}
-        <button
-          onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-            activeTab === 'completed'
-              ? 'border-[#1D61E7] text-[#1D61E7]'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          ✅ {t('tasks.completedTasks')}
-        </button>
+      <div className="flex gap-0 border-b border-border mb-3 flex-wrap">
+        {isInternUser ? (
+          <>
+            <button
+              onClick={() => { setActiveTab('intern_tasks'); setStatusFilter(''); }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'intern_tasks'
+                  ? 'border-[#1D61E7] text-[#1D61E7]'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              🎓 {t('tasks.internTasksTab')}
+              {internTasksCount > 0 && (
+                <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{internTasksCount}</Badge>
+              )}
+            </button>
 
-        {isOwner && user?.role !== 'moderation' && (
-          <button
-            onClick={() => { setActiveTab('archived'); setStatusFilter(''); }}
-            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-              activeTab === 'archived'
-                ? 'border-[#1D61E7] text-[#1D61E7]'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            📂 {t('tasks.archivedTasks')}
-          </button>
+            <button
+              onClick={() => { setActiveTab('pending_review'); setStatusFilter(''); }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'pending_review'
+                  ? 'border-violet-600 text-violet-600 dark:border-violet-400 dark:text-violet-400 font-bold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              📤 {t('tasks.pendingReviewTab')}
+              {pendingReviewCount > 0 && (
+                <Badge className="text-[11px] h-5 px-1.5 bg-violet-600 hover:bg-violet-600 text-white font-bold">{pendingReviewCount}</Badge>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'completed'
+                  ? 'border-[#1D61E7] text-[#1D61E7]'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              ✅ {t('tasks.completedTasks')}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => { setActiveTab('active'); setStatusFilter(''); }}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'active'
+                  ? 'border-[#1D61E7] text-[#1D61E7]'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              📋 {t('tasks.activeTasks')}
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('pending_review'); setStatusFilter(''); }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'pending_review'
+                  ? 'border-violet-600 text-violet-600 dark:border-violet-400 dark:text-violet-400 font-bold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              📤 {t('tasks.pendingReviewTab')}
+              {pendingReviewCount > 0 && (
+                <Badge className="text-[11px] h-5 px-1.5 bg-violet-600 hover:bg-violet-600 text-white font-bold">{pendingReviewCount}</Badge>
+              )}
+            </button>
+
+            {isOwner && (
+              <button
+                onClick={() => { setActiveTab('my_tasks'); setStatusFilter(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                  activeTab === 'my_tasks'
+                    ? 'border-[#1D61E7] text-[#1D61E7]'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                👤 {t('tasks.myTasksTab')}
+                {myTasksCount > 0 && (
+                  <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{myTasksCount}</Badge>
+                )}
+              </button>
+            )}
+
+            {(isOwner || user?.role === 'content_creator') && (
+              <button
+                onClick={() => { setActiveTab('intern_tasks'); setStatusFilter(''); }}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                  activeTab === 'intern_tasks'
+                    ? 'border-[#1D61E7] text-[#1D61E7]'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🎓 {t('tasks.internTasksTab')}
+                {internTasksCount > 0 && (
+                  <Badge className="text-[11px] h-5 px-1.5 bg-[#1D61E7] hover:bg-[#1D61E7] text-white">{internTasksCount}</Badge>
+                )}
+              </button>
+            )}
+
+            <button
+              onClick={() => { setActiveTab('completed'); setStatusFilter(''); }}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === 'completed'
+                  ? 'border-[#1D61E7] text-[#1D61E7]'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              ✅ {t('tasks.completedTasks')}
+            </button>
+
+            {isOwner && user?.role !== 'moderation' && (
+              <button
+                onClick={() => { setActiveTab('archived'); setStatusFilter(''); }}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                  activeTab === 'archived'
+                    ? 'border-[#1D61E7] text-[#1D61E7]'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                📂 {t('tasks.archivedTasks')}
+              </button>
+            )}
+          </>
         )}
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        {activeTab !== 'completed' && (
+
+        {activeTab !== 'completed' && activeTab !== 'pending_review' && (
           <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || '')}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder={t('tasks.allStatuses')} />
@@ -294,22 +362,24 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="empty-state">
-          <div className="empty-state-icon">{activeTab === 'archived' ? '🗄️' : activeTab === 'completed' ? '✅' : activeTab === 'my_tasks' ? '👤' : activeTab === 'intern_tasks' ? '🎓' : '🔍'}</div>
-          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : activeTab === 'completed' ? t('tasks.noCompletedTasks') : activeTab === 'my_tasks' ? t('tasks.noMyTasks') : activeTab === 'intern_tasks' ? t('tasks.noInternTasks') : t('tasks.noTasks')}</div>
+          <div className="empty-state-icon">{activeTab === 'archived' ? '🗄️' : activeTab === 'completed' ? '✅' : activeTab === 'pending_review' ? '📤' : activeTab === 'my_tasks' ? '👤' : activeTab === 'intern_tasks' ? '🎓' : '🔍'}</div>
+          <div className="empty-state-title">{activeTab === 'archived' ? t('tasks.noArchivedTasks') : activeTab === 'completed' ? t('tasks.noCompletedTasks') : activeTab === 'pending_review' ? t('tasks.noPendingReviewTasks') : activeTab === 'my_tasks' ? t('tasks.noMyTasks') : activeTab === 'intern_tasks' ? t('tasks.noInternTasks') : t('tasks.noTasks')}</div>
           <div className="empty-state-desc">
             {statusFilter || priorityFilter
               ? t('tasks.adjustFilters')
               : activeTab === 'completed'
                 ? t('tasks.noCompletedDesc')
-                : activeTab === 'my_tasks'
-                  ? t('tasks.noMyTasksDesc')
-                  : activeTab === 'intern_tasks'
-                    ? t('tasks.noInternTasksDesc')
-                    : isOwner
-                      ? activeTab === 'archived'
-                        ? t('tasks.noArchivedTasks')
-                        : t('tasks.noActiveOwner')
-                      : t('tasks.noActiveMember')}
+                : activeTab === 'pending_review'
+                  ? t('tasks.noPendingReviewDesc')
+                  : activeTab === 'my_tasks'
+                    ? t('tasks.noMyTasksDesc')
+                    : activeTab === 'intern_tasks'
+                      ? t('tasks.noInternTasksDesc')
+                      : isOwner
+                        ? activeTab === 'archived'
+                          ? t('tasks.noArchivedTasks')
+                          : t('tasks.noActiveOwner')
+                        : t('tasks.noActiveMember')}
           </div>
           {canCreate && !statusFilter && !priorityFilter && (activeTab === 'active' || activeTab === 'intern_tasks') && (
             <Button onClick={() => setCreateModalOpen(true)}>
