@@ -362,61 +362,78 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
           </div>
 
           {/* Secondary Widgets Section */}
-          {hasRevisionRequested || (isOwner && submittedCount > 0) || loggedTimeText ? (
-            <div className="flex flex-col gap-2 mt-1">
-              {/* Revision banner for worker */}
-              {!isOwner && isMyRevisionNeeded && (
-                <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
-                  🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
-                </div>
-              )}
+          {(() => {
+            const isContentCreator = user?.role === 'content_creator';
+            const isCreator = task.creator_id === user?.id;
+            const canSeeSubmissionProgress = isOwner || isContentCreator || isCreator;
+            const isMySubmitted = myAssignment?.status === 'submitted';
 
-              {/* Revision indicator for owner */}
-              {isOwner && hasRevisionRequested && (
-                <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
-                  🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
-                </div>
-              )}
+            const shouldShowWidgets = hasRevisionRequested || isMyRevisionNeeded || (canSeeSubmissionProgress && submittedCount > 0) || isMySubmitted || !!loggedTimeText;
+            if (!shouldShowWidgets) return null;
 
-              {/* Submission progress for admin */}
-              {isOwner && submittedCount > 0 && (
-                <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
-                  📤 {t('tasks.submissionsPending', { count: submittedCount })}
-                </div>
-              )}
+            return (
+              <div className="flex flex-col gap-2 mt-1">
+                {/* Revision banner for worker */}
+                {!canSeeSubmissionProgress && isMyRevisionNeeded && (
+                  <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                    🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
+                  </div>
+                )}
 
-              {/* Logged Time & Overtime Indicator (Only for assigned team members, hidden for managers) */}
-              {!isOwner && myAssignment && (() => {
-                const mySeconds = myAssignment.total_time_spent || 0;
-                const estimatedSec = (task.estimated_time_minutes || 0) * 60;
-                const isOvertime = estimatedSec > 0 && mySeconds > estimatedSec;
-                
-                if (isOvertime) {
-                  return (
-                    <div className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold px-2 py-1 rounded border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 select-none text-start">
-                      <span>⚠️</span>
-                      <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
-                    </div>
-                  );
-                } else if (estimatedSec > 0) {
-                  return (
-                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
-                      <span>⏱️</span>
-                      <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
-                    </div>
-                  );
-                } else if (loggedTimeText) {
-                  return (
-                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
-                      <span>⏱️</span>
-                      <span>{loggedTimeText}</span>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </div>
-          ) : null}
+                {/* Revision indicator for owner/creator */}
+                {canSeeSubmissionProgress && hasRevisionRequested && (
+                  <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                    🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
+                  </div>
+                )}
+
+                {/* Submission progress for admin / content creator */}
+                {canSeeSubmissionProgress && submittedCount > 0 && (
+                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
+                    📤 {t('tasks.submissionsPending', { count: submittedCount })}
+                  </div>
+                )}
+
+                {/* Submission banner for assigned worker / intern */}
+                {!canSeeSubmissionProgress && isMySubmitted && (
+                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
+                    📤 {locale === 'ar' ? 'تم التسليم (بانتظار المراجعة)' : 'Submitted (Pending Review)'}
+                  </div>
+                )}
+
+                {/* Logged Time & Overtime Indicator (Only for assigned team members, hidden for managers) */}
+                {!isOwner && myAssignment && (() => {
+                  const mySeconds = myAssignment.total_time_spent || 0;
+                  const estimatedSec = (task.estimated_time_minutes || 0) * 60;
+                  const isOvertime = estimatedSec > 0 && mySeconds > estimatedSec;
+                  
+                  if (isOvertime) {
+                    return (
+                      <div className="text-[10px] bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-bold px-2 py-1 rounded border border-rose-200 dark:border-rose-900/50 flex items-center gap-1 select-none text-start">
+                        <span>⚠️</span>
+                        <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
+                      </div>
+                    );
+                  } else if (estimatedSec > 0) {
+                    return (
+                      <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
+                        <span>⏱️</span>
+                        <span>{formatDuration(mySeconds)} / {formatDuration(estimatedSec)}</span>
+                      </div>
+                    );
+                  } else if (loggedTimeText) {
+                    return (
+                      <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 select-none text-start">
+                        <span>⏱️</span>
+                        <span>{loggedTimeText}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            );
+          })()}
 
           {/* Bottom section (pinned to bottom) */}
           <div className="mt-auto flex flex-col gap-2">
