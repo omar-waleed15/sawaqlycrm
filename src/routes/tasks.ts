@@ -53,14 +53,23 @@ async function canAdministerTask(userId: string, role: string, taskId: string): 
 
   if (isAdminRole) return true;
 
-  // Task creator can administer/review tasks they created
+  // Task creator or Content Creator managing intern task can administer/review
   const { data: task } = await supabaseAdmin
     .from('tasks')
-    .select('creator_id')
+    .select('creator_id, task_assignees(user:profiles(role))')
     .eq('id', taskId)
     .maybeSingle();
 
-  return task ? task.creator_id === userId : false;
+  if (!task) return false;
+
+  if (task.creator_id === userId) return true;
+
+  if (role === 'content_creator') {
+    const hasInternAssignee = (task.task_assignees || []).some((a: any) => a.user?.role === 'content_creator_intern');
+    if (hasInternAssignee) return true;
+  }
+
+  return false;
 }
 
 // Helper: get computed task status based on assignees status
@@ -159,8 +168,16 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
         .order('created_at', { ascending: false });
 
       if (userRole === 'content_creator') {
-        if (assignedTaskIds.length > 0) {
-          query = query.or(`id.in.(${assignedTaskIds.join(',')}),creator_id.eq.${req.user!.id}`);
+        const { data: internAssignments } = await supabaseAdmin
+          .from('task_assignees')
+          .select('task_id, user:profiles!inner(role)')
+          .eq('user.role', 'content_creator_intern');
+
+        const internTaskIds = (internAssignments || []).map((a: any) => a.task_id);
+        const accessibleTaskIds = Array.from(new Set([...assignedTaskIds, ...internTaskIds]));
+
+        if (accessibleTaskIds.length > 0) {
+          query = query.or(`id.in.(${accessibleTaskIds.join(',')}),creator_id.eq.${req.user!.id}`);
         } else {
           query = query.eq('creator_id', req.user!.id);
         }
@@ -505,10 +522,14 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    // Members can only view tasks they're assigned to
+    // Members can only view tasks they're assigned to, created by them, or intern tasks for content creators
     if (!isTaskAdmin(req.user!.role)) {
       const isAssigned = data.task_assignees?.some((a: any) => a.user_id === req.user!.id);
-      if (!isAssigned) {
+      const isCreator = data.creator_id === req.user!.id;
+      const isContentCreatorManagingIntern = req.user!.role === 'content_creator' &&
+        data.task_assignees?.some((a: any) => a.user?.role === 'content_creator_intern');
+
+      if (!isAssigned && !isCreator && !isContentCreatorManagingIntern) {
         res.status(403).json({ error: 'Access denied' });
         return;
       }
@@ -622,6 +643,19 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       // If assignee_ids provided, sync assignees
       if (assignee_ids !== undefined) {
         const newIds: string[] = Array.isArray(assignee_ids) ? assignee_ids : [];
+
+        if (req.user!.role === 'content_creator' && newIds.length > 0) {
+          const { data: assigneeProfiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role')
+            .in('id', newIds);
+
+          const invalidAssignees = (assigneeProfiles || []).filter((p: any) => p.role !== 'content_creator_intern');
+          if (invalidAssignees.length > 0) {
+            res.status(403).json({ error: 'Content Creators can only assign tasks to Content Creator Interns' });
+            return;
+          }
+        }
 
         // Get current assignees
         const { data: currentAssignees } = await supabaseAdmin
@@ -979,8 +1013,8 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
   }
 });
 
-// DELETE /api/tasks/:id — Delete task (owner or team leader)
-router.delete('/:id', authMiddleware, ownerOrTeamLeader, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/tasks/:id — Delete task (owner, team leader, or content creator for intern tasks)
+router.delete('/:id', authMiddleware, ownerOrTeamLeaderOrSalesOrContentCreator, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   if (!(await canAdministerTask(req.user!.id, req.user!.role, id as string))) {

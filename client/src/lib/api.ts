@@ -673,3 +673,36 @@ export const clientOnboardingApi = {
     }),
 };
 
+// Social Media Integration API
+export const socialApi = {
+  addAccountByUrl: (clientId: string, profileUrl: string, platform?: string) =>
+    request<{ success: boolean; account: import('@/types').ClientSocialAccount }>(`/social/clients/${clientId}/accounts/add-link`, {
+      method: 'POST',
+      body: JSON.stringify({ profile_url: profileUrl, platform }),
+    }),
+  getAccounts: (clientId: string) =>
+    request<{ accounts: import('@/types').ClientSocialAccount[] }>(`/social/clients/${clientId}/accounts`),
+  disconnectAccount: (accountId: string) =>
+    request(`/social/accounts/${accountId}`, { method: 'DELETE' }),
+  syncMetrics: (clientId: string) =>
+    request<{ success: boolean; results: any }>(`/social/clients/${clientId}/sync`, { method: 'POST' }),
+  getAnalytics: (clientId: string) =>
+    request<import('@/types').SocialAnalyticsData>(`/social/clients/${clientId}/analytics`),
+  updatePost: (postId: string, data: Partial<{ caption: string; like_count: number; comments_count: number; views_count: number; media_url: string; permalink: string }>) =>
+    request<{ success: boolean; post: import('@/types').SocialRecentPost }>(`/social/posts/${postId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deletePost: (postId: string) =>
+    request(`/social/posts/${postId}`, { method: 'DELETE' }),
+  getSettings: () =>
+    request<{ instagram_session_id: string; has_active_cookie: boolean }>('/social/settings'),
+  updateSettings: (instagram_session_id: string) =>
+    request<{ success: boolean; message: string; has_active_cookie: boolean }>('/social/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ instagram_session_id }),
+    }),
+};
+
+
+

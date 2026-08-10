@@ -78,7 +78,8 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const [taskCreatedAt, setTaskCreatedAt] = useState<string>('');
 
   useEffect(() => {
-    if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'moderation' && user?.role !== 'account_manager') {
+    const allowedRoles = ['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator'];
+    if (!allowedRoles.includes(user?.role || '')) {
       router.replace('/dashboard');
       return;
     }
@@ -94,9 +95,13 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
       const isOwnerRole = user?.role === 'owner';
       const isOtherAdminRole = user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
+      const isCreator = tData.creator_id === user?.id;
+      const hasInternAssignee = tData.task_assignees?.some((a: any) => a.user?.role === 'content_creator_intern');
       const isAssigned = !!myA;
 
-      if (!isOwnerRole && (!isOtherAdminRole || isAssigned)) {
+      const canEditTask = isOwnerRole || isOtherAdminRole || ((isCreator || (user?.role === 'content_creator' && hasInternAssignee)) && !isAssigned);
+
+      if (!canEditTask) {
         router.replace(`/dashboard/tasks/${id}`);
         return;
       }
@@ -124,7 +129,12 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       // Load existing assignees from task_assignees
       const existingIds = (tData.task_assignees || []).map(a => a.user_id);
       setAssigneeIds(existingIds);
-      setMembers((usersData.users || []).filter((u: any) => u.role !== 'client'));
+
+      let userList = (usersData.users || []).filter((u: any) => u.role !== 'client');
+      if (user?.role === 'content_creator') {
+        userList = userList.filter((u: any) => u.role === 'content_creator_intern');
+      }
+      setMembers(userList);
       setClients(clientsData.clients);
       setExistingAttachments(tData.attachments || []);
     }).catch(() => router.replace('/dashboard/tasks'))

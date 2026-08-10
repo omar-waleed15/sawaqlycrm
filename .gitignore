@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+client/node_modules/
+.pnpm-store/
+
+# Next.js & Build Output
+client/.next/
+dist/
+build/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# Temporary Scratch Files & Test Logs
+scratch_*
+scratch/
+*.log
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

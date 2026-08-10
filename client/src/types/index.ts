@@ -741,3 +741,57 @@ export interface ClientOnboarding {
   updated_at?: string;
 }
 
+export interface ClientSocialAccount {
+  id: string;
+  client_id: string;
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin';
+  account_id: string;
+  account_name: string;
+  profile_url?: string;
+  avatar_url?: string;
+  meta_page_id?: string;
+  connected_at?: string;
+  updated_at?: string;
+}
+
+export interface SocialAnalyticsSummary {
+  total_followers: number;
+  total_likes: number;
+  total_comments: number;
+  total_posts: number;
+  monthly_reach?: number;
+  monthly_impressions?: number;
+  monthly_likes?: number;
+  monthly_comments?: number;
+  monthly_shares?: number;
+}
+
+export interface SocialPostComment {
+  id: string;
+  text: string;
+  username: string;
+  timestamp: string;
+}
+
+export interface SocialRecentPost {
+  id: string;
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin';
+  account_name: string;
+  caption: string;
+  permalink: string;
+  media_url?: string | null;
+  media_type?: string;
+  like_count: number;
+  comments_count: number;
+  views_count?: number;
+  timestamp: string;
+  comments?: SocialPostComment[];
+}
+
+export interface SocialAnalyticsData {
+  connected: boolean;
+  accounts?: ClientSocialAccount[];
+  summary: SocialAnalyticsSummary;
+  recent_posts: SocialRecentPost[];
+  analytics_history: any[];
+}

@@ -15,6 +15,7 @@ import ClosedClientCalendar from '@/components/closed-client/ClosedClientCalenda
 import ClosedClientReport from '@/components/closed-client/ClosedClientReport';
 import ClosedClientAccount from '@/components/closed-client/ClosedClientAccount';
 import ClosedClientTasks from '@/components/closed-client/ClosedClientTasks';
+import SocialAnalyticsTab from '@/components/SocialAnalyticsTab';
 import {
   Select,
   SelectContent,
@@ -34,14 +35,16 @@ import {
   ListTodo,
   BookOpen,
   FolderKanban,
+  Globe,
 } from 'lucide-react';
 
-type SubTab = 'faq' | 'contentHub' | 'tasks' | 'contentPlan' | 'ideas' | 'calendar' | 'report' | 'account';
+type SubTab = 'faq' | 'contentHub' | 'tasks' | 'contentPlan' | 'ideas' | 'calendar' | 'report' | 'socialAnalytics' | 'account';
 
 const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ElementType }[] = [
   { key: 'faq', labelKey: 'closedClients.tab.faq', icon: HelpCircle },
   { key: 'contentHub', labelKey: 'closedClients.tab.contentHub', icon: BookOpen },
   { key: 'tasks', labelKey: 'closedClients.tab.tasks', icon: ListTodo },
+  { key: 'socialAnalytics', labelKey: 'closedClients.tab.socialAnalytics', icon: Globe },
   { key: 'contentPlan', labelKey: 'closedClients.tab.contentPlan', icon: FileText },
   { key: 'ideas', labelKey: 'closedClients.tab.ideas', icon: Lightbulb },
   { key: 'calendar', labelKey: 'closedClients.tab.calendar', icon: Calendar },
@@ -256,6 +259,9 @@ export default function ClosedClientDetailPage() {
           )}
           {activeTab === 'tasks' && user?.role !== 'content_creator' && (
             <ClosedClientTasks clientId={clientId} client={client} />
+          )}
+          {activeTab === 'socialAnalytics' && (
+            <SocialAnalyticsTab clientId={clientId} />
           )}
           {activeTab === 'contentPlan' && (
             <ClosedClientDeliverables client={client} onRefresh={loadAll} />

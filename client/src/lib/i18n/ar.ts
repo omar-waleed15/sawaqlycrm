@@ -1206,6 +1206,7 @@ export const ar: Record<string, string> = {
   'portal.profileUpdated': 'تم تحديث إعدادات العلامة التجارية بنجاح',
   // Closed Client Account tab
   'closedClients.tab.account': 'الحساب',
+  'closedClients.tab.socialAnalytics': 'تحليلات التواصل الاجتماعي',
   'closedClients.account.title': 'حساب بوابة العميل',
   'closedClients.account.desc': 'إدارة بيانات تسجيل الدخول لوصول العميل إلى البوابة',
   'closedClients.account.linked': 'الحساب مرتبط',

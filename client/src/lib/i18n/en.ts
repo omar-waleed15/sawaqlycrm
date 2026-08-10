@@ -1206,6 +1206,7 @@ export const en: Record<string, string> = {
   'portal.profileUpdated': 'Brand settings updated successfully',
   // Closed Client Account tab
   'closedClients.tab.account': 'Account',
+  'closedClients.tab.socialAnalytics': 'Social Analytics',
   'closedClients.account.title': 'Client Portal Account',
   'closedClients.account.desc': 'Manage the login credentials for this client\'s portal access',
   'closedClients.account.linked': 'Account Linked',
