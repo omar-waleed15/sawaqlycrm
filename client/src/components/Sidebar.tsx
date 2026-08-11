@@ -131,7 +131,7 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
         const userTasks = tasksRes.tasks || [];
         const lastReadTasks = localStorage.getItem('last_read_tasks_time');
         const hasUnreadT = userTasks.some((t: any) => {
-          if (t.status === 'completed') return false;
+          if (t.status === 'completed' || t.is_archived) return false;
           if (!lastReadTasks) return true;
           return new Date(t.created_at) > new Date(lastReadTasks);
         });

@@ -139,10 +139,10 @@ export default function TasksPage() {
 
   const filteredDisplayed = displayedTasks;
 
-  const completedCount = tasks.filter(t => t.status === 'completed' && (isInternUser ? isInternTask(t) : true)).length;
-  const myTasksCount = tasks.filter(t => t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
-  const internTasksCount = tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && isInternTask(t)).length;
-  const pendingReviewCount = tasks.filter(t => t.status === 'submitted' && !t.is_archived && (isInternUser ? isInternTask(t) : true)).length;
+  const completedCount = tasks.filter(t => !t.is_archived && t.status === 'completed' && (isInternUser ? isInternTask(t) : true)).length;
+  const myTasksCount = tasks.filter(t => !t.is_archived && t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
+  const internTasksCount = tasks.filter(t => !t.is_archived && t.status !== 'completed' && t.status !== 'submitted' && isInternTask(t)).length;
+  const pendingReviewCount = tasks.filter(t => !t.is_archived && t.status === 'submitted' && (isInternUser ? isInternTask(t) : true)).length;
 
   return (
     <div className="page-container fade-in">
