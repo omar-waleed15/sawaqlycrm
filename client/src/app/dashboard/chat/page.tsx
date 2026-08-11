@@ -70,14 +70,15 @@ export default function GlobalChatPage() {
     loadMessages(true);
   }, []);
 
-  // Polling for updates every 5 seconds
+  // Realtime updates for new chat messages
   useEffect(() => {
-    const interval = setInterval(() => {
+    const handleGlobalMessage = () => {
       loadMessages();
       setNowTime(Date.now());
-    }, 5000);
+    };
 
-    return () => clearInterval(interval);
+    window.addEventListener('app-global-message', handleGlobalMessage);
+    return () => window.removeEventListener('app-global-message', handleGlobalMessage);
   }, []);
 
   // Scroll to bottom when message list changes (e.g. when sending a message)

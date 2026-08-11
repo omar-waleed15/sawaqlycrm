@@ -108,10 +108,13 @@ export default function RemindersPage() {
   useEffect(() => {
     if (user) {
       loadData(true);
-      const interval = setInterval(() => {
-        loadData(false);
-      }, 15000);
-      return () => clearInterval(interval);
+      
+      const handleReminderChange = () => loadData(false);
+      window.addEventListener('app-reminder-changed', handleReminderChange);
+
+      return () => {
+        window.removeEventListener('app-reminder-changed', handleReminderChange);
+      };
     }
   }, [user]);
 

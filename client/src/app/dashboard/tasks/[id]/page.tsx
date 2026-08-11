@@ -189,6 +189,20 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   useEffect(() => {
     loadTask();
+
+    const handleRealtimeTaskUpdate = (e: any) => {
+      if (e.detail?.id === id || e.detail?.task_id === id) {
+        loadTask();
+      }
+    };
+
+    window.addEventListener('app-task-updated', handleRealtimeTaskUpdate);
+    window.addEventListener('app-comment-changed', handleRealtimeTaskUpdate);
+
+    return () => {
+      window.removeEventListener('app-task-updated', handleRealtimeTaskUpdate);
+      window.removeEventListener('app-comment-changed', handleRealtimeTaskUpdate);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

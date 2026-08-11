@@ -83,10 +83,14 @@ export default function AdminClientChatPage() {
   useEffect(() => {
     if (!selectedRoom) return;
     fetchMessages(selectedRoom.id, false);
-    const interval = setInterval(() => {
+
+    const handleClientMessage = (e: any) => {
       fetchMessages(selectedRoom.id, true);
-    }, 3000);
-    return () => clearInterval(interval);
+      fetchRooms();
+    };
+
+    window.addEventListener('app-client-message', handleClientMessage);
+    return () => window.removeEventListener('app-client-message', handleClientMessage);
   }, [selectedRoom?.id]);
 
   useEffect(() => {

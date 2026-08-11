@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { chatApi, remindersApi, tasksApi, clientChatApi } from '@/lib/api';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { createBackgroundTimer, sendDesktopNotification } from '@/lib/backgroundNotification';
+import { initRealtimeSubscriptions } from '@/lib/realtime';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -192,8 +193,30 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
     };
 
     checkUnreads();
-    const cleanupWorker = createBackgroundTimer(checkUnreads, 3000);
-    return () => cleanupWorker();
+    
+    // Initialize Realtime WebSocket subscriptions
+    const cleanupRealtime = initRealtimeSubscriptions();
+
+    // Event listeners for instant updates when DB changes occur
+    const handleRealtimeUpdate = () => checkUnreads();
+    window.addEventListener('app-reminder-changed', handleRealtimeUpdate);
+    window.addEventListener('app-global-message', handleRealtimeUpdate);
+    window.addEventListener('app-client-message', handleRealtimeUpdate);
+    window.addEventListener('app-task-created', handleRealtimeUpdate);
+    window.addEventListener('app-task-updated', handleRealtimeUpdate);
+
+    // Passive fallback timer (2 minutes instead of 3 seconds)
+    const cleanupWorker = createBackgroundTimer(checkUnreads, 120000);
+
+    return () => {
+      window.removeEventListener('app-reminder-changed', handleRealtimeUpdate);
+      window.removeEventListener('app-global-message', handleRealtimeUpdate);
+      window.removeEventListener('app-client-message', handleRealtimeUpdate);
+      window.removeEventListener('app-task-created', handleRealtimeUpdate);
+      window.removeEventListener('app-task-updated', handleRealtimeUpdate);
+      cleanupWorker();
+      cleanupRealtime();
+    };
   }, [pathname, user, locale]);
 
   const hasAnyUnread = hasNewMessage || hasNewClientChatMessage || hasNewReminder || hasNewTask;

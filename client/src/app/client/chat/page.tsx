@@ -75,11 +75,12 @@ export default function ClientPortalChatPage() {
 
     fetchMessages(clientId, false);
 
-    const interval = setInterval(() => {
+    const handleClientMessage = () => {
       fetchMessages(clientId, true);
-    }, 3000);
+    };
 
-    return () => clearInterval(interval);
+    window.addEventListener('app-client-message', handleClientMessage);
+    return () => window.removeEventListener('app-client-message', handleClientMessage);
   }, [clientId]);
 
   // Scroll to bottom when messages update
