@@ -1,6 +1,6 @@
-import { spawn } from 'child_process';
+import puppeteer from 'puppeteer-core';
 import fs from 'fs';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin as supabase } from '../lib/supabase';
 
 export interface ScrapedSocialPost {
   post_id: string;
@@ -26,48 +26,182 @@ export interface ScrapedSocialProfile {
   logs: string[];
 }
 
-export async function fetchWithNativeChrome(url: string, cookies?: string): Promise<string> {
-  return new Promise((resolve) => {
-    const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-    if (!fs.existsSync(chromePath)) {
-      resolve('');
-      return;
+export async function scrapeInstagramWithPuppeteer(
+  handle: string,
+  logs: string[]
+): Promise<{ followersCount: number; postsCount: number; accountName: string; avatarUrl: string; posts: ScrapedSocialPost[] }> {
+  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  if (!fs.existsSync(chromePath)) {
+    logs.push(`[InstagramScraper] Chrome executable not found at ${chromePath}`);
+    return { followersCount: 0, postsCount: 0, accountName: handle, avatarUrl: `https://unavatar.io/instagram/${handle}`, posts: [] };
+  }
+
+  let browser;
+  try {
+    logs.push(`[InstagramScraper] Strategy 2: Launching Puppeteer Headless Chrome...`);
+    browser = await puppeteer.launch({
+      executablePath: chromePath,
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty((globalThis as any).navigator, 'webdriver', { get: () => undefined });
+    });
+
+    const profileUrl = `https://www.instagram.com/${handle}/`;
+    logs.push(`[InstagramScraper] Puppeteer navigating to ${profileUrl}`);
+    await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
+
+    await new Promise((r) => setTimeout(r, 4000));
+
+    const pageTitle = await page.title();
+    let accountName = handle;
+    if (pageTitle && pageTitle.includes('(@')) {
+      accountName = pageTitle.split('(@')[0].replace('• Instagram photos and videos', '').trim();
     }
 
-    const args = [
-      '--headless=new',
-      '--disable-gpu',
-      '--no-sandbox',
-      '--virtual-time-budget=2500',
-      '--dump-dom',
-      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      url,
-    ];
+    const data = await page.evaluate((targetHandle: string) => {
+      const doc = (globalThis as any).document;
+      const links = Array.from(doc.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
+      const shortcodes: string[] = [];
+      const seenShortcodes = new Set<string>();
 
-    const proc = spawn(chromePath, args);
-    let html = '';
+      links.forEach((aEl: any) => {
+        const href = aEl.getAttribute('href') || '';
+        const match = href.match(/\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+        if (!match) return;
+        const shortcode = match[1];
+        if (seenShortcodes.has(shortcode)) return;
+        seenShortcodes.add(shortcode);
+        shortcodes.push(shortcode);
+      });
 
-    proc.stdout.on('data', (data) => {
-      html += data.toString();
-    });
+      const metaDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
+      const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
 
-    proc.on('close', () => {
-      resolve(html);
-    });
+      let followers = 0;
+      let postsCnt = 0;
 
-    proc.on('error', () => {
-      resolve('');
-    });
-  });
+      const fM = metaDesc.match(/([0-9.,KMBkmb]+)\s*Followers/i);
+      if (fM) {
+        const clean = fM[1].replace(/,/g, '');
+        const mult = clean.slice(-1).toUpperCase();
+        const num = parseFloat(clean);
+        if (!isNaN(num)) {
+          if (mult === 'K') followers = Math.round(num * 1000);
+          else if (mult === 'M') followers = Math.round(num * 1000000);
+          else followers = Math.round(num);
+        }
+      }
+
+      const pM = metaDesc.match(/([0-9.,KMBkmb]+)\s*Posts/i);
+      if (pM) {
+        const clean = pM[1].replace(/,/g, '');
+        const num = parseFloat(clean);
+        if (!isNaN(num)) postsCnt = Math.round(num);
+      }
+
+      return { followers, postsCnt, ogImage, shortcodes: shortcodes.slice(0, 8) };
+    }, handle);
+
+    logs.push(`[InstagramScraper] Found ${data.shortcodes.length} shortcodes from profile, now fetching exact post metrics...`);
+
+    const posts: ScrapedSocialPost[] = [];
+    for (const sc of data.shortcodes) {
+      try {
+        const embedUrl = `https://www.instagram.com/p/${sc}/embed/captioned/`;
+        await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await new Promise((r) => setTimeout(r, 2000));
+
+        const postInfo = await page.evaluate((shortcode: string, targetHandle: string) => {
+          const doc = (globalThis as any).document;
+          const bodyText = doc.body?.innerText || '';
+
+          const likesM = bodyText.match(/([0-9.,KMBkmb]+)\s*likes/i) || bodyText.match(/Liked by [^0-9]*([0-9.,KMBkmb]+)/i);
+          const commentsM = bodyText.match(/View all ([0-9.,KMBkmb]+) comments/i) || bodyText.match(/([0-9.,KMBkmb]+)\s*comments/i);
+
+          const captionEl = doc.querySelector('.CaptionText, .Caption, [class*="Caption"]');
+          const captionText = captionEl ? captionEl.textContent.trim() : '';
+
+          const mediaImg = doc.querySelector('img.EmbeddedMediaImage, img[src*="cdninstagram"]')?.getAttribute('src') || undefined;
+
+          let likes = 0;
+          if (likesM && likesM[1]) {
+            const clean = likesM[1].replace(/,/g, '');
+            const num = parseFloat(clean);
+            if (!isNaN(num)) likes = Math.round(num);
+          }
+
+          let comments = 0;
+          if (commentsM && commentsM[1]) {
+            const clean = commentsM[1].replace(/,/g, '');
+            const num = parseFloat(clean);
+            if (!isNaN(num)) comments = Math.round(num);
+          }
+
+          return {
+            post_id: `ig_${targetHandle}_p_${shortcode}`,
+            caption: captionText || `Instagram Post (${shortcode})`,
+            media_url: mediaImg,
+            permalink: `https://www.instagram.com/p/${shortcode}/`,
+            like_count: likes,
+            comments_count: comments,
+            views_count: 0,
+            posted_at: new Date().toISOString(),
+          };
+        }, sc, handle);
+
+        posts.push(postInfo);
+      } catch (err: any) {
+        logs.push(`[InstagramScraper] Error fetching embed for shortcode ${sc}: ${err.message || err}`);
+      }
+    }
+
+    logs.push(
+      `[InstagramScraper] Strategy 2 Success: Parsed ${posts.length} real Instagram posts with verified likes/comments, Followers=${data.followers}`
+    );
+
+    return {
+      followersCount: data.followers,
+      postsCount: data.postsCnt || posts.length,
+      accountName,
+      avatarUrl: data.ogImage || `https://unavatar.io/instagram/${handle}`,
+      posts: posts,
+    };
+  } catch (err: any) {
+    logs.push(`[InstagramScraper] Strategy 2 Puppeteer Exception: ${err.message || err}`);
+    return { followersCount: 0, postsCount: 0, accountName: handle, avatarUrl: `https://unavatar.io/instagram/${handle}`, posts: [] };
+  } finally {
+    if (browser) await browser.close();
+  }
 }
 
 export async function scrapeInstagramProfile(urlOrHandle: string): Promise<ScrapedSocialProfile> {
   const logs: string[] = [];
 
-  let handle = urlOrHandle.trim();
+  let isSpecificPost = false;
+  let postShortcode = '';
+  const rawInput = urlOrHandle.trim();
+
+  let handle = rawInput;
   if (handle.includes('instagram.com/')) {
-    const raw = handle.split('instagram.com/')[1].split('/')[0].split('?')[0];
-    handle = raw.replace(/^@/, '');
+    const postMatch = handle.match(/instagram\.com\/(?:p|reel)\/([A-Za-z0-9_-]+)/i);
+    if (postMatch) {
+      postShortcode = postMatch[1];
+      isSpecificPost = true;
+      const userMatch = handle.match(/instagram\.com\/([A-Za-z0-9_.]+)\/(?:p|reel)\//i);
+      handle = userMatch ? userMatch[1] : 'instagram_user';
+    } else {
+      const raw = handle.split('instagram.com/')[1].split('/')[0].split('?')[0];
+      handle = raw.replace(/^@/, '');
+    }
   } else {
     handle = handle.replace(/^@/, '');
   }
@@ -80,7 +214,7 @@ export async function scrapeInstagramProfile(urlOrHandle: string): Promise<Scrap
   let likesCount = 0;
   const recentPosts: ScrapedSocialPost[] = [];
 
-  logs.push(`[InstagramScraper] Target handle: "@${handle}"`);
+  logs.push(`[InstagramScraper] Target handle: "@${handle}"${isSpecificPost ? ` (Shortcode: ${postShortcode})` : ''}`);
 
   let sessionId = process.env.INSTAGRAM_SESSION_ID || process.env.INSTAGRAM_COOKIE || '';
 
@@ -182,71 +316,65 @@ export async function scrapeInstagramProfile(urlOrHandle: string): Promise<Scrap
     logs.push(`[InstagramScraper] Note: INSTAGRAM_SESSION_ID not set in .env; proceeding with Headless Chrome renderer.`);
   }
 
-  // Strategy 2: Headless Chrome Profile Renderer (For Unauthenticated Profile Info)
+  // Strategy 2: Puppeteer Headless Chrome Renderer
   if (followersCount === 0 || recentPosts.length === 0) {
     try {
-      logs.push(`[InstagramScraper] Strategy 2: Navigating Headless Chrome to ${profileUrl}`);
-      const html = await fetchWithNativeChrome(profileUrl);
-
-      if (html && html.length > 500) {
-        // Extract Title & Name
-        const titleM = html.match(/<title>(.*?)<\/title>/i);
-        if (titleM && titleM[1]) {
-          const rawTitle = titleM[1];
-          const cleanName = rawTitle.split('(@')[0].replace('• Instagram photos and videos', '').trim();
-          if (cleanName) accountName = cleanName;
-        }
-
-        // Extract OpenGraph Description (Followers & Posts)
-        const descM = html.match(/<meta property="og:description" content="([^"]+)"/i) ||
-                      html.match(/content="([^"]*Followers[^"]*)"/i);
-        if (descM && descM[1]) {
-          const desc = descM[1];
-          const followersM = desc.match(/([0-9.,KMBkmb]+)\s*Followers/i);
-          if (followersM) {
-            followersCount = parseFormattedNumber(followersM[1]);
-          }
-
-          const postsM = desc.match(/([0-9.,KMBkmb]+)\s*Posts/i);
-          if (postsM) {
-            postsCount = parseFormattedNumber(postsM[1]);
-          }
-        }
-
-        // Extract OpenGraph Image
-        const ogImageM = html.match(/<meta property="og:image" content="([^"]+)"/i);
-        if (ogImageM && ogImageM[1]) {
-          avatarUrl = ogImageM[1].replace(/&amp;/g, '&');
-        }
+      const pupRes = await scrapeInstagramWithPuppeteer(handle, logs);
+      if (pupRes.followersCount > 0) followersCount = pupRes.followersCount;
+      if (pupRes.postsCount > 0) postsCount = pupRes.postsCount;
+      if (pupRes.accountName && accountName === handle) accountName = pupRes.accountName;
+      if (pupRes.avatarUrl) avatarUrl = pupRes.avatarUrl;
+      if (pupRes.posts.length > 0 && recentPosts.length === 0) {
+        recentPosts.push(...pupRes.posts);
       }
     } catch (err: any) {
       logs.push(`[InstagramScraper] Strategy 2 Exception: ${err.message || err}`);
     }
   }
 
-  // Fallback: Generate post items across account if post grid is hidden behind login prompt
-  if (recentPosts.length === 0 && (followersCount > 0 || postsCount > 0)) {
-    const totalContentItems = postsCount > 0 ? postsCount : 12;
-    logs.push(`[InstagramScraper] Unauthenticated mode: Generating posts across ${followersCount} followers & ${totalContentItems} posts`);
-
-    const avgLikesPerPost = Math.round(followersCount * 0.035) || 65;
-    const avgCommentsPerPost = Math.round(followersCount * 0.004) || 8;
-
-    for (let i = 1; i <= Math.min(totalContentItems, 50); i++) {
-      const variance = 0.85 + ((i * 7) % 35) / 100;
-      recentPosts.push({
-        post_id: `ig_${handle}_content_${i}`,
-        caption: `Post/Reel #${i} by ${accountName} (@${handle})`,
-        permalink: profileUrl,
-        like_count: Math.round(avgLikesPerPost * variance),
-        comments_count: Math.round(avgCommentsPerPost * variance),
-        views_count: Math.round(followersCount * 0.45 * variance),
-        posted_at: new Date(Date.now() - i * 86400000 * 2).toISOString(),
+  // Strategy 3: Single Post/Reel Captioned Embed Parser (For Direct Post URLs)
+  if (isSpecificPost && postShortcode) {
+    try {
+      logs.push(`[InstagramScraper] Strategy 3: Parsing specific post embed for shortcode "${postShortcode}"...`);
+      const embedUrl = `https://www.instagram.com/p/${postShortcode}/embed/captioned/`;
+      const embedRes = await fetch(embedUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
       });
+
+      if (embedRes.ok) {
+        const embedHtml = await embedRes.text();
+        const captionMatch = embedHtml.match(/class="CaptionText"[^>]*>([\s\S]*?)<\/div>/i) || embedHtml.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+        const captionText = captionMatch ? captionMatch[1].replace(/<[^>]+>/g, '').trim() : `Instagram Post (${postShortcode})`;
+
+        const imgMatch = embedHtml.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/i) || embedHtml.match(/src="([^"]+)"[^>]*class="EmbeddedMediaImage"/i) || embedHtml.match(/<img [^>]*src="([^"]+)"/i);
+        const mediaUrl = imgMatch ? imgMatch[1].replace(/&amp;/g, '&') : undefined;
+
+        const likesMatch = embedHtml.match(/([0-9.,KMBkmb]+)\s*likes/i);
+        const postLikes = likesMatch ? parseFormattedNumber(likesMatch[1]) : 0;
+
+        recentPosts.unshift({
+          post_id: `ig_${handle}_p_${postShortcode}`,
+          caption: captionText,
+          media_url: mediaUrl,
+          permalink: `https://www.instagram.com/p/${postShortcode}/`,
+          like_count: postLikes,
+          comments_count: 0,
+          views_count: 0,
+          posted_at: new Date().toISOString(),
+        });
+        logs.push(`[InstagramScraper] Strategy 3 Success: Parsed post "${postShortcode}" with caption and media!`);
+      }
+    } catch (err: any) {
+      logs.push(`[InstagramScraper] Strategy 3 Exception: ${err.message || err}`);
     }
   }
 
-  likesCount = recentPosts.reduce((acc, p) => acc + (p.like_count || 0), 0);
+  if (recentPosts.length > 0) {
+    likesCount = recentPosts.reduce((acc, p) => acc + (p.like_count || 0), 0);
+  }
 
   logs.push(
     `[InstagramScraper] Scrape Complete for @${handle}: Followers=${followersCount}, Posts=${postsCount}, TotalLikes=${likesCount}, ParsedRealPosts=${recentPosts.length}`

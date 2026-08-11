@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { supabase } from '../lib/supabase';
+import { supabaseAdmin as supabase } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { scrapeSocialProfile, detectPlatformFromUrl } from '../services/scraperManager';
 
@@ -45,16 +45,18 @@ router.post('/clients/:clientId/accounts/add-link', authMiddleware, async (req: 
 
     // Save daily analytics snapshot
     const todayStr = new Date().toISOString().split('T')[0];
+    const postLikesSum = scraped.recent_posts.reduce((sum, p) => sum + (p.like_count || 0), 0);
+    const postCommentsSum = scraped.recent_posts.reduce((sum, p) => sum + (p.comments_count || 0), 0);
     const dailyRecord = {
       client_id: clientId,
       account_id: scraped.account_id,
       platform: scraped.platform,
       record_date: todayStr,
       followers_count: scraped.followers_count,
-      likes: scraped.likes_count || 0,
-      impressions: scraped.posts_count || 0,
+      likes: postLikesSum || scraped.likes_count || 0,
+      impressions: scraped.recent_posts.length,
       reach: scraped.followers_count,
-      comments_count: scraped.recent_posts.reduce((sum, p) => sum + p.comments_count, 0),
+      comments_count: postCommentsSum,
     };
 
     await supabase
@@ -190,6 +192,44 @@ router.delete('/posts/:id', authMiddleware, async (req: AuthRequest, res: Respon
   }
 });
 
+// 3c_add. POST /api/social/clients/:clientId/posts/custom — Manually add a post item for a client
+router.post('/clients/:clientId/posts/custom', authMiddleware, async (req: AuthRequest, res: Response) => {
+  const clientId = req.params.clientId as string;
+  const { platform, account_id, caption, permalink, media_url, like_count, comments_count, views_count } = req.body;
+
+  if (!platform || !caption) {
+    return res.status(400).json({ error: 'platform and caption are required' });
+  }
+
+  try {
+    const postRecord = {
+      client_id: clientId,
+      platform,
+      account_id: account_id || 'manual_post',
+      post_id: `custom_${platform}_${Date.now()}`,
+      caption,
+      permalink: permalink || '',
+      media_url: media_url || null,
+      like_count: parseInt(like_count || 0, 10),
+      comments_count: parseInt(comments_count || 0, 10),
+      views_count: parseInt(views_count || 0, 10),
+      posted_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('client_social_posts')
+      .insert(postRecord)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, post: data });
+  } catch (err: any) {
+    console.error('Error adding custom social post:', err);
+    res.status(500).json({ error: err.message || 'Failed to add custom post' });
+  }
+});
+
 // 3d. GET /api/social/settings — Fetch system social settings (e.g. Instagram session ID)
 router.get('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
@@ -274,6 +314,8 @@ router.post('/clients/:clientId/sync', authMiddleware, async (req: AuthRequest, 
 
       // Upsert daily snapshot
       const todayStr = new Date().toISOString().split('T')[0];
+      const syncPostLikes = scraped.recent_posts.reduce((s, p) => s + (p.like_count || 0), 0);
+      const syncPostComments = scraped.recent_posts.reduce((s, p) => s + (p.comments_count || 0), 0);
       await supabase
         .from('client_social_analytics_daily')
         .upsert(
@@ -283,10 +325,10 @@ router.post('/clients/:clientId/sync', authMiddleware, async (req: AuthRequest, 
             platform: acc.platform,
             record_date: todayStr,
             followers_count: scraped.followers_count,
-            likes: scraped.likes_count || 0,
-            impressions: scraped.posts_count || 0,
+            likes: syncPostLikes || scraped.likes_count || 0,
+            impressions: scraped.recent_posts.length,
             reach: scraped.followers_count,
-            comments_count: scraped.recent_posts.reduce((s, p) => s + p.comments_count, 0),
+            comments_count: syncPostComments,
           },
           { onConflict: 'client_id,account_id,platform,record_date' }
         );
@@ -370,13 +412,14 @@ router.get('/clients/:clientId/analytics', authMiddleware, async (req: AuthReque
       .order('posted_at', { ascending: false });
 
     const safePosts = allPosts || [];
+    totalPosts = safePosts.length;
 
     if (safePosts.length > 0) {
       totalLikes = safePosts.reduce((sum, p) => sum + (p.like_count || 0), 0);
       totalComments = safePosts.reduce((sum, p) => sum + (p.comments_count || 0), 0);
     }
 
-    // Latest daily stats per platform/account
+    // Latest daily stats per platform/account (for followers + fallback likes/comments)
     const { data: latestStats } = await supabase
       .from('client_social_analytics_daily')
       .select('*')
@@ -389,9 +432,11 @@ router.get('/clients/:clientId/analytics', authMiddleware, async (req: AuthReque
       if (!seenAccountKeys.has(key)) {
         seenAccountKeys.add(key);
         totalFollowers += row.followers_count || 0;
+        // Only use daily snapshot likes/comments as fallback if no posts exist
         if (totalLikes === 0) totalLikes += row.likes || 0;
         if (totalComments === 0) totalComments += row.comments_count || 0;
-        totalPosts += row.impressions || 0;
+        // Only use daily snapshot post count as fallback if no posts in DB
+        if (totalPosts === 0) totalPosts += row.impressions || 0;
       }
     });
 
@@ -408,7 +453,7 @@ router.get('/clients/:clientId/analytics', authMiddleware, async (req: AuthReque
         total_followers: totalFollowers,
         total_likes: totalLikes,
         total_comments: totalComments,
-        total_posts: totalPosts || safePosts.length,
+        total_posts: totalPosts,
       },
       recent_posts: safePosts.slice(0, 12).map(p => ({
         id: p.id,

@@ -110,7 +110,7 @@ export default function RemindersPage() {
       loadData(true);
       const interval = setInterval(() => {
         loadData(false);
-      }, 3000);
+      }, 15000);
       return () => clearInterval(interval);
     }
   }, [user]);

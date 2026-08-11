@@ -1,4 +1,126 @@
 import { ScrapedSocialProfile, ScrapedSocialPost, parseFormattedNumber } from './instagramScraper';
+import puppeteer from 'puppeteer-core';
+import fs from 'fs';
+
+export async function scrapeTikTokWithPuppeteer(
+  handle: string,
+  logs: string[]
+): Promise<{ followersCount: number; likesCount: number; accountName: string; avatarUrl: string; posts: ScrapedSocialPost[] }> {
+  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  if (!fs.existsSync(chromePath)) {
+    logs.push(`[TikTokScraper] Chrome executable not found at ${chromePath}`);
+    return { followersCount: 0, likesCount: 0, accountName: `@${handle}`, avatarUrl: `https://unavatar.io/tiktok/${handle}`, posts: [] };
+  }
+
+  let browser;
+  try {
+    logs.push(`[TikTokScraper] Launching Puppeteer for TikTok mobile viewport...`);
+    browser = await puppeteer.launch({
+      executablePath: chromePath,
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 390, height: 844, isMobile: true });
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty((globalThis as any).navigator, 'webdriver', { get: () => undefined });
+    });
+
+    const profileUrl = `https://www.tiktok.com/@${handle}`;
+    logs.push(`[TikTokScraper] Puppeteer navigating to ${profileUrl}`);
+    await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+
+    await new Promise((r) => setTimeout(r, 4000));
+
+    const pageTitle = await page.title();
+    let accountName = `@${handle}`;
+    if (pageTitle && pageTitle.includes('TikTok')) {
+      accountName = pageTitle.split('|')[0].replace('TikTok', '').trim() || `@${handle}`;
+    }
+
+    const data = await page.evaluate((targetHandle: string) => {
+      const doc = (globalThis as any).document;
+      const links = Array.from(doc.querySelectorAll('a[href*="/video/"]'));
+      const posts: any[] = [];
+      const seenLinks = new Set<string>();
+
+      links.forEach((aEl: any, i: number) => {
+        const href = aEl.getAttribute('href') || '';
+        if (seenLinks.has(href)) return;
+        seenLinks.add(href);
+
+        const img = aEl.querySelector('img');
+        const mediaUrl = img ? img.getAttribute('src') : undefined;
+        const altText = img ? (img.getAttribute('alt') || img.getAttribute('title') || '') : '';
+        const caption = altText.trim() || `TikTok Video #${i + 1} by @${targetHandle}`;
+
+        posts.push({
+          post_id: `tiktok_${targetHandle}_v_${i + 1}`,
+          caption: caption,
+          media_url: mediaUrl || undefined,
+          permalink: href.startsWith('http') ? href : `https://www.tiktok.com${href}`,
+          like_count: 0,
+          comments_count: 0,
+          views_count: 0,
+          posted_at: new Date().toISOString(),
+        });
+      });
+
+      const text = doc.body?.innerText || '';
+      let followers = 0;
+      let likes = 0;
+
+      const fM = text.match(/([0-9.,KMBkmb]+)\s*Followers/i);
+      if (fM) {
+        const clean = fM[1].replace(/,/g, '');
+        const mult = clean.slice(-1).toUpperCase();
+        const num = parseFloat(clean);
+        if (!isNaN(num)) {
+          if (mult === 'K') followers = Math.round(num * 1000);
+          else if (mult === 'M') followers = Math.round(num * 1000000);
+          else followers = Math.round(num);
+        }
+      }
+
+      const lM = text.match(/([0-9.,KMBkmb]+)\s*Likes/i);
+      if (lM) {
+        const clean = lM[1].replace(/,/g, '');
+        const mult = clean.slice(-1).toUpperCase();
+        const num = parseFloat(clean);
+        if (!isNaN(num)) {
+          if (mult === 'K') likes = Math.round(num * 1000);
+          else if (mult === 'M') likes = Math.round(num * 1000000);
+          else likes = Math.round(num);
+        }
+      }
+
+      const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || '';
+
+      return { followers, likes, ogImage, posts };
+    }, handle);
+
+    logs.push(`[TikTokScraper] Puppeteer parsed ${data.posts.length} videos, Followers=${data.followers}, Likes=${data.likes}`);
+
+    return {
+      followersCount: data.followers,
+      likesCount: data.likes,
+      accountName,
+      avatarUrl: data.ogImage || `https://unavatar.io/tiktok/${handle}`,
+      posts: data.posts,
+    };
+  } catch (err: any) {
+    logs.push(`[TikTokScraper] Puppeteer TikTok Exception: ${err.message || err}`);
+    return { followersCount: 0, likesCount: 0, accountName: `@${handle}`, avatarUrl: `https://unavatar.io/tiktok/${handle}`, posts: [] };
+  } finally {
+    if (browser) await browser.close();
+  }
+}
 
 export async function scrapeTikTokProfile(urlOrHandle: string): Promise<ScrapedSocialProfile> {
   const logs: string[] = [];
@@ -153,7 +275,7 @@ export async function scrapeTikTokProfile(urlOrHandle: string): Promise<ScrapedS
             caption: realCaption,
             media_url: vImg ? vImg[1] : undefined,
             permalink: vLink[1].startsWith('http') ? vLink[1] : `https://urlebird.com${vLink[1]}`,
-            like_count: Math.round(likesCount / Math.max(videoCount, 12)) || 0,
+            like_count: 0,
             comments_count: 0,
             views_count: vViews ? parseFormattedNumber(vViews[1]) : 0,
             posted_at: new Date().toISOString(),
@@ -166,14 +288,31 @@ export async function scrapeTikTokProfile(urlOrHandle: string): Promise<ScrapedS
     logs.push(`[TikTokScraper] Strategy 3 Exception: ${err.message || err}`);
   }
 
+  // Strategy 4: Puppeteer Mobile Renderer
+  if (followersCount === 0 || recentPosts.length === 0) {
+    try {
+      logs.push(`[TikTokScraper] Strategy 4: Launching Puppeteer TikTok Renderer...`);
+      const pupRes = await scrapeTikTokWithPuppeteer(handle, logs);
+      if (pupRes.followersCount > 0) followersCount = pupRes.followersCount;
+      if (pupRes.likesCount > 0) likesCount = pupRes.likesCount;
+      if (pupRes.accountName && accountName === `@${handle}`) accountName = pupRes.accountName;
+      if (pupRes.avatarUrl) avatarUrl = pupRes.avatarUrl;
+      if (pupRes.posts.length > 0 && recentPosts.length === 0) {
+        recentPosts.push(...pupRes.posts);
+      }
+    } catch (err: any) {
+      logs.push(`[TikTokScraper] Strategy 4 Exception: ${err.message || err}`);
+    }
+  }
+
   // Insert specific video item if a video URL was submitted
-  if (isSpecificVideo && videoTitle) {
+  if (isSpecificVideo) {
     recentPosts.unshift({
-      post_id: `tiktok_${handle}_v_${videoId || 'main'}`,
-      caption: videoTitle,
-      media_url: videoThumbnailUrl || undefined,
+      post_id: `tiktok_${handle}_v_${videoId || Date.now()}`,
+      caption: videoTitle || `TikTok Video by ${accountName}`,
+      media_url: videoThumbnailUrl || avatarUrl || undefined,
       permalink: rawInput,
-      like_count: Math.round(likesCount / 20) || 0,
+      like_count: 0,
       comments_count: 0,
       views_count: 0,
       posted_at: new Date().toISOString(),

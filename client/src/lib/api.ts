@@ -695,6 +695,11 @@ export const socialApi = {
     }),
   deletePost: (postId: string) =>
     request(`/social/posts/${postId}`, { method: 'DELETE' }),
+  addCustomPost: (clientId: string, data: { platform: string; account_id?: string; caption: string; permalink?: string; media_url?: string; like_count?: number; comments_count?: number; views_count?: number }) =>
+    request<{ success: boolean; post: import('@/types').SocialRecentPost }>(`/social/clients/${clientId}/posts/custom`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   getSettings: () =>
     request<{ instagram_session_id: string; has_active_cookie: boolean }>('/social/settings'),
   updateSettings: (instagram_session_id: string) =>

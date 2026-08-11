@@ -48,13 +48,22 @@ async function canAdministerTask(userId, role, taskId) {
     }
     if (isAdminRole)
         return true;
-    // Task creator can administer/review tasks they created
+    // Task creator or Content Creator managing intern task can administer/review
     const { data: task } = await supabase_1.supabaseAdmin
         .from('tasks')
-        .select('creator_id')
+        .select('creator_id, task_assignees(user:profiles(role))')
         .eq('id', taskId)
         .maybeSingle();
-    return task ? task.creator_id === userId : false;
+    if (!task)
+        return false;
+    if (task.creator_id === userId)
+        return true;
+    if (role === 'content_creator') {
+        const hasInternAssignee = (task.task_assignees || []).some((a) => a.user?.role === 'content_creator_intern');
+        if (hasInternAssignee)
+            return true;
+    }
+    return false;
 }
 // Helper: get computed task status based on assignees status
 function getTaskStatus(task, userId, role) {
@@ -145,8 +154,14 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
                 .eq('is_archived', false)
                 .order('created_at', { ascending: false });
             if (userRole === 'content_creator') {
-                if (assignedTaskIds.length > 0) {
-                    query = query.or(`id.in.(${assignedTaskIds.join(',')}),creator_id.eq.${req.user.id}`);
+                const { data: internAssignments } = await supabase_1.supabaseAdmin
+                    .from('task_assignees')
+                    .select('task_id, user:profiles!inner(role)')
+                    .eq('user.role', 'content_creator_intern');
+                const internTaskIds = (internAssignments || []).map((a) => a.task_id);
+                const accessibleTaskIds = Array.from(new Set([...assignedTaskIds, ...internTaskIds]));
+                if (accessibleTaskIds.length > 0) {
+                    query = query.or(`id.in.(${accessibleTaskIds.join(',')}),creator_id.eq.${req.user.id}`);
                 }
                 else {
                     query = query.eq('creator_id', req.user.id);
@@ -474,10 +489,13 @@ router.get('/:id', auth_1.authMiddleware, async (req, res) => {
             res.status(404).json({ error: 'Task not found' });
             return;
         }
-        // Members can only view tasks they're assigned to
+        // Members can only view tasks they're assigned to, created by them, or intern tasks for content creators
         if (!isTaskAdmin(req.user.role)) {
             const isAssigned = data.task_assignees?.some((a) => a.user_id === req.user.id);
-            if (!isAssigned) {
+            const isCreator = data.creator_id === req.user.id;
+            const isContentCreatorManagingIntern = req.user.role === 'content_creator' &&
+                data.task_assignees?.some((a) => a.user?.role === 'content_creator_intern');
+            if (!isAssigned && !isCreator && !isContentCreatorManagingIntern) {
                 res.status(403).json({ error: 'Access denied' });
                 return;
             }
@@ -595,6 +613,17 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
             // If assignee_ids provided, sync assignees
             if (assignee_ids !== undefined) {
                 const newIds = Array.isArray(assignee_ids) ? assignee_ids : [];
+                if (req.user.role === 'content_creator' && newIds.length > 0) {
+                    const { data: assigneeProfiles } = await supabase_1.supabaseAdmin
+                        .from('profiles')
+                        .select('id, role')
+                        .in('id', newIds);
+                    const invalidAssignees = (assigneeProfiles || []).filter((p) => p.role !== 'content_creator_intern');
+                    if (invalidAssignees.length > 0) {
+                        res.status(403).json({ error: 'Content Creators can only assign tasks to Content Creator Interns' });
+                        return;
+                    }
+                }
                 // Get current assignees
                 const { data: currentAssignees } = await supabase_1.supabaseAdmin
                     .from('task_assignees')
@@ -934,8 +963,8 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => 
         res.status(500).json({ error: 'Failed to update assignee' });
     }
 });
-// DELETE /api/tasks/:id — Delete task (owner or team leader)
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeader, async (req, res) => {
+// DELETE /api/tasks/:id — Delete task (owner, team leader, or content creator for intern tasks)
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSalesOrContentCreator, async (req, res) => {
     const { id } = req.params;
     if (!(await canAdministerTask(req.user.id, req.user.role, id))) {
         res.status(403).json({ error: 'Access denied. You cannot administer this task if you are assigned to it.' });

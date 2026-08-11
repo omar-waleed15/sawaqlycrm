@@ -294,7 +294,7 @@ export default function SocialAnalyticsTab({ clientId }: Props) {
 
           <Button onClick={() => setIsModalOpen(true)} className="bg-[#1D61E7] hover:bg-[#154ec2] text-white">
             <Plus className="size-4 mr-1.5" />
-            Add Social Link
+            Add Social Link / Post URL
           </Button>
         </div>
       </div>
@@ -744,10 +744,10 @@ export default function SocialAnalyticsTab({ clientId }: Props) {
             <div>
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <LinkIcon className="size-5 text-[#1D61E7]" />
-                Track Social Channel or Post Link
+                Add Social Channel or Specific Post URL
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Enter an Instagram, TikTok, or Facebook profile link or handle to auto-scrape stats.
+                Paste a channel link (@handle or profile URL) OR a specific post/video link (e.g. instagram.com/p/... or tiktok.com/@user/video/...) to auto-scrape.
               </p>
             </div>
 
@@ -794,15 +794,15 @@ export default function SocialAnalyticsTab({ clientId }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Profile URL or Handle</Label>
+                <Label className="text-xs font-semibold">Profile URL, Post Link, or Handle</Label>
                 <Input
                   value={profileUrl}
                   onChange={(e) => setProfileUrl(e.target.value)}
                   placeholder={
                     selectedPlatform === 'instagram'
-                      ? 'https://instagram.com/brand or @brand'
+                      ? 'https://instagram.com/brand or /p/SHORTCODE'
                       : selectedPlatform === 'tiktok'
-                      ? 'https://tiktok.com/@brand or @brand'
+                      ? 'https://tiktok.com/@brand or /video/123...'
                       : 'https://facebook.com/brand'
                   }
                   required
