@@ -432,8 +432,8 @@ const parseLocalDate = (dateStr: string): Date => {
   return new Date(yyyy, mm - 1, dd);
 };
 
-// GET /api/finance-analytics/custom-report — Get custom financial reports (owner only)
-router.get('/custom-report', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// GET /api/finance-analytics/custom-report — Get custom financial reports (owner/sales)
+router.get('/custom-report', authMiddleware, ownerOrSales, async (req: AuthRequest, res: Response): Promise<void> => {
   const { startDate, endDate } = req.query;
 
   if (!startDate || !endDate) {

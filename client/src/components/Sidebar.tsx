@@ -53,7 +53,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/chat',     labelKey: 'nav.globalChat',    icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/client-chat', labelKey: 'nav.clientChat',  icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'account_manager'] },
   { href: '/dashboard/team',     labelKey: 'nav.team',          icon: Users,           allowedRoles: ['owner', 'team_leader'] },
-  { href: '/dashboard/finance',  labelKey: 'nav.finance',       icon: Briefcase,       allowedRoles: ['owner'] },
+  { href: '/dashboard/finance',  labelKey: 'nav.finance',       icon: Briefcase,       allowedRoles: ['owner', 'team_leader'] },
   { href: '/dashboard/my-salary', labelKey: 'nav.mySalary',     icon: Wallet,          allowedRoles: ['team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/clients',  labelKey: 'nav.clients',       icon: Users,           allowedRoles: ['owner', 'team_leader'] },
   { href: '/dashboard/closed-clients', labelKey: 'nav.closedClients', icon: Archive, allowedRoles: ['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'] },
@@ -290,7 +290,9 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
               )}
             >
               <Icon className="size-4 shrink-0" />
-              <span className="flex-1">{t(item.labelKey)}</span>
+              <span className="flex-1">
+                {item.href === '/dashboard/finance' && user?.role === 'team_leader' ? t('finance.salariesTab') : t(item.labelKey)}
+              </span>
               {item.href === '/dashboard/chat' && hasNewMessage && (
                 <span className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 -translate-y-1/2 size-2.5 rounded-full bg-rose-500 animate-pulse shadow-xs" />
               )}

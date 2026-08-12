@@ -1,20 +1,21 @@
 import { ScrapedSocialProfile, ScrapedSocialPost, parseFormattedNumber } from './instagramScraper';
 import puppeteer from 'puppeteer-core';
 import fs from 'fs';
+import { getChromeExecutablePath } from './chromeLocator';
 
 export async function scrapeTikTokWithPuppeteer(
   handle: string,
   logs: string[]
 ): Promise<{ followersCount: number; likesCount: number; accountName: string; avatarUrl: string; posts: ScrapedSocialPost[] }> {
-  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  if (!fs.existsSync(chromePath)) {
-    logs.push(`[TikTokScraper] Chrome executable not found at ${chromePath}`);
+  const chromePath = getChromeExecutablePath();
+  if (!chromePath) {
+    logs.push(`[TikTokScraper] Chrome/Edge executable not found on system.`);
     return { followersCount: 0, likesCount: 0, accountName: `@${handle}`, avatarUrl: `https://unavatar.io/tiktok/${handle}`, posts: [] };
   }
 
   let browser;
   try {
-    logs.push(`[TikTokScraper] Launching Puppeteer for TikTok mobile viewport...`);
+    logs.push(`[TikTokScraper] Launching Puppeteer for TikTok (${chromePath})...`);
     browser = await puppeteer.launch({
       executablePath: chromePath,
       headless: true,

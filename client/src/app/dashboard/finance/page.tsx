@@ -80,8 +80,11 @@ export default function FinanceDashboardPage() {
 
   // Navigation Guard
   useEffect(() => {
-    if (user && user.role !== 'owner') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
       router.replace('/dashboard');
+    } else if (user && user.role === 'team_leader') {
+      setActiveTab('expenses');
+      setExpensesSubTab('salaries');
     }
   }, [user, router]);
 
@@ -336,10 +339,14 @@ export default function FinanceDashboardPage() {
 
   const loadExpensesAndSalaries = async (monthStr: string) => {
     try {
-      const expRes = await expensesApi.list({ month: monthStr });
-      setExpenses(expRes.expenses || []);
+      if (user?.role !== 'team_leader') {
+        const expRes = await expensesApi.list({ month: monthStr });
+        setExpenses(expRes.expenses || []);
+      } else {
+        setExpenses([]);
+      }
 
-      if (user?.role === 'owner') {
+      if (user?.role === 'owner' || user?.role === 'team_leader') {
         try {
           const salRes = await salariesApi.list({ month: monthStr });
           setSalaries(salRes.salaries || []);
@@ -350,11 +357,12 @@ export default function FinanceDashboardPage() {
         setSalaries([]);
       }
     } catch (err) {
-      console.warn('Failed to load expenses:', err);
+      console.warn('Failed to load expenses/salaries:', err);
     }
   };
 
   const loadAnalytics = async () => {
+    if (user?.role === 'team_leader') return;
     try {
       setAnalyticsLoading(true);
       const res = await financeAnalyticsApi.getDashboard();
@@ -370,22 +378,27 @@ export default function FinanceDashboardPage() {
   const loadData = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [statsRes, clientsRes, projectsRes, contractsRes, usersRes] = await Promise.all([
-        contractsApi.stats().catch(() => ({ stats: null })),
-        clientsApi.list().catch(() => ({ clients: [] })),
-        projectsApi.list().catch(() => ({ projects: [] })),
-        contractsApi.list().catch(() => ({ contracts: [] })),
-        usersApi.list().catch(() => ({ users: [] })),
-      ]);
-      if (statsRes.stats) setStats(statsRes.stats);
-      setClients(clientsRes.clients || []);
-      setProjects(projectsRes.projects || []);
-      setContracts(contractsRes.contracts || []);
-      setUsersList(usersRes.users || []);
+      if (user?.role === 'team_leader') {
+        const usersRes = await usersApi.list().catch(() => ({ users: [] }));
+        setUsersList(usersRes.users || []);
+      } else {
+        const [statsRes, clientsRes, projectsRes, contractsRes, usersRes] = await Promise.all([
+          contractsApi.stats().catch(() => ({ stats: null })),
+          clientsApi.list().catch(() => ({ clients: [] })),
+          projectsApi.list().catch(() => ({ projects: [] })),
+          contractsApi.list().catch(() => ({ contracts: [] })),
+          usersApi.list().catch(() => ({ users: [] })),
+        ]);
+        if (statsRes.stats) setStats(statsRes.stats);
+        setClients(clientsRes.clients || []);
+        setProjects(projectsRes.projects || []);
+        setContracts(contractsRes.contracts || []);
+        setUsersList(usersRes.users || []);
+      }
       
       await loadExpensesAndSalaries(expenseMonthFilter);
 
-      if (activeTab === 'analytics') {
+      if (activeTab === 'analytics' && user?.role !== 'team_leader') {
         await loadAnalytics();
       }
     } catch (err) {
@@ -424,7 +437,7 @@ export default function FinanceDashboardPage() {
   }, [activeTab, reportStartDate, reportEndDate]);
 
   useEffect(() => {
-    if ((user?.role === 'owner' || user?.role === 'sales') && activeTab === 'expenses') {
+    if ((user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'sales') && activeTab === 'expenses') {
       loadExpensesAndSalaries(expenseMonthFilter);
     }
   }, [user, activeTab, expenseMonthFilter]);
@@ -436,7 +449,7 @@ export default function FinanceDashboardPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (user?.role === 'owner' || user?.role === 'sales') {
+    if (user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'sales') {
       loadData();
     }
   }, [user]);
@@ -589,7 +602,6 @@ export default function FinanceDashboardPage() {
           }
         `}} />
 
-        {/* Filters Toolbar */}
         {/* Filters Toolbar */}
         <div className="no-print p-5 bg-card border border-border rounded-xl shadow-xs flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between">
           {/* Left: Date ranges */}
@@ -996,12 +1008,12 @@ export default function FinanceDashboardPage() {
   };
 
   useEffect(() => {
-    if (user?.role === 'owner' || user?.role === 'sales') {
+    if (user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'sales') {
       loadData();
     }
   }, [user]);
 
-  if (user?.role !== 'owner' && user?.role !== 'sales') return null;
+  if (user?.role !== 'owner' && user?.role !== 'team_leader' && user?.role !== 'sales') return null;
 
   const resetProjectForm = (project?: Project) => {
     if (project) {
@@ -2303,13 +2315,13 @@ export default function FinanceDashboardPage() {
       {/* ── Page Header ── */}
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-header-title">{t('finance.title')}</h1>
-          <p className="page-header-subtitle">{t('finance.subtitle')}</p>
+          <h1 className="page-header-title">{user?.role === 'team_leader' ? '👤 ' + t('finance.salariesTab') : t('finance.title')}</h1>
+          <p className="page-header-subtitle">{user?.role === 'team_leader' ? (locale === 'ar' ? 'إدارة رواتب ومستحقات الفريق' : 'Manage team member salaries, bonuses, penalties, and advances') : t('finance.subtitle')}</p>
         </div>
       </div>
 
       {/* ── Stats Metric Cards Grid ── */}
-      {stats && (
+      {stats && user?.role !== 'team_leader' && (
         <div className="stats-grid">
           {/* Card 1: Active Clients */}
           <div
@@ -2412,85 +2424,89 @@ export default function FinanceDashboardPage() {
       )}
 
       {/* ── Sub-Tab Navigation Switcher (Responsive) ── */}
-      {/* Mobile Tab Select Dropdown */}
-      <div className="block md:hidden mb-6 p-4 rounded-xl border border-border bg-card shadow-xs">
-        <Select
-          value={activeTab}
-          onValueChange={(val) => setActiveTab(val as any)}
-        >
-          <SelectTrigger className="w-full h-10 px-3 bg-background border border-input rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              {(() => {
-                const tabsList = [
+      {user?.role !== 'team_leader' && (
+        <>
+          {/* Mobile Tab Select Dropdown */}
+          <div className="block md:hidden mb-6 p-4 rounded-xl border border-border bg-card shadow-xs">
+            <Select
+              value={activeTab}
+              onValueChange={(val) => setActiveTab(val as any)}
+            >
+              <SelectTrigger className="w-full h-10 px-3 bg-background border border-input rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  {(() => {
+                    const tabsList = [
+                      { id: 'overview', label: t('finance.overview'), icon: BarChart3 },
+                      { id: 'analytics', label: t('finance.analytics'), icon: TrendingUp },
+                      { id: 'contracts', label: t('finance.contracts'), icon: Briefcase },
+                      { id: 'expenses', label: t('finance.expenses'), icon: DollarSign },
+                      { id: 'report', label: t('finance.customReports'), icon: FileText },
+                    ];
+                    const currentTab = tabsList.find(tab => tab.id === activeTab);
+                    if (currentTab) {
+                      const Icon = currentTab.icon;
+                      return (
+                        <>
+                          <Icon className="size-4 text-indigo-500 shrink-0" />
+                          <span>{currentTab.label}</span>
+                        </>
+                      );
+                    }
+                    return t('closedClients.tab.selectTab') || 'Select Section';
+                  })()}
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {[
                   { id: 'overview', label: t('finance.overview'), icon: BarChart3 },
                   { id: 'analytics', label: t('finance.analytics'), icon: TrendingUp },
                   { id: 'contracts', label: t('finance.contracts'), icon: Briefcase },
                   { id: 'expenses', label: t('finance.expenses'), icon: DollarSign },
                   { id: 'report', label: t('finance.customReports'), icon: FileText },
-                ];
-                const currentTab = tabsList.find(tab => tab.id === activeTab);
-                if (currentTab) {
-                  const Icon = currentTab.icon;
+                ].map(tab => {
+                  const Icon = tab.icon;
                   return (
-                    <>
-                      <Icon className="size-4 text-indigo-500 shrink-0" />
-                      <span>{currentTab.label}</span>
-                    </>
+                    <SelectItem key={tab.id} value={tab.id}>
+                      <span className="flex items-center gap-2 text-xs font-semibold">
+                        <Icon className="size-4 text-indigo-500 shrink-0" />
+                        <span>{tab.label}</span>
+                      </span>
+                    </SelectItem>
                   );
-                }
-                return t('closedClients.tab.selectTab') || 'Select Section';
-              })()}
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            {[
-              { id: 'overview', label: t('finance.overview'), icon: BarChart3 },
-              { id: 'analytics', label: t('finance.analytics'), icon: TrendingUp },
-              { id: 'contracts', label: t('finance.contracts'), icon: Briefcase },
-              { id: 'expenses', label: t('finance.expenses'), icon: DollarSign },
-              { id: 'report', label: t('finance.customReports'), icon: FileText },
-            ].map(tab => {
-              const Icon = tab.icon;
-              return (
-                <SelectItem key={tab.id} value={tab.id}>
-                  <span className="flex items-center gap-2 text-xs font-semibold">
-                    <Icon className="size-4 text-indigo-500 shrink-0" />
-                    <span>{tab.label}</span>
-                  </span>
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-      </div>
+                })}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Desktop Tabs Bar */}
-      <div className="hidden md:flex border-b border-border mb-6 gap-6 overflow-x-auto">
-        {[
-          { id: 'overview', label: '📊 ' + t('finance.overview') },
-          { id: 'analytics', label: '📊 ' + t('finance.analytics') },
-          { id: 'contracts', label: '💼 ' + t('finance.contracts') },
-          { id: 'expenses', label: '💸 ' + t('finance.expenses') },
-          { id: 'report', label: '📄 ' + t('finance.customReports') },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            style={{
-              padding: '12px 6px',
-              fontSize: '0.9375rem',
-              fontWeight: activeTab === tab.id ? 700 : 500,
-              color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+          {/* Desktop Tabs Bar */}
+          <div className="hidden md:flex border-b border-border mb-6 gap-6 overflow-x-auto">
+            {[
+              { id: 'overview', label: '📊 ' + t('finance.overview') },
+              { id: 'analytics', label: '📊 ' + t('finance.analytics') },
+              { id: 'contracts', label: '💼 ' + t('finance.contracts') },
+              { id: 'expenses', label: '💸 ' + t('finance.expenses') },
+              { id: 'report', label: '📄 ' + t('finance.customReports') },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                style={{
+                  padding: '12px 6px',
+                  fontSize: '0.9375rem',
+                  fontWeight: activeTab === tab.id ? 700 : 500,
+                  color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  borderBottom: activeTab === tab.id ? '3px solid var(--color-primary)' : '3px solid transparent',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── TAB CONTENT ── */}
 
@@ -2950,29 +2966,31 @@ export default function FinanceDashboardPage() {
       {activeTab === 'expenses' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Sub Tab selection */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', gap: 16 }}>
-            {[
-              { id: 'expenses', label: '💸 ' + t('finance.expensesTab') },
-              user?.role === 'owner' ? { id: 'salaries', label: '👤 ' + t('finance.salariesTab') } : null,
-            ].filter(Boolean).map((sub: any) => (
-              <button
-                key={sub.id}
-                type="button"
-                onClick={() => setExpensesSubTab(sub.id as any)}
-                style={{
-                  padding: '10px 4px',
-                  fontSize: '0.875rem',
-                  fontWeight: expensesSubTab === sub.id ? 700 : 500,
-                  color: expensesSubTab === sub.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                  borderBottom: expensesSubTab === sub.id ? '2px solid var(--color-primary)' : '2px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {sub.label}
-              </button>
-            ))}
-          </div>
+          {user?.role !== 'team_leader' && (
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', gap: 16 }}>
+              {[
+                { id: 'expenses', label: '💸 ' + t('finance.expensesTab') },
+                { id: 'salaries', label: '👤 ' + t('finance.salariesTab') },
+              ].map((sub: any) => (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setExpensesSubTab(sub.id as any)}
+                  style={{
+                    padding: '10px 4px',
+                    fontSize: '0.875rem',
+                    fontWeight: expensesSubTab === sub.id ? 700 : 500,
+                    color: expensesSubTab === sub.id ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                    borderBottom: expensesSubTab === sub.id ? '2px solid var(--color-primary)' : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Sub tab content */}
           {expensesSubTab === 'expenses' ? (
@@ -4410,7 +4428,7 @@ export default function FinanceDashboardPage() {
           >
             ✏️ {t('common.edit')}
           </button>
-          {user?.role === 'owner' && (
+          {(user?.role === 'owner' || user?.role === 'team_leader') && (
             <>
               <button
                 type="button"

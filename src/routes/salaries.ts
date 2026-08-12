@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOnly } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrTeamLeaderOnly } from '../middleware/roleCheck';
 
 const router = Router();
 
@@ -45,7 +45,7 @@ const attachAdvancesToSalaries = async (salaries: any[]) => {
 };
 
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
-router.get('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.get('/', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   let { month } = req.query;
 
   try {
@@ -166,7 +166,7 @@ router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response)
 });
 
 // POST /api/salaries — Create or upsert a salary record
-router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.post('/', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { user_id, amount, month, paid, paid_date, is_recurring, recurrence, note, installments } = req.body;
 
   if (!user_id || amount === undefined || !month) {
@@ -259,7 +259,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
 });
 
 // PUT /api/salaries/:id — Update a salary record
-router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.put('/:id', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { amount, paid, paid_date, is_recurring, recurrence, note, installments } = req.body;
 
@@ -315,7 +315,7 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
 });
 
 // PATCH /api/salaries/:id/installments/:instId/paid — Toggle installment paid status
-router.patch('/:id/installments/:instId/paid', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.patch('/:id/installments/:instId/paid', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { instId } = req.params;
   const { paid } = req.body;
 
@@ -333,7 +333,7 @@ router.patch('/:id/installments/:instId/paid', authMiddleware, ownerOnly, async 
 });
 
 // DELETE /api/salaries/:id — Delete a salary record
-router.delete('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
   try {
@@ -349,8 +349,8 @@ router.delete('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: R
   }
 });
 
-// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner only)
-router.post('/:id/penalties', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner/Team Leader)
+router.post('/:id/penalties', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { amount, notes } = req.body;
 
@@ -381,8 +381,8 @@ router.post('/:id/penalties', authMiddleware, ownerOnly, async (req: AuthRequest
   }
 });
 
-// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner only)
-router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner/Team Leader)
+router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { penaltyId } = req.params;
 
   try {
@@ -402,8 +402,8 @@ router.delete('/:id/penalties/:penaltyId', authMiddleware, ownerOnly, async (req
   }
 });
 
-// POST /api/salaries/:id/bonuses — Add a bonus to a salary record (Owner only)
-router.post('/:id/bonuses', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/salaries/:id/bonuses — Add a bonus to a salary record (Owner/Team Leader)
+router.post('/:id/bonuses', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { amount, notes } = req.body;
 
@@ -434,8 +434,8 @@ router.post('/:id/bonuses', authMiddleware, ownerOnly, async (req: AuthRequest, 
   }
 });
 
-// DELETE /api/salaries/:id/bonuses/:bonusId — Delete a bonus (Owner only)
-router.delete('/:id/bonuses/:bonusId', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/salaries/:id/bonuses/:bonusId — Delete a bonus (Owner/Team Leader)
+router.delete('/:id/bonuses/:bonusId', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { bonusId } = req.params;
 
   try {
@@ -455,8 +455,8 @@ router.delete('/:id/bonuses/:bonusId', authMiddleware, ownerOnly, async (req: Au
   }
 });
 
-// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Sales)
-router.post('/:id/advances', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Team Leader)
+router.post('/:id/advances', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { amount, notes, date } = req.body;
 
@@ -489,7 +489,7 @@ router.post('/:id/advances', authMiddleware, ownerOnly, async (req: AuthRequest,
 });
 
 // DELETE /api/salaries/:id/advances/:advanceId — Delete a salary advance
-router.delete('/:id/advances/:advanceId', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+router.delete('/:id/advances/:advanceId', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { advanceId } = req.params;
 
   try {

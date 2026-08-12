@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer-core';
 import fs from 'fs';
 import { supabaseAdmin as supabase } from '../lib/supabase';
+import { getChromeExecutablePath } from './chromeLocator';
 
 export interface ScrapedSocialPost {
   post_id: string;
@@ -30,15 +31,15 @@ export async function scrapeInstagramWithPuppeteer(
   handle: string,
   logs: string[]
 ): Promise<{ followersCount: number; postsCount: number; accountName: string; avatarUrl: string; posts: ScrapedSocialPost[] }> {
-  const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  if (!fs.existsSync(chromePath)) {
-    logs.push(`[InstagramScraper] Chrome executable not found at ${chromePath}`);
+  const chromePath = getChromeExecutablePath();
+  if (!chromePath) {
+    logs.push(`[InstagramScraper] Chrome/Edge executable not found on system.`);
     return { followersCount: 0, postsCount: 0, accountName: handle, avatarUrl: `https://unavatar.io/instagram/${handle}`, posts: [] };
   }
 
   let browser;
   try {
-    logs.push(`[InstagramScraper] Strategy 2: Launching Puppeteer Headless Chrome...`);
+    logs.push(`[InstagramScraper] Launching Puppeteer Headless Browser (${chromePath})...`);
     browser = await puppeteer.launch({
       executablePath: chromePath,
       headless: true,
@@ -69,13 +70,13 @@ export async function scrapeInstagramWithPuppeteer(
 
     const data = await page.evaluate((targetHandle: string) => {
       const doc = (globalThis as any).document;
-      const links = Array.from(doc.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
+      const links = Array.from(doc.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]'));
       const shortcodes: string[] = [];
       const seenShortcodes = new Set<string>();
 
       links.forEach((aEl: any) => {
         const href = aEl.getAttribute('href') || '';
-        const match = href.match(/\/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+        const match = href.match(/\/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/);
         if (!match) return;
         const shortcode = match[1];
         if (seenShortcodes.has(shortcode)) return;
@@ -108,13 +109,41 @@ export async function scrapeInstagramWithPuppeteer(
         if (!isNaN(num)) postsCnt = Math.round(num);
       }
 
-      return { followers, postsCnt, ogImage, shortcodes: shortcodes.slice(0, 8) };
+      return { followers, postsCnt, ogImage, shortcodes };
     }, handle);
 
-    logs.push(`[InstagramScraper] Found ${data.shortcodes.length} shortcodes from profile, now fetching exact post metrics...`);
+    // Also navigate to Reels tab to collect dedicated Reels
+    const reelsTabUrl = `https://www.instagram.com/${handle}/reels/`;
+    logs.push(`[InstagramScraper] Puppeteer scanning Reels tab (${reelsTabUrl})...`);
+    try {
+      await page.goto(reelsTabUrl, { waitUntil: 'domcontentloaded', timeout: 12000 });
+      await new Promise((r) => setTimeout(r, 2500));
+      const reelCodes = await page.evaluate(() => {
+        const doc = (globalThis as any).document;
+        const rLinks = Array.from(doc.querySelectorAll('a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"]'));
+        const scs: string[] = [];
+        rLinks.forEach((aEl: any) => {
+          const href = aEl.getAttribute('href') || '';
+          const m = href.match(/\/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/);
+          if (m && !scs.includes(m[1])) scs.push(m[1]);
+        });
+        return scs;
+      });
+
+      reelCodes.forEach(rc => {
+        if (!data.shortcodes.includes(rc)) {
+          data.shortcodes.push(rc);
+        }
+      });
+    } catch {
+      logs.push(`[InstagramScraper] Note: Reels tab scan completed or skipped.`);
+    }
+
+    const finalShortcodes = data.shortcodes.slice(0, 12);
+    logs.push(`[InstagramScraper] Found ${finalShortcodes.length} total posts & reels shortcodes, now fetching exact metrics...`);
 
     const posts: ScrapedSocialPost[] = [];
-    for (const sc of data.shortcodes) {
+    for (const sc of finalShortcodes) {
       try {
         const embedUrl = `https://www.instagram.com/p/${sc}/embed/captioned/`;
         await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -124,27 +153,56 @@ export async function scrapeInstagramWithPuppeteer(
           const doc = (globalThis as any).document;
           const bodyText = doc.body?.innerText || '';
 
-          const likesM = bodyText.match(/([0-9.,KMBkmb]+)\s*likes/i) || bodyText.match(/Liked by [^0-9]*([0-9.,KMBkmb]+)/i);
-          const commentsM = bodyText.match(/View all ([0-9.,KMBkmb]+) comments/i) || bodyText.match(/([0-9.,KMBkmb]+)\s*comments/i);
+          const parseNum = (str: string): number => {
+            if (!str) return 0;
+            const clean = str.trim().replace(/,/g, '');
+            const mult = clean.slice(-1).toUpperCase();
+            const num = parseFloat(clean);
+            if (isNaN(num)) return 0;
+            if (mult === 'K') return Math.round(num * 1000);
+            if (mult === 'M') return Math.round(num * 1000000);
+            if (mult === 'B') return Math.round(num * 1000000000);
+            return Math.round(num);
+          };
+
+          let likes = 0;
+          let comments = 0;
+
+          // 1. Check embedded JSON scripts for exact counts
+          const scripts = Array.from(doc.querySelectorAll('script'));
+          for (const s of scripts) {
+            const txt = (s as any).textContent || '';
+            const cMatch = txt.match(/"edge_media_to_comment":\s*\{\s*"count":\s*(\d+)/i) ||
+                           txt.match(/"comment_count":\s*(\d+)/i) ||
+                           txt.match(/"comments":\s*\{\s*"count":\s*(\d+)/i);
+            if (cMatch) comments = parseInt(cMatch[1], 10);
+
+            const lMatch = txt.match(/"edge_media_preview_like":\s*\{\s*"count":\s*(\d+)/i) ||
+                           txt.match(/"like_count":\s*(\d+)/i) ||
+                           txt.match(/"likes":\s*\{\s*"count":\s*(\d+)/i);
+            if (lMatch) likes = parseInt(lMatch[1], 10);
+          }
+
+          // 2. Fallback to multilingual DOM regex
+          if (likes === 0) {
+            const likesM = bodyText.match(/([0-9.,KMBkmb]+)\s*likes/i) ||
+                           bodyText.match(/Liked by [^0-9]*([0-9.,KMBkmb]+)/i) ||
+                           bodyText.match(/([0-9.,KMBkmb]+)\s*إعجاب/i);
+            if (likesM && likesM[1]) likes = parseNum(likesM[1]);
+          }
+
+          if (comments === 0) {
+            const commentsM = bodyText.match(/View all ([0-9.,KMBkmb]+) comments/i) ||
+                              bodyText.match(/([0-9.,KMBkmb]+)\s*comments?/i) ||
+                              bodyText.match(/([0-9.,KMBkmb]+)\s*تعليقا?/i) ||
+                              bodyText.match(/عرض جميع الـ\s*([0-9.,KMBkmb]+)/i) ||
+                              bodyText.match(/([0-9.,KMBkmb]+)\s*تعليقات/i);
+            if (commentsM && commentsM[1]) comments = parseNum(commentsM[1]);
+          }
 
           const captionEl = doc.querySelector('.CaptionText, .Caption, [class*="Caption"]');
           const captionText = captionEl ? captionEl.textContent.trim() : '';
-
           const mediaImg = doc.querySelector('img.EmbeddedMediaImage, img[src*="cdninstagram"]')?.getAttribute('src') || undefined;
-
-          let likes = 0;
-          if (likesM && likesM[1]) {
-            const clean = likesM[1].replace(/,/g, '');
-            const num = parseFloat(clean);
-            if (!isNaN(num)) likes = Math.round(num);
-          }
-
-          let comments = 0;
-          if (commentsM && commentsM[1]) {
-            const clean = commentsM[1].replace(/,/g, '');
-            const num = parseFloat(clean);
-            if (!isNaN(num)) comments = Math.round(num);
-          }
 
           return {
             post_id: `ig_${targetHandle}_p_${shortcode}`,
@@ -352,8 +410,17 @@ export async function scrapeInstagramProfile(urlOrHandle: string): Promise<Scrap
         const imgMatch = embedHtml.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/i) || embedHtml.match(/src="([^"]+)"[^>]*class="EmbeddedMediaImage"/i) || embedHtml.match(/<img [^>]*src="([^"]+)"/i);
         const mediaUrl = imgMatch ? imgMatch[1].replace(/&amp;/g, '&') : undefined;
 
-        const likesMatch = embedHtml.match(/([0-9.,KMBkmb]+)\s*likes/i);
+        const likesMatch = embedHtml.match(/([0-9.,KMBkmb]+)\s*likes/i) || embedHtml.match(/([0-9.,KMBkmb]+)\s*إعجاب/i);
         const postLikes = likesMatch ? parseFormattedNumber(likesMatch[1]) : 0;
+
+        const commentsMatch = embedHtml.match(/View all ([0-9.,KMBkmb]+) comments/i) ||
+                              embedHtml.match(/([0-9.,KMBkmb]+)\s*comments?/i) ||
+                              embedHtml.match(/([0-9.,KMBkmb]+)\s*تعليقا?/i) ||
+                              embedHtml.match(/عرض جميع الـ\s*([0-9.,KMBkmb]+)/i) ||
+                              embedHtml.match(/([0-9.,KMBkmb]+)\s*تعليقات/i) ||
+                              embedHtml.match(/"comment_count":\s*(\d+)/i) ||
+                              embedHtml.match(/"edge_media_to_comment":\s*\{\s*"count":\s*(\d+)/i);
+        const postComments = commentsMatch ? parseFormattedNumber(commentsMatch[1]) : 0;
 
         recentPosts.unshift({
           post_id: `ig_${handle}_p_${postShortcode}`,
@@ -361,7 +428,7 @@ export async function scrapeInstagramProfile(urlOrHandle: string): Promise<Scrap
           media_url: mediaUrl,
           permalink: `https://www.instagram.com/p/${postShortcode}/`,
           like_count: postLikes,
-          comments_count: 0,
+          comments_count: postComments,
           views_count: 0,
           posted_at: new Date().toISOString(),
         });

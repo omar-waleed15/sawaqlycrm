@@ -1,4 +1,6 @@
 import { ScrapedSocialProfile, ScrapedSocialPost, parseFormattedNumber } from './instagramScraper';
+import puppeteer from 'puppeteer-core';
+import { getChromeExecutablePath } from './chromeLocator';
 
 export async function scrapeFacebookProfile(urlOrHandle: string): Promise<ScrapedSocialProfile> {
   const logs: string[] = [];
@@ -58,6 +60,38 @@ export async function scrapeFacebookProfile(urlOrHandle: string): Promise<Scrape
     }
   } catch (err: any) {
     logs.push(`[FacebookScraper] Exception: ${err.message || err}`);
+  }
+
+  // Puppeteer fallback for Facebook
+  if (followersCount === 0 && likesCount === 0) {
+    const chromePath = getChromeExecutablePath();
+    if (chromePath) {
+      let browser;
+      try {
+        logs.push(`[FacebookScraper] Launching Puppeteer for Facebook profile (${profileUrl})...`);
+        browser = await puppeteer.launch({
+          executablePath: chromePath,
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled'],
+        });
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+        await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await new Promise(r => setTimeout(r, 3000));
+
+        const content = await page.content();
+        const fM = content.match(/([0-9.,KMBkmb]+)\s*followers/i);
+        if (fM) followersCount = parseFormattedNumber(fM[1]);
+        const lM = content.match(/([0-9.,KMBkmb]+)\s*likes/i);
+        if (lM) likesCount = parseFormattedNumber(lM[1]);
+
+        logs.push(`[FacebookScraper] Puppeteer parsed Followers=${followersCount}, Likes=${likesCount}`);
+      } catch (pErr: any) {
+        logs.push(`[FacebookScraper] Puppeteer Exception: ${pErr.message || pErr}`);
+      } finally {
+        if (browser) await browser.close();
+      }
+    }
   }
 
   logs.push(`[FacebookScraper] Final Scrape Result: Followers=${followersCount || likesCount}, Likes=${likesCount}`);
