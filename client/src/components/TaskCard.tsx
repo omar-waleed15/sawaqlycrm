@@ -375,14 +375,14 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
               <div className="flex flex-col gap-2 mt-1">
                 {/* Revision banner for worker */}
                 {!canSeeSubmissionProgress && isMyRevisionNeeded && (
-                  <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
                     🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
                   </div>
                 )}
 
                 {/* Revision indicator for owner/creator */}
                 {canSeeSubmissionProgress && hasRevisionRequested && (
-                  <div className="bg-amber-50 dark:bg-amber-955/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
+                  <div className="bg-amber-50 dark:bg-amber-950/30 border-s-2 border-amber-500 rounded px-2.5 py-1 text-[11px] text-amber-800 dark:text-amber-300 font-semibold text-start">
                     🔄 {locale === 'ar' ? 'تعديل مطلوب' : 'Revision Requested'}
                   </div>
                 )}
