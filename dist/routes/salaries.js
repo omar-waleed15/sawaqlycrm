@@ -44,7 +44,7 @@ const attachAdvancesToSalaries = async (salaries) => {
     return salaries;
 };
 // GET /api/salaries — List all salary records (filter: ?month=YYYY-MM)
-router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     let { month } = req.query;
     try {
         if (!month || typeof month !== 'string') {
@@ -144,7 +144,7 @@ router.get('/my-salary', auth_1.authMiddleware, async (req, res) => {
     }
 });
 // POST /api/salaries — Create or upsert a salary record
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { user_id, amount, month, paid, paid_date, is_recurring, recurrence, note, installments } = req.body;
     if (!user_id || amount === undefined || !month) {
         res.status(400).json({ error: 'User, amount, and month are required' });
@@ -239,7 +239,7 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
     }
 });
 // PUT /api/salaries/:id — Update a salary record
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { id } = req.params;
     const { amount, paid, paid_date, is_recurring, recurrence, note, installments } = req.body;
     try {
@@ -305,7 +305,7 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
     }
 });
 // PATCH /api/salaries/:id/installments/:instId/paid — Toggle installment paid status
-router.patch('/:id/installments/:instId/paid', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.patch('/:id/installments/:instId/paid', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { instId } = req.params;
     const { paid } = req.body;
     try {
@@ -324,7 +324,7 @@ router.patch('/:id/installments/:instId/paid', auth_1.authMiddleware, roleCheck_
     }
 });
 // DELETE /api/salaries/:id — Delete a salary record
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { id } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin
@@ -341,8 +341,8 @@ router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, 
         res.status(500).json({ error: 'Failed to delete salary record' });
     }
 });
-// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner only)
-router.post('/:id/penalties', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// POST /api/salaries/:id/penalties — Add a penalty to a salary record (Owner/Team Leader)
+router.post('/:id/penalties', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { id } = req.params;
     const { amount, notes } = req.body;
     if (amount === undefined || isNaN(Number(amount))) {
@@ -369,8 +369,8 @@ router.post('/:id/penalties', auth_1.authMiddleware, roleCheck_1.ownerOnly, asyn
         res.status(500).json({ error: 'Failed to create penalty' });
     }
 });
-// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner only)
-router.delete('/:id/penalties/:penaltyId', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// DELETE /api/salaries/:id/penalties/:penaltyId — Delete a penalty (Owner/Team Leader)
+router.delete('/:id/penalties/:penaltyId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { penaltyId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin
@@ -387,8 +387,8 @@ router.delete('/:id/penalties/:penaltyId', auth_1.authMiddleware, roleCheck_1.ow
         res.status(500).json({ error: 'Failed to delete penalty' });
     }
 });
-// POST /api/salaries/:id/bonuses — Add a bonus to a salary record (Owner only)
-router.post('/:id/bonuses', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// POST /api/salaries/:id/bonuses — Add a bonus to a salary record (Owner/Team Leader)
+router.post('/:id/bonuses', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { id } = req.params;
     const { amount, notes } = req.body;
     if (amount === undefined || isNaN(Number(amount))) {
@@ -415,8 +415,8 @@ router.post('/:id/bonuses', auth_1.authMiddleware, roleCheck_1.ownerOnly, async 
         res.status(500).json({ error: 'Failed to create bonus' });
     }
 });
-// DELETE /api/salaries/:id/bonuses/:bonusId — Delete a bonus (Owner only)
-router.delete('/:id/bonuses/:bonusId', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// DELETE /api/salaries/:id/bonuses/:bonusId — Delete a bonus (Owner/Team Leader)
+router.delete('/:id/bonuses/:bonusId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { bonusId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin
@@ -433,8 +433,8 @@ router.delete('/:id/bonuses/:bonusId', auth_1.authMiddleware, roleCheck_1.ownerO
         res.status(500).json({ error: 'Failed to delete bonus' });
     }
 });
-// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Sales)
-router.post('/:id/advances', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// POST /api/salaries/:id/advances — Add a salary advance to a salary record (Owner/Team Leader)
+router.post('/:id/advances', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { id } = req.params;
     const { amount, notes, date } = req.body;
     if (amount === undefined || isNaN(Number(amount))) {
@@ -463,7 +463,7 @@ router.post('/:id/advances', auth_1.authMiddleware, roleCheck_1.ownerOnly, async
     }
 });
 // DELETE /api/salaries/:id/advances/:advanceId — Delete a salary advance
-router.delete('/:id/advances/:advanceId', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+router.delete('/:id/advances/:advanceId', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { advanceId } = req.params;
     try {
         const { error } = await supabase_1.supabaseAdmin

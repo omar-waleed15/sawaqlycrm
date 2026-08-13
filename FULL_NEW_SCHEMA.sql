@@ -74,13 +74,13 @@ CREATE TABLE IF NOT EXISTS public.salary_penalties (id uuid PRIMARY KEY DEFAULT 
 
 CREATE TABLE IF NOT EXISTS public.sales_call_logs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), notes text, outcome text NOT NULL DEFAULT 'contacted'::text, call_date timestamptz DEFAULT now(), sales_rep_id uuid NOT NULL, client_id uuid NOT NULL);
 
-CREATE TABLE IF NOT EXISTS public.sales_targets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), target_amount numeric NOT NULL DEFAULT 0, user_id uuid NOT NULL, created_at timestamptz DEFAULT now(), month varchar(7) NOT NULL);
+CREATE TABLE IF NOT EXISTS public.sales_targets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), target_amount numeric NOT NULL DEFAULT 0, user_id uuid NOT NULL, created_at timestamptz DEFAULT now(), month varchar(7) NOT NULL, UNIQUE(user_id, month));
 
 CREATE TABLE IF NOT EXISTS public.system_settings (key text PRIMARY KEY, value text NOT NULL, updated_at timestamptz DEFAULT now());
 
 CREATE TABLE IF NOT EXISTS public.task_assignees (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), submitted_at timestamptz, timer_started_at timestamptz, total_time_spent int4 NOT NULL DEFAULT 0, rating int4, updated_at timestamptz DEFAULT now(), assigned_at timestamptz DEFAULT now(), user_id uuid NOT NULL, task_id uuid NOT NULL, status text NOT NULL DEFAULT 'todo'::text, submission_link text, completion_note text, feedback text);
 
-CREATE TABLE IF NOT EXISTS public.task_targets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), target_tasks int4 NOT NULL DEFAULT 0, created_at timestamptz DEFAULT now(), month varchar(7) NOT NULL, user_id uuid NOT NULL);
+CREATE TABLE IF NOT EXISTS public.task_targets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), target_tasks int4 NOT NULL DEFAULT 0, created_at timestamptz DEFAULT now(), month varchar(7) NOT NULL, user_id uuid NOT NULL, UNIQUE(user_id, month));
 
 CREATE TABLE IF NOT EXISTS public.tasks (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), assignee_id uuid, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(), title text NOT NULL, description text, priority text NOT NULL DEFAULT 'medium'::text, status text NOT NULL DEFAULT 'todo'::text, submission_link text, publish_date date, client_id uuid, is_archived bool NOT NULL DEFAULT false, feedback text, progress_note text, drive_link text, content_type text, content_description text, completion_note text, is_deliverable bool DEFAULT false, publish_notes text, estimated_time_minutes int4, deliverable_month date, deliverable_type text, due_date timestamptz, creator_id uuid);
 

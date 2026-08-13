@@ -419,8 +419,8 @@ const parseLocalDate = (dateStr) => {
     const [yyyy, mm, dd] = dateStr.split('-').map(Number);
     return new Date(yyyy, mm - 1, dd);
 };
-// GET /api/finance-analytics/custom-report — Get custom financial reports (owner only)
-router.get('/custom-report', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// GET /api/finance-analytics/custom-report — Get custom financial reports (owner/sales)
+router.get('/custom-report', auth_1.authMiddleware, roleCheck_1.ownerOrSales, async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) {
         res.status(400).json({ error: 'startDate and endDate query parameters are required' });
