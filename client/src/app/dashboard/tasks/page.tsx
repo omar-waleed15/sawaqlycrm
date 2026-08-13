@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi } from '@/lib/api';
-import { Task } from '@/types';
+import { tasksApi, usersApi } from '@/lib/api';
+import { Task, User } from '@/types';
 import { sortActiveTasks } from '@/lib/taskSortUtils';
 import TaskCard from '@/components/TaskCard';
 import CreateTaskModal from '@/components/CreateTaskModal';
@@ -32,6 +32,8 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [teamMemberFilter, setTeamMemberFilter] = useState('');
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const isInternUser = user?.role === 'content_creator_intern';
   const [activeTab, setActiveTab] = useState<'active' | 'pending_review' | 'my_tasks' | 'intern_tasks' | 'completed' | 'archived'>(
     user?.role === 'content_creator_intern' ? 'intern_tasks' : 'active'
@@ -40,6 +42,18 @@ export default function TasksPage() {
 
   const isOwner = user?.role === 'owner' || user?.role === 'team_leader' || user?.role === 'moderation' || user?.role === 'account_manager';
   const canCreate = isOwner || user?.role === 'content_creator';
+
+  useEffect(() => {
+    if (isOwner) {
+      usersApi.list()
+        .then(data => {
+          const members = (data.users || []).filter((u: User) => u.role !== 'client');
+          members.sort((a: User, b: User) => a.name.localeCompare(b.name));
+          setTeamMembers(members);
+        })
+        .catch(console.error);
+    }
+  }, [isOwner]);
 
   useEffect(() => {
     if (user?.role === 'content_creator_intern' && activeTab !== 'intern_tasks' && activeTab !== 'pending_review' && activeTab !== 'completed') {
@@ -52,7 +66,7 @@ export default function TasksPage() {
     }
     loadTasks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, priorityFilter, activeTab, user]);
+  }, [statusFilter, priorityFilter, teamMemberFilter, activeTab, user]);
 
   // Live Task Event Listeners & Focus Refetch
   useEffect(() => {
@@ -93,13 +107,14 @@ export default function TasksPage() {
       window.removeEventListener('focus', handleFocus);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, priorityFilter, activeTab, user]);
+  }, [statusFilter, priorityFilter, teamMemberFilter, activeTab, user]);
 
   const loadTasks = (showLoading = true) => {
     if (showLoading) setLoading(true);
     const params: Record<string, string> = {};
     if (statusFilter) params.status = statusFilter;
     if (priorityFilter) params.priority = priorityFilter;
+    if (teamMemberFilter) params.assignee_id = teamMemberFilter;
     if (activeTab === 'archived') {
       params.archived = 'true';
     }
@@ -126,7 +141,7 @@ export default function TasksPage() {
     (t.creator_id === user?.id && (user?.role === 'content_creator' || user?.role === 'content_creator_intern'));
 
   const displayedTasks = activeTab === 'active'
-    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && !isInternTask(t)), user?.id)
+    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && (!isInternTask(t) || Boolean(teamMemberFilter))), user?.id)
     : activeTab === 'pending_review'
       ? sortActiveTasks(tasks.filter(t => t.status === 'submitted' && (isInternUser ? isInternTask(t) : true)), user?.id)
       : activeTab === 'completed'
@@ -137,7 +152,9 @@ export default function TasksPage() {
             ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && isInternTask(t)), user?.id)
             : tasks;
 
-  const filteredDisplayed = displayedTasks;
+  const filteredDisplayed = teamMemberFilter
+    ? displayedTasks.filter(t => t.task_assignees?.some(a => a.user_id === teamMemberFilter) || t.assignee_id === teamMemberFilter)
+    : displayedTasks;
 
   const completedCount = tasks.filter(t => !t.is_archived && t.status === 'completed' && (isInternUser ? isInternTask(t) : true)).length;
   const myTasksCount = tasks.filter(t => !t.is_archived && t.status !== 'completed' && t.task_assignees?.some(a => a.user_id === user?.id)).length;
@@ -292,6 +309,26 @@ export default function TasksPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
+
+        {isOwner && (
+          <Select value={teamMemberFilter} onValueChange={(val) => setTeamMemberFilter(val || '')}>
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder={t('tasks.allTeamMembers')}>
+                {teamMemberFilter
+                  ? `👤 ${teamMembers.find(m => m.id === teamMemberFilter)?.name || ''}`
+                  : `👤 ${t('tasks.allTeamMembers')}`}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">👤 {t('tasks.allTeamMembers')}</SelectItem>
+              {teamMembers.map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {activeTab !== 'completed' && activeTab !== 'pending_review' && (
           <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || '')}>

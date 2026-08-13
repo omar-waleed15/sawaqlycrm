@@ -163,6 +163,7 @@ export const ar: Record<string, string> = {
   'tasks.searchPlaceholder': 'البحث عن مهام بالعنوان...',
   'tasks.filterByStatus': 'تصفية حسب الحالة',
   'tasks.allStatuses': 'جميع الحالات',
+  'tasks.allTeamMembers': 'جميع أعضاء الفريق',
   'tasks.sortBy': 'ترتيب حسب',
   'tasks.dueDate': 'تاريخ الاستحقاق',
   'tasks.title_sort': 'العنوان',
@@ -327,6 +328,7 @@ export const ar: Record<string, string> = {
 
   // ── تفاصيل العضو ───────────────────────────────────────────────────
   'memberDetail.teamManagement': 'إدارة الفريق',
+  'memberDetail.tasks': 'مهام العضو',
   'memberDetail.loadingProfile': 'جاري تحميل ملف العضو...',
   'memberDetail.email': 'البريد:',
   'memberDetail.repIntelligence': 'ذكاء وإنجازات المندوب',

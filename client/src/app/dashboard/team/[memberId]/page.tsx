@@ -49,6 +49,45 @@ function getMemberStatus(task: Task, memberId: string): TaskStatus {
   return (getMemberAssignment(task, memberId)?.status || 'todo') as TaskStatus;
 }
 
+function matchesMonth(dateStr: string | undefined | null, targetMonth: string): boolean {
+  if (!dateStr) return false;
+  const clean = dateStr.trim();
+  if (!clean) return false;
+  if (clean.substring(0, 7) === targetMonth) return true;
+  const d = new Date(clean);
+  if (!isNaN(d.getTime())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    if (`${yyyy}-${mm}` === targetMonth) return true;
+    const utcYyyy = d.getUTCFullYear();
+    const utcMm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    if (`${utcYyyy}-${utcMm}` === targetMonth) return true;
+  }
+  return false;
+}
+
+function isTaskInTargetMonth(task: Task, memberId: string, targetMonth: string): boolean {
+  const assignment = getMemberAssignment(task, memberId);
+
+  // Check due_date
+  if (matchesMonth(task.due_date, targetMonth)) return true;
+
+  // Check deliverable_month
+  if (matchesMonth(task.deliverable_month, targetMonth)) return true;
+
+  // Check assigned_at
+  if (matchesMonth(assignment?.assigned_at, targetMonth)) return true;
+
+  // Check updated_at & submitted_at (especially for completed/submitted tasks)
+  if (matchesMonth(assignment?.updated_at, targetMonth)) return true;
+  if (matchesMonth(assignment?.submitted_at, targetMonth)) return true;
+
+  // Check created_at
+  if (matchesMonth(task.created_at, targetMonth)) return true;
+
+  return false;
+}
+
 const STATUS_CONFIG: Record<string, { labelKey: string; icon: string; accentClass: string; bgClass: string; textClass: string }> = {
   todo:        { labelKey: 'status.todo', icon: '📝', accentClass: 'bg-slate-400', bgClass: 'bg-slate-50 border-slate-100', textClass: 'text-slate-700' },
   in_progress: { labelKey: 'status.in_progress', icon: '⚡', accentClass: 'bg-blue-500', bgClass: 'bg-blue-50/50 border-blue-100', textClass: 'text-blue-700' },
@@ -160,14 +199,16 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   const targetVal = targetTasks === '' ? 0 : Number(targetTasks);
   const achievementRate = targetVal > 0 ? Math.round((completedTasks / targetVal) * 100) : 0;
 
+  const targetMonthTasks = tasks.filter(t => isTaskInTargetMonth(t, memberId, targetMonth));
+
   const stats = {
-    total: tasks.length,
-    todo: tasks.filter(t => getMemberStatus(t, memberId) === 'todo').length,
-    inProgress: tasks.filter(t => getMemberStatus(t, memberId) === 'in_progress').length,
-    submitted: tasks.filter(t => getMemberStatus(t, memberId) === 'submitted').length,
-    revision: tasks.filter(t => getMemberStatus(t, memberId) === 'revision').length,
-    completed: tasks.filter(t => getMemberStatus(t, memberId) === 'completed').length,
-    overdue: tasks.filter(t => isOverdue(t.due_date, getMemberStatus(t, memberId))).length,
+    total: targetMonthTasks.length,
+    todo: targetMonthTasks.filter(t => getMemberStatus(t, memberId) === 'todo').length,
+    inProgress: targetMonthTasks.filter(t => getMemberStatus(t, memberId) === 'in_progress').length,
+    submitted: targetMonthTasks.filter(t => getMemberStatus(t, memberId) === 'submitted').length,
+    revision: targetMonthTasks.filter(t => getMemberStatus(t, memberId) === 'revision').length,
+    completed: targetMonthTasks.filter(t => getMemberStatus(t, memberId) === 'completed').length,
+    overdue: targetMonthTasks.filter(t => isOverdue(t.due_date, getMemberStatus(t, memberId))).length,
   };
 
   const getProcessedTasks = (taskList: Task[]) => {
@@ -196,11 +237,11 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   };
 
   const filteredTasks = activeStatus === 'all'
-    ? getProcessedTasks(tasks)
-    : getProcessedTasks(tasks.filter(t => getMemberStatus(t, memberId) === activeStatus));
+    ? getProcessedTasks(targetMonthTasks)
+    : getProcessedTasks(targetMonthTasks.filter(t => getMemberStatus(t, memberId) === activeStatus));
 
   const filterTabs = [
-    { key: 'all', label: t('memberDetail.allTasks'), count: tasks.length },
+    { key: 'all', label: t('memberDetail.allTasks'), count: targetMonthTasks.length },
     { key: 'todo', label: t('memberDetail.toDo'), count: stats.todo },
     { key: 'in_progress', label: t('memberDetail.inProgress'), count: stats.inProgress },
     { key: 'submitted', label: t('memberDetail.submitted'), count: stats.submitted },
@@ -345,6 +386,18 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
       {/* Search, Filter & Switch View Panel */}
       <Card className="mb-6 shadow-sm border-border/80">
         <CardContent className="p-6 flex flex-col gap-6">
+          <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground">{t('memberDetail.tasks') || 'Tasks'}</h3>
+              <Badge variant="secondary" className="text-xs font-semibold bg-[#1D61E7]/10 text-[#1D61E7] border border-[#1D61E7]/20">
+                📅 {targetMonth}
+              </Badge>
+            </div>
+            <span className="text-xs text-muted-foreground font-semibold">
+              {targetMonthTasks.length} {t('common.tasks') || 'tasks'}
+            </span>
+          </div>
+
           {/* Top Panel Controls */}
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
             {/* Search Input */}

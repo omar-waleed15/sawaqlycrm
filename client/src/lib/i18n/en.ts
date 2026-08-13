@@ -163,6 +163,7 @@ export const en: Record<string, string> = {
   'tasks.searchPlaceholder': 'Search tasks by title...',
   'tasks.filterByStatus': 'Filter by status',
   'tasks.allStatuses': 'All Statuses',
+  'tasks.allTeamMembers': 'All Team Members',
   'tasks.sortBy': 'Sort by',
   'tasks.dueDate': 'Due Date',
   'tasks.title_sort': 'Title',
@@ -327,6 +328,7 @@ export const en: Record<string, string> = {
 
   // ── Member Detail Page ──────────────────────────────────────────────
   'memberDetail.teamManagement': 'Team Management',
+  'memberDetail.tasks': 'Member Tasks',
   'memberDetail.loadingProfile': 'Loading member profile...',
   'memberDetail.email': 'Email:',
   'memberDetail.repIntelligence': 'Representative Intelligence & Achievements',
