@@ -15,8 +15,11 @@ const SALARY_SELECT = `
 
 const attachAdvancesToSalaries = async (salaries: any[]) => {
   if (!salaries || salaries.length === 0) return salaries;
-  const salaryIds = salaries.map(s => s.id).filter(Boolean);
-  if (salaryIds.length === 0) return salaries;
+  const salaryIds = salaries.filter(s => !s.is_fallback).map(s => s.id).filter(Boolean);
+  if (salaryIds.length === 0) {
+    salaries.forEach(s => { s.advances = []; });
+    return salaries;
+  }
 
   try {
     const { data: advancesData, error } = await supabaseAdmin
@@ -32,13 +35,17 @@ const attachAdvancesToSalaries = async (salaries: any[]) => {
       });
 
       salaries.forEach(s => {
-        s.advances = advancesMap[s.id] || [];
+        if (!s.is_fallback) {
+          s.advances = advancesMap[s.id] || [];
+        } else {
+          s.advances = [];
+        }
       });
     } else {
-      salaries.forEach(s => { s.advances = s.advances || []; });
+      salaries.forEach(s => { s.advances = []; });
     }
   } catch (err) {
-    salaries.forEach(s => { s.advances = s.advances || []; });
+    salaries.forEach(s => { s.advances = []; });
   }
 
   return salaries;
@@ -84,7 +91,24 @@ router.get('/', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, 
       }
     });
 
-    const resultSalaries = Object.values(userSalaryMap);
+    const resultSalaries = Object.values(userSalaryMap).map(s => {
+      const isExactMonth = s.month && s.month.startsWith(month);
+      if (!isExactMonth) {
+        return {
+          ...s,
+          month: `${month}-01`,
+          paid: false,
+          paid_date: null,
+          installments: [],
+          penalties: [],
+          bonuses: [],
+          advances: [],
+          is_fallback: true,
+        };
+      }
+      return s;
+    });
+
     const enriched = await attachAdvancesToSalaries(resultSalaries);
     res.json({ salaries: enriched });
   } catch (err) {
@@ -131,12 +155,24 @@ router.get('/my-salary', authMiddleware, async (req: AuthRequest, res: Response)
         .maybeSingle();
 
       if (latestSalary) {
-        salary = latestSalary;
+        salary = {
+          ...latestSalary,
+          month: firstDayOfMonth,
+          paid: false,
+          paid_date: null,
+          installments: [],
+          penalties: [],
+          bonuses: [],
+          advances: [],
+          is_fallback: true,
+        };
       }
     }
 
-    if (salary) {
+    if (salary && !salary.is_fallback) {
       await attachAdvancesToSalaries([salary]);
+    } else if (salary) {
+      salary.advances = [];
     }
 
     // Fetch available historical months for this user

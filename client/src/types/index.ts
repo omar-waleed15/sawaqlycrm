@@ -248,6 +248,7 @@ export interface Salary {
   penalties?: SalaryPenalty[];
   bonuses?: SalaryBonus[];
   advances?: SalaryAdvance[];
+  is_fallback?: boolean;
   note?: string;
   created_by: string;
   created_at: string;

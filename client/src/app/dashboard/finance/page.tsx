@@ -1345,6 +1345,22 @@ export default function FinanceDashboardPage() {
     setErrorMsg('');
   };
 
+  const ensureSalaryRecord = async (salary: Salary): Promise<Salary> => {
+    if (!salary.is_fallback) return salary;
+    const monthStr = `${expenseMonthFilter}-01`;
+    const res = await salariesApi.create({
+      user_id: salary.user_id,
+      amount: salary.amount,
+      month: monthStr,
+      paid: false,
+      paid_date: null,
+      is_recurring: salary.is_recurring ?? true,
+      recurrence: salary.recurrence || 'monthly',
+      note: salary.note || null,
+    });
+    return { ...res.salary, is_fallback: false };
+  };
+
   const handleSalarySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!salaryForm.user_id || !salaryForm.amount || !salaryForm.paid_date) {
@@ -1384,7 +1400,7 @@ export default function FinanceDashboardPage() {
         note: salaryForm.note || null,
         installments,
       };
-      if (modalMode === 'create') {
+      if (modalMode === 'create' || selectedSalary?.is_fallback) {
         await salariesApi.create(data);
       } else if (selectedSalary) {
         await salariesApi.update(selectedSalary.id, data);
@@ -1399,9 +1415,24 @@ export default function FinanceDashboardPage() {
   };
 
   const handleToggleSalaryPaid = async (salaryId: string, paid: boolean) => {
+    const salaryObj = salaries.find(s => s.id === salaryId);
     setSalaries(prev => prev.map(s => s.id === salaryId ? { ...s, paid } : s));
     try {
-      await salariesApi.update(salaryId, { paid });
+      if (salaryObj?.is_fallback) {
+        const monthStr = `${expenseMonthFilter}-01`;
+        await salariesApi.create({
+          user_id: salaryObj.user_id,
+          amount: salaryObj.amount,
+          month: monthStr,
+          paid,
+          paid_date: paid ? getCairoTodayString() : null,
+          is_recurring: salaryObj.is_recurring ?? true,
+          recurrence: salaryObj.recurrence || 'monthly',
+          note: salaryObj.note || null,
+        });
+      } else {
+        await salariesApi.update(salaryId, { paid });
+      }
       contractsApi.stats().then(res => { if (res.stats) setStats(res.stats); });
     } catch (err: any) {
       alert(err.message || 'Failed to update salary status');
@@ -1447,16 +1478,17 @@ export default function FinanceDashboardPage() {
     try {
       setSubmittingPenalty(true);
       setPenaltyErrorMsg('');
-      const res = await salariesApi.createPenalty(selectedSalaryForPenalties.id, {
+      const targetSalary = await ensureSalaryRecord(selectedSalaryForPenalties);
+      const res = await salariesApi.createPenalty(targetSalary.id, {
         amount: Number(amountVal),
         notes: notesVal || undefined,
       });
 
       // Update local state reactively
-      const updatedPenalties = [...(selectedSalaryForPenalties.penalties || []), res.penalty];
-      const updatedSalary = { ...selectedSalaryForPenalties, penalties: updatedPenalties };
+      const updatedPenalties = [...(targetSalary.penalties || []), res.penalty];
+      const updatedSalary = { ...targetSalary, penalties: updatedPenalties };
       
-      setSalaries(prev => prev.map(s => s.id === selectedSalaryForPenalties.id ? updatedSalary : s));
+      setSalaries(prev => prev.map(s => (s.id === selectedSalaryForPenalties.id || s.user_id === targetSalary.user_id) ? updatedSalary : s));
       setSelectedSalaryForPenalties(updatedSalary);
       form.reset();
       
@@ -1511,16 +1543,17 @@ export default function FinanceDashboardPage() {
     try {
       setSubmittingBonus(true);
       setBonusErrorMsg('');
-      const res = await salariesApi.createBonus(selectedSalaryForBonuses.id, {
+      const targetSalary = await ensureSalaryRecord(selectedSalaryForBonuses);
+      const res = await salariesApi.createBonus(targetSalary.id, {
         amount: Number(amountVal),
         notes: notesVal || undefined,
       });
 
       // Update local state reactively
-      const updatedBonuses = [...(selectedSalaryForBonuses.bonuses || []), res.bonus];
-      const updatedSalary = { ...selectedSalaryForBonuses, bonuses: updatedBonuses };
+      const updatedBonuses = [...(targetSalary.bonuses || []), res.bonus];
+      const updatedSalary = { ...targetSalary, bonuses: updatedBonuses };
       
-      setSalaries(prev => prev.map(s => s.id === selectedSalaryForBonuses.id ? updatedSalary : s));
+      setSalaries(prev => prev.map(s => (s.id === selectedSalaryForBonuses.id || s.user_id === targetSalary.user_id) ? updatedSalary : s));
       setSelectedSalaryForBonuses(updatedSalary);
       form.reset();
       
@@ -1569,17 +1602,18 @@ export default function FinanceDashboardPage() {
     try {
       setSubmittingAdvance(true);
       setAdvanceErrorMsg('');
-      const res = await salariesApi.createAdvance(selectedSalaryForAdvances.id, {
+      const targetSalary = await ensureSalaryRecord(selectedSalaryForAdvances);
+      const res = await salariesApi.createAdvance(targetSalary.id, {
         amount: Number(advanceFormAmount),
         notes: advanceFormNotes || undefined,
         date: advanceFormDate || undefined,
       });
 
       // Update local state reactively
-      const updatedAdvances = [...(selectedSalaryForAdvances.advances || []), res.advance];
-      const updatedSalary = { ...selectedSalaryForAdvances, advances: updatedAdvances };
+      const updatedAdvances = [...(targetSalary.advances || []), res.advance];
+      const updatedSalary = { ...targetSalary, advances: updatedAdvances };
 
-      setSalaries(prev => prev.map(s => s.id === selectedSalaryForAdvances.id ? updatedSalary : s));
+      setSalaries(prev => prev.map(s => (s.id === selectedSalaryForAdvances.id || s.user_id === targetSalary.user_id) ? updatedSalary : s));
       setSelectedSalaryForAdvances(updatedSalary);
       setAdvanceFormAmount('');
       setAdvanceFormNotes('');
