@@ -361,6 +361,46 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
                   {completedTasks} / {targetVal > 0 ? targetVal : '0'} {t('common.tasks')}
                 </p>
               </div>
+
+              {/* Weekly Completed Tasks Card */}
+              {(() => {
+                const now = new Date();
+                const dayOfWeek = now.getDay();
+                const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0, 0).toISOString();
+                const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 7, 0, 0, 0, 0).toISOString();
+                const lastWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 1, 23, 59, 59, 999).toISOString();
+
+                let completedThisWeek = 0;
+                let completedLastWeek = 0;
+
+                tasks.forEach(t => {
+                  const assignment = getMemberAssignment(t, memberId);
+                  if (assignment && assignment.status === 'completed') {
+                    const compTime = assignment.updated_at || assignment.assigned_at;
+                    if (compTime) {
+                      if (compTime >= thisWeekStart) {
+                        completedThisWeek++;
+                      } else if (compTime >= lastWeekStart && compTime <= lastWeekEnd) {
+                        completedLastWeek++;
+                      }
+                    }
+                  }
+                });
+
+                return (
+                  <div className="flex-1 min-w-[200px] border border-teal-200/80 bg-teal-50/20 dark:bg-teal-950/10 rounded-lg p-3 flex flex-col justify-center">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                      {t('dashboard.weeklyCompletedTasks')}
+                    </span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-extrabold text-teal-700 dark:text-teal-300">{completedThisWeek}</span>
+                      <span className="text-[10px] text-muted-foreground font-semibold">
+                        ({t('dashboard.completedLastWeek')}: <strong className="text-foreground">{completedLastWeek}</strong>)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {fetchingTarget && (

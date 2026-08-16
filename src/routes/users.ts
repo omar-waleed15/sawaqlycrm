@@ -43,6 +43,17 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     const eDate = endDate ? String(endDate) : undefined;
     const currentMonthStr = new Date().toISOString().substring(0, 7);
 
+    // Week boundaries (Sunday to Saturday)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday
+    const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0, 0);
+    const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 7, 0, 0, 0, 0);
+    const lastWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 1, 23, 59, 59, 999);
+
+    const thisWeekStartISO = thisWeekStart.toISOString();
+    const lastWeekStartISO = lastWeekStart.toISOString();
+    const lastWeekEndISO = lastWeekEnd.toISOString();
+
     // 1. Fetch profiles
     const profilesPromise = supabaseAdmin
       .from('profiles')
@@ -52,7 +63,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
     // 2. Fetch task assignees within the date window
     let assigneesQuery = supabaseAdmin
       .from('task_assignees')
-      .select('user_id, status, rating, assigned_at, total_time_spent, task:tasks(estimated_time_minutes)');
+      .select('user_id, status, rating, assigned_at, updated_at, total_time_spent, task:tasks(estimated_time_minutes)');
     if (sDate) assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
     if (eDate) assigneesQuery = assigneesQuery.lte('assigned_at', eDate);
 
@@ -114,7 +125,7 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
       console.warn('Assignees query with estimated_time_minutes failed, falling back:', assigneesErr.message);
       let fallbackQuery = supabaseAdmin
         .from('task_assignees')
-        .select('user_id, status, rating, assigned_at, total_time_spent');
+        .select('user_id, status, rating, assigned_at, updated_at, total_time_spent');
       if (sDate) fallbackQuery = fallbackQuery.gte('assigned_at', sDate);
       if (eDate) fallbackQuery = fallbackQuery.lte('assigned_at', eDate);
       const { data: fbData, error: fbErr } = await fallbackQuery;
@@ -141,6 +152,9 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
       const completedTasks = userAssignments.filter(a => a.status === 'completed').length;
       const incompleteTasks = totalTasks - completedTasks;
       const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      let completedThisWeek = 0;
+      let completedLastWeek = 0;
       
       const ratedAssignments = userAssignments.filter(a => a.rating !== null && a.rating !== undefined);
       const averageRating = ratedAssignments.length > 0
@@ -148,6 +162,17 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
         : null;
 
       const completedAssignments = userAssignments.filter(a => a.status === 'completed');
+      completedAssignments.forEach((a: any) => {
+        const compTime = a.updated_at || a.assigned_at;
+        if (compTime) {
+          if (compTime >= thisWeekStartISO) {
+            completedThisWeek++;
+          } else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+            completedLastWeek++;
+          }
+        }
+      });
+
       const averageCompletionTime = completedAssignments.length > 0
         ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
         : null;
@@ -205,6 +230,8 @@ router.get('/performance', authMiddleware, ownerOnly, async (req: AuthRequest, r
           onTimeRate,
           netTimeVarianceSeconds,
           overtimeTasksCount,
+          completedThisWeek,
+          completedLastWeek,
           taskTarget: targetMap.get(user.id) || null
         },
         salesStats: {

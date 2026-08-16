@@ -98,6 +98,8 @@ export interface DashboardStats {
   submitted: number;
   todo: number;
   overdue: number;
+  completedThisWeek?: number;
+  completedLastWeek?: number;
 }
 
 export interface AuthResponse {
@@ -439,6 +441,8 @@ export interface UserTaskPerformanceStats {
   onTimeRate: number | null;
   netTimeVarianceSeconds: number | null;
   overtimeTasksCount: number;
+  completedThisWeek?: number;
+  completedLastWeek?: number;
 }
 
 export interface UserSalesPerformanceStats {

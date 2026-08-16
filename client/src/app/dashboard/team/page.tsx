@@ -355,6 +355,8 @@ export default function TeamPage() {
                           <th className="py-3 px-4 text-start font-semibold">{t('team.name')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.totalTasks')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.completedTasks')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('dashboard.completedThisWeek')}</th>
+                          <th className="py-3 px-4 text-start font-semibold">{t('dashboard.completedLastWeek')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.incompleteTasks')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.targetColumn')}</th>
                           <th className="py-3 px-4 text-start font-semibold">{t('team.progressColumn')}</th>
@@ -407,6 +409,12 @@ export default function TeamPage() {
                               </td>
                               <td className="py-3 px-4 text-start text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
                                 {p.taskStats.completedTasks}
+                              </td>
+                              <td className="py-3 px-4 text-start text-teal-600 dark:text-teal-400 font-semibold tabular-nums">
+                                {p.taskStats.completedThisWeek ?? 0}
+                              </td>
+                              <td className="py-3 px-4 text-start text-muted-foreground font-semibold tabular-nums">
+                                {p.taskStats.completedLastWeek ?? 0}
                               </td>
                               <td className="py-3 px-4 text-start text-muted-foreground font-semibold tabular-nums">
                                 {p.taskStats.incompleteTasks}

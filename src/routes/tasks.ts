@@ -257,6 +257,17 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
     const today = new Date().toISOString().split('T')[0];
     const isAdmin = isTaskAdmin(req.user!.role);
 
+    // Week boundaries (Sunday to Saturday)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday
+    const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0, 0);
+    const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 7, 0, 0, 0, 0);
+    const lastWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 1, 23, 59, 59, 999);
+
+    const thisWeekStartISO = thisWeekStart.toISOString();
+    const lastWeekStartISO = lastWeekStart.toISOString();
+    const lastWeekEndISO = lastWeekEnd.toISOString();
+
     if (isAdmin) {
       // Admin: count unique active tasks
       const { data: tasks, error } = await supabaseAdmin
@@ -264,7 +275,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
         .select(`
           id,
           due_date,
-          task_assignees(status)
+          task_assignees(status, updated_at, assigned_at)
         `)
         .eq('is_archived', false);
 
@@ -276,6 +287,8 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
       let submitted = 0;
       let todo = 0;
       let overdue = 0;
+      let completedThisWeek = 0;
+      let completedLastWeek = 0;
 
       for (const t of (tasks || [])) {
         total++;
@@ -286,6 +299,20 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
         if (t.due_date && t.due_date < today && hasUncompleted) {
           overdue++;
         }
+
+        // Count weekly completed assignees
+        assignees.forEach((a: any) => {
+          if (a.status === 'completed') {
+            const compTime = a.updated_at || a.assigned_at;
+            if (compTime) {
+              if (compTime >= thisWeekStartISO) {
+                completedThisWeek++;
+              } else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+                completedLastWeek++;
+              }
+            }
+          }
+        });
 
         if (assignees.length === 0) {
           todo++;
@@ -307,12 +334,12 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
         }
       }
 
-      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
+      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue, completedThisWeek, completedLastWeek } });
     } else {
       // Member: only see stats for their own assignments
       const { data: assignments, error } = await supabaseAdmin
         .from('task_assignees')
-        .select('status, task:tasks(due_date, is_archived)')
+        .select('status, updated_at, assigned_at, task:tasks(due_date, is_archived)')
         .eq('user_id', req.user!.id);
 
       if (error) { res.status(500).json({ error: error.message }); return; }
@@ -329,7 +356,23 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
         return dueDate && dueDate < today && a.status !== 'completed';
       }).length;
 
-      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
+      let completedThisWeek = 0;
+      let completedLastWeek = 0;
+
+      items.forEach((a: any) => {
+        if (a.status === 'completed') {
+          const compTime = a.updated_at || a.assigned_at;
+          if (compTime) {
+            if (compTime >= thisWeekStartISO) {
+              completedThisWeek++;
+            } else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+              completedLastWeek++;
+            }
+          }
+        }
+      });
+
+      res.json({ stats: { total, completed, inProgress, submitted, todo, overdue, completedThisWeek, completedLastWeek } });
     }
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch stats' });

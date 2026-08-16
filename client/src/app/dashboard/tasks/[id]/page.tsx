@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock, ChevronDown, MoreVertical, Download, ExternalLink, Plus, X } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Loader2, Send, CheckCircle2, RotateCcw, Clock, ChevronDown, MoreVertical, Download, ExternalLink, Plus, X, Copy, Check } from 'lucide-react';
 
 function formatDate(dateStr?: string, t?: any, locale?: string): string {
   if (!dateStr) return t ? t('taskDetail.noDueDate') : 'No due date';
@@ -88,6 +88,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [copiedDescription, setCopiedDescription] = useState(false);
+
+  const handleCopyDescription = () => {
+    if (!task?.description) return;
+    navigator.clipboard.writeText(task.description);
+    setCopiedDescription(true);
+    setTimeout(() => setCopiedDescription(false), 2000);
+  };
 
   // Member submission state (dynamic list of link inputs)
   const [submissionLinkInputs, setSubmissionLinkInputs] = useState<string[]>(['']);
@@ -451,7 +459,30 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
               {/* Description */}
               <div className="flex flex-col gap-2">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t('taskDetail.description') || 'Description'}</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t('taskDetail.description') || 'Description'}</h3>
+                  {task.description && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyDescription}
+                      className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-border/80 text-muted-foreground hover:text-foreground transition-all shadow-2xs"
+                      title={t('taskDetail.copyDescription') || 'Copy Description'}
+                    >
+                      {copiedDescription ? (
+                        <>
+                          <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">{t('taskDetail.copied') || 'Copied!'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5" />
+                          <span>{t('taskDetail.copyDescription') || 'Copy Description'}</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
                 {task.description ? (
                   <p className="text-foreground leading-relaxed text-sm whitespace-pre-wrap">{task.description}</p>
                 ) : (

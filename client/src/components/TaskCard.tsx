@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { MoreVertical, Pencil, Trash2, Loader2, Save, X, ArrowRight, MessageSquare, Paperclip } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, Loader2, Save, X, ArrowRight, MessageSquare, Paperclip, Copy, Check } from 'lucide-react';
 
 interface TaskCardProps {
   task: Task;
@@ -111,6 +111,16 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
   const [loadingLists, setLoadingLists] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const [copiedDescription, setCopiedDescription] = useState(false);
+
+  const handleCopyDescription = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!task.description) return;
+    navigator.clipboard.writeText(task.description);
+    setCopiedDescription(true);
+    setTimeout(() => setCopiedDescription(false), 2000);
+  };
 
   const [form, setForm] = useState({
     title: task.title,
@@ -355,9 +365,23 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
               {task.title}
             </h3>
             {task.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mt-1.5 break-words">
-                {task.description}
-              </p>
+              <div className="group/desc relative mt-1.5">
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed break-words pr-6 rtl:pl-6 rtl:pr-0">
+                  {task.description}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCopyDescription}
+                  className="absolute top-0 right-0 rtl:left-0 rtl:right-auto p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-all"
+                  title={t('taskDetail.copyDescription') || 'Copy Description'}
+                >
+                  {copiedDescription ? (
+                    <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                </button>
+              </div>
             )}
           </div>
 

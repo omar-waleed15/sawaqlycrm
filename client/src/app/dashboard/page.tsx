@@ -428,9 +428,24 @@ export default function DashboardPage() {
                   {/* Time Intelligence & Performance Row */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      {locale === 'ar' ? 'أدائي في كفاءة الوقت' : 'My Time Efficiency Performance'}
+                      {locale === 'ar' ? 'أدائي في كفاءة الوقت والإنجاز' : 'My Performance & Velocity'}
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Weekly Completed Tasks */}
+                      <Card className="hover:shadow-md transition-shadow border-teal-200/80 bg-teal-50/30 dark:bg-teal-950/10">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <span className="text-sm font-medium text-muted-foreground">{t('dashboard.weeklyCompletedTasks')}</span>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-extrabold text-teal-700 dark:text-teal-300">
+                            {stats?.completedThisWeek ?? 0}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1 uppercase tracking-wider font-semibold">
+                            {t('dashboard.completedLastWeek')}: <span className="font-extrabold text-foreground">{stats?.completedLastWeek ?? 0}</span>
+                          </p>
+                        </CardContent>
+                      </Card>
+
                       {/* On-Time Completion Rate */}
                       <Card className="hover:shadow-md transition-shadow border-indigo-200/80 bg-indigo-50/30 dark:bg-indigo-950/10">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
