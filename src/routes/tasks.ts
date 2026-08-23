@@ -295,7 +295,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
         const assignees = t.task_assignees || [];
         
         // Check if overdue
-        const hasUncompleted = assignees.length === 0 || assignees.some((a: any) => a.status !== 'completed');
+        const hasUncompleted = assignees.length === 0 || assignees.some((a: any) => a.status !== 'completed' && a.status !== 'submitted');
         if (t.due_date && t.due_date < today && hasUncompleted) {
           overdue++;
         }
@@ -353,7 +353,7 @@ router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response): Pr
       const todo = items.filter((a: any) => a.status === 'todo').length;
       const overdue = items.filter((a: any) => {
         const dueDate = a.task?.due_date;
-        return dueDate && dueDate < today && a.status !== 'completed';
+        return dueDate && dueDate < today && a.status !== 'completed' && a.status !== 'submitted';
       }).length;
 
       let completedThisWeek = 0;

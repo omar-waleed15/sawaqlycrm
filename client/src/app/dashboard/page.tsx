@@ -120,7 +120,7 @@ export default function DashboardPage() {
   const todayStr = getCairoTodayString();
   const myOverdueCount = myTasks.filter(task => {
     const myAssignee = task.task_assignees?.find(a => a.user_id === user?.id);
-    return task.due_date && task.due_date < todayStr && myAssignee?.status !== 'completed';
+    return task.due_date && task.due_date < todayStr && myAssignee?.status !== 'completed' && myAssignee?.status !== 'submitted';
   }).length;
 
   // Time performance statistics for all employees
