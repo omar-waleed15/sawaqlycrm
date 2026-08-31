@@ -164,7 +164,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   const isCreator = task?.creator_id === user?.id;
   const hasInternAssignee = task?.task_assignees?.some(a => a.user?.role === 'content_creator_intern');
-  const canAdminister = (isOwner || isCreator || (user?.role === 'content_creator' && hasInternAssignee)) && !myAssignment;
+  const canAdminister = isOwner || ((isCreator || (user?.role === 'content_creator' && hasInternAssignee)) && !myAssignment);
 
   const loadTask = async () => {
     try {
@@ -912,7 +912,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <CardContent className="p-5 flex flex-col gap-4 text-start">
                 <div className="flex flex-col gap-4 divide-y divide-border/60">
                   {assignees.map((a, index) => {
-                    const hasSubmitted = a.submission_link || a.completion_note;
+                    const hasSubmitted = a.submission_link || a.completion_note || a.submitted_at || a.status === 'submitted' || a.status === 'completed';
                     const isSubmitting = submittingReview[a.user_id];
                     const isWritingFeedback = activeRevisionUserId === a.user_id;
                     const isApproving = activeApprovalUserId === a.user_id;
@@ -963,14 +963,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                           </div>
                           <div className="flex items-center gap-2 shrink-0 flex-wrap">
                             <StatusBadge status={a.status} />
-                            {a.status === 'submitted' && (
+                            {(a.status === 'submitted' || a.status === 'completed') && a.submitted_at && (
                               isAssigneeSubmittedLate(task.due_date, a.submitted_at) ? (
                                 <span className="text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
                                   ⚠️ {locale === 'ar' ? 'تُسلّم بعد الموعد' : 'Submitted Late'}
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                                  ✨ {locale === 'ar' ? 'في انتظار المراجعة (في الموعد)' : 'Submitted On Time (Pending Review)'}
+                                  ✨ {a.status === 'submitted' ? (locale === 'ar' ? 'في انتظار المراجعة (في الموعد)' : 'Submitted On Time (Pending Review)') : (locale === 'ar' ? 'تم التسليم في الموعد' : 'Submitted On Time')}
                                 </span>
                               )
                             )}
@@ -980,6 +980,14 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                         {/* Submission details */}
                         {hasSubmitted ? (
                           <div className="bg-muted/40 border border-border/40 rounded-lg p-3.5 flex flex-col gap-2.5 ml-10 rtl:ml-0 rtl:mr-10">
+                            {a.submitted_at && (
+                              <div className="flex items-center justify-between gap-2 text-xs pb-2 border-b border-border/40 flex-wrap">
+                                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                  <span className="text-muted-foreground font-bold">📅 {t('taskDetail.submittedAt') || 'Submitted at:'}</span>
+                                  <span className="font-semibold text-primary">{formatServerTimestamp(a.submitted_at, locale)}</span>
+                                </div>
+                              </div>
+                            )}
                             {parseSubmissionLinks(a.submission_link).length > 0 && (
                               <div className="flex flex-col gap-1 text-xs">
                                 <span className="text-muted-foreground font-bold">{t('taskDetail.submissionLinkLabel') || 'Submission Links:'}</span>

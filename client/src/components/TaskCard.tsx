@@ -413,15 +413,25 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
 
                 {/* Submission progress for admin / content creator */}
                 {canSeeSubmissionProgress && submittedCount > 0 && (
-                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
-                    📤 {t('tasks.submissionsPending', { count: submittedCount })}
+                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start flex items-center justify-between gap-1 flex-wrap">
+                    <span>📤 {t('tasks.submissionsPending', { count: submittedCount })}</span>
+                    {assignees.find(a => a.submitted_at)?.submitted_at && (
+                      <span className="text-[10px] opacity-85 font-normal">
+                        {formatServerTimestamp(assignees.find(a => a.submitted_at)!.submitted_at, locale)}
+                      </span>
+                    )}
                   </div>
                 )}
 
                 {/* Submission banner for assigned worker / intern */}
                 {!canSeeSubmissionProgress && isMySubmitted && (
-                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start">
-                    📤 {locale === 'ar' ? 'تم التسليم (بانتظار المراجعة)' : 'Submitted (Pending Review)'}
+                  <div className="bg-violet-50 dark:bg-violet-950/20 border-s-2 border-violet-400 rounded px-2.5 py-1 text-[11px] text-violet-800 dark:text-violet-300 font-semibold text-start flex items-center justify-between gap-1 flex-wrap">
+                    <span>📤 {locale === 'ar' ? 'تم التسليم (بانتظار المراجعة)' : 'Submitted (Pending Review)'}</span>
+                    {myAssignment?.submitted_at && (
+                      <span className="text-[10px] opacity-85 font-normal">
+                        {formatServerTimestamp(myAssignment.submitted_at, locale)}
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -464,7 +474,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
             {/* Line separator */}
             <div className="h-px bg-border my-1" />
 
-            {/* Row 1: Dates (Created at & Due date) */}
+            {/* Row 1: Dates (Created at, Due date & Submission date) */}
             <div className="flex items-center text-[10px] text-muted-foreground select-none gap-2 flex-wrap text-start px-0.5">
               <span className="inline-flex items-center gap-1 shrink-0 font-medium">
                 <span>📅</span>
@@ -481,6 +491,20 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                   </span>
                 </>
               )}
+              {(() => {
+                const subDate = myAssignment?.submitted_at || assignees.find(a => a.submitted_at)?.submitted_at;
+                if (!subDate) return null;
+                return (
+                  <>
+                    <span className="text-muted-foreground/30">|</span>
+                    <span className="inline-flex items-center gap-1 shrink-0 font-medium">
+                      <span>📤</span>
+                      <span className="text-muted-foreground/80">{t('taskDetail.submittedAt') || 'Submitted'}:</span>
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatServerTimestamp(subDate, locale)}</span>
+                    </span>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Row 2: Creator, Assignees, Metrics & Open Button */}

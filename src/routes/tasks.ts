@@ -37,9 +37,10 @@ function isTaskAdmin(role: string): boolean {
 
 // Helper: check if user is allowed to administer/review a specific task
 async function canAdministerTask(userId: string, role: string, taskId: string): Promise<boolean> {
-  const isAdminRole = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
+  const isAdminRole = isTaskAdmin(role);
+  if (isAdminRole) return true;
 
-  // An admin/TL/moderator/creator cannot administer or approve a task if they are assigned to it as a worker
+  // Non-admins (e.g. content_creator): cannot administer/approve if assigned as a worker
   const { data: assignment } = await supabaseAdmin
     .from('task_assignees')
     .select('id')
@@ -50,8 +51,6 @@ async function canAdministerTask(userId: string, role: string, taskId: string): 
   if (assignment) {
     return false; // Assigned worker cannot administer/approve their own task
   }
-
-  if (isAdminRole) return true;
 
   // Task creator or Content Creator managing intern task can administer/review
   const { data: task } = await supabaseAdmin
@@ -993,6 +992,14 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
         .eq('id', id);
     }
 
+    // Check if assignee exists & stop timer if active
+    const { data: assignment } = await supabaseAdmin
+      .from('task_assignees')
+      .select('*')
+      .eq('task_id', id)
+      .eq('user_id', userId)
+      .single();
+
     const updates: Record<string, unknown> = {};
     if (status !== undefined) {
       updates.status = status;
@@ -1000,6 +1007,8 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
         updates.submitted_at = new Date().toISOString();
       } else if (status === 'revision') {
         updates.submitted_at = null;
+      } else if (status === 'completed' && assignment && !assignment.submitted_at) {
+        updates.submitted_at = new Date().toISOString();
       }
     }
     if (feedback !== undefined) updates.feedback = feedback;
@@ -1011,14 +1020,6 @@ router.put('/:id/assignees/:userId', authMiddleware, async (req: AuthRequest, re
       updates.rating = rating;
     }
     updates.updated_at = new Date().toISOString();
-
-    // Check if assignee has a running timer, stop it if we are updating their record/status
-    const { data: assignment } = await supabaseAdmin
-      .from('task_assignees')
-      .select('*')
-      .eq('task_id', id)
-      .eq('user_id', userId)
-      .single();
 
     if (assignment && assignment.timer_started_at) {
       const startTime = new Date(assignment.timer_started_at).getTime();

@@ -140,8 +140,15 @@ export default function TasksPage() {
     t.creator?.role === 'content_creator_intern' ||
     (t.creator_id === user?.id && (user?.role === 'content_creator' || user?.role === 'content_creator_intern'));
 
+  const hasRegularAssignees = (t: Task) =>
+    (t.task_assignees || []).some(a => a.user?.role && a.user.role !== 'content_creator_intern') ||
+    (t.creator?.role && t.creator.role !== 'content_creator' && t.creator.role !== 'content_creator_intern') ||
+    (!t.task_assignees || t.task_assignees.length === 0);
+
+  const isPureInternTask = (t: Task) => isInternTask(t) && !hasRegularAssignees(t);
+
   const displayedTasks = activeTab === 'active'
-    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && (!isInternTask(t) || Boolean(teamMemberFilter))), user?.id)
+    ? sortActiveTasks(tasks.filter(t => t.status !== 'completed' && t.status !== 'submitted' && (!isPureInternTask(t) || Boolean(teamMemberFilter))), user?.id)
     : activeTab === 'pending_review'
       ? sortActiveTasks(tasks.filter(t => t.status === 'submitted' && (isInternUser ? isInternTask(t) : true)), user?.id)
       : activeTab === 'completed'

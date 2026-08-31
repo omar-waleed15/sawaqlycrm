@@ -884,6 +884,7 @@ export const ar: Record<string, string> = {
   'taskDetail.finalThoughtsColon': 'الأفكار النهائية:',
   'taskDetail.submissionsProgress': 'التسليمات والتقدم',
   'taskDetail.submissionLinkLabel': 'رابط التسليم:',
+  'taskDetail.submittedAt': 'تاريخ التسليم:',
   'taskDetail.notesThoughts': 'ملاحظات/أفكار:',
   'taskDetail.approvalFeedback': 'ملاحظات الموافقة:',
   'taskDetail.revisionFeedbackLabel': 'ملاحظات المراجعة:',

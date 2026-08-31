@@ -884,6 +884,7 @@ export const en: Record<string, string> = {
   'taskDetail.finalThoughtsColon': 'Final Thoughts:',
   'taskDetail.submissionsProgress': 'Submissions & Progress',
   'taskDetail.submissionLinkLabel': 'Submission Link:',
+  'taskDetail.submittedAt': 'Submitted at:',
   'taskDetail.notesThoughts': 'Notes/Thoughts:',
   'taskDetail.approvalFeedback': 'Approval Feedback:',
   'taskDetail.revisionFeedbackLabel': 'Revision Feedback:',
