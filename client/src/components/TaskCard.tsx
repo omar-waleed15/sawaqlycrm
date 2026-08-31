@@ -205,6 +205,18 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
     router.push(`/dashboard/tasks/${task.id}`);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push(`/dashboard/tasks/${task.id}`);
+  };
+
+  const handleAuxClick = (e: React.MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      window.open(`/dashboard/tasks/${task.id}`, '_blank');
+    }
+  };
+
   const handleToggleArchive = async () => {
     const archiveState = !task.is_archived;
     const confirmMsg = archiveState ? t('taskDetail.archiveConfirm') : t('taskDetail.unarchiveConfirm');
@@ -285,6 +297,8 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
       <Card
         className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 slide-up h-full flex flex-col"
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        onAuxClick={handleAuxClick}
       >
         <CardContent className="p-4 flex flex-col gap-3 flex-1">
           {/* Header: Type, Priority & Actions */}
@@ -324,13 +338,14 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                       size="icon"
                       className="size-7 p-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted rounded-full shrink-0 -mt-1"
                       onClick={(e) => e.stopPropagation()}
+                      onContextMenu={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="size-4" />
                       <span className="sr-only">Actions</span>
                     </Button>
                   }
                 />
-                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsEditDialogOpen(true); }}>
                     <Pencil className="size-3.5 mr-2" />
                     {t('common.edit')}
@@ -372,6 +387,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
                 <button
                   type="button"
                   onClick={handleCopyDescription}
+                  onContextMenu={(e) => e.stopPropagation()}
                   className="absolute top-0 right-0 rtl:left-0 rtl:right-auto p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-all"
                   title={t('taskDetail.copyDescription') || 'Copy Description'}
                 >

@@ -257,6 +257,16 @@ export default function ClientCard({
                   <div
                     key={tData.id}
                     onClick={() => router.push(`/dashboard/tasks/${tData.id}`)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      router.push(`/dashboard/tasks/${tData.id}`);
+                    }}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        window.open(`/dashboard/tasks/${tData.id}`, '_blank');
+                      }
+                    }}
                     className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-background hover:bg-muted/30 transition cursor-pointer text-xs animate-in fade-in"
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
