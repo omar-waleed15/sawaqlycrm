@@ -47,7 +47,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard',          labelKey: 'nav.dashboard',     icon: LayoutDashboard, allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
-  { href: '/dashboard/tasks',    labelKey: 'nav.allTasks',      icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
+  { href: '/dashboard/tasks',    labelKey: 'nav.allTasks',      icon: CheckSquare,     allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/content',  labelKey: 'nav.content',       icon: Film,            allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/reminders', labelKey: 'nav.reminders',     icon: StickyNote,      allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/chat',     labelKey: 'nav.globalChat',    icon: MessageSquare,   allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
