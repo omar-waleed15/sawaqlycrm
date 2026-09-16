@@ -25,6 +25,7 @@ import campaignsRoutes from './routes/campaigns';
 import rolesRoutes from './routes/roles';
 import clientOnboardingRoutes from './routes/client_onboarding';
 import socialIntegrationRoutes from './routes/social_integration';
+import reportsRoutes from './routes/reports';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ app.use('/api/campaigns', campaignsRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/client-onboarding', clientOnboardingRoutes);
 app.use('/api/social', socialIntegrationRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

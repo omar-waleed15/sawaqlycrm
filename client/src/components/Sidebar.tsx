@@ -36,6 +36,8 @@ import {
   Megaphone,
   Shield,
   Wallet,
+  UserCircle,
+  FileBarChart,
 } from 'lucide-react';
 
 interface NavItem {
@@ -57,12 +59,14 @@ const navItems: NavItem[] = [
   { href: '/dashboard/my-salary', labelKey: 'nav.mySalary',     icon: Wallet,          allowedRoles: ['team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/clients',  labelKey: 'nav.clients',       icon: Users,           allowedRoles: ['owner', 'team_leader'] },
   { href: '/dashboard/closed-clients', labelKey: 'nav.closedClients', icon: Archive, allowedRoles: ['owner', 'team_leader', 'account_manager', 'moderation', 'content_creator'] },
+  { href: '/dashboard/reports',  labelKey: 'nav.reportsHub',    icon: FileBarChart,    allowedRoles: ['owner', 'team_leader', 'account_manager'] },
   { href: '/dashboard/ideas',    labelKey: 'nav.contentIdeas',  icon: Lightbulb,       allowedRoles: ['owner', 'team_leader', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/calendar', labelKey: 'nav.calendar',      icon: Calendar,        allowedRoles: ['owner', 'team_leader', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/sales-calendar', labelKey: 'nav.salesCalendar', icon: CalendarDays, allowedRoles: ['sales'] },
   { href: '/dashboard/campaigns', labelKey: 'nav.campaigns',   icon: Megaphone,       allowedRoles: ['owner'] },
   { href: '/dashboard/notes',    labelKey: 'nav.notes',         icon: FileText,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/roles',   labelKey: 'nav.roles',         icon: Shield,          allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
+  { href: '/dashboard/profile',  labelKey: 'nav.myProfile',     icon: UserCircle,      allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
   { href: '/dashboard/settings', labelKey: 'nav.settings',      icon: Settings,        allowedRoles: ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'] },
 ];
 
@@ -347,19 +351,26 @@ export default function Sidebar({ isOpen, onClose, onUnreadChange }: { isOpen?: 
       {/* Footer */}
       <div className="px-3 py-4">
         <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-          <Avatar className="size-8 shrink-0 overflow-hidden">
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt={user.name} className="size-full object-cover animate-fade-in" />
-            ) : (
-              <AvatarFallback className="bg-[#1D61E7] text-white text-[11px] font-bold">
-                {user?.name ? getInitials(user.name) : '?'}
-              </AvatarFallback>
-            )}
-          </Avatar>
-          <div className="flex-1 overflow-hidden">
-            <div className="text-xs font-semibold text-[#0F172A] dark:text-slate-100 truncate">{user?.name || 'User'}</div>
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 capitalize font-mono leading-none">{user?.role ? t(`role.${user.role}`) : t('role.member')}</div>
-          </div>
+          <Link
+            href="/dashboard/profile"
+            onClick={() => { if (onClose) onClose(); }}
+            className="flex items-center gap-2.5 flex-1 overflow-hidden group text-start"
+            title={t('nav.myProfile')}
+          >
+            <Avatar className="size-8 shrink-0 overflow-hidden ring-1 ring-border group-hover:ring-primary transition-all">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="size-full object-cover animate-fade-in" />
+              ) : (
+                <AvatarFallback className="bg-[#1D61E7] text-white text-[11px] font-bold">
+                  {user?.name ? getInitials(user.name) : '?'}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <div className="flex-1 overflow-hidden">
+              <div className="text-xs font-semibold text-[#0F172A] dark:text-slate-100 truncate group-hover:text-primary transition-colors">{user?.name || 'User'}</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 capitalize font-mono leading-none">{user?.role ? t(`role.${user.role}`) : t('role.member')}</div>
+            </div>
+          </Link>
           <Button
             variant="ghost"
             size="icon"

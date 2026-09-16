@@ -20,7 +20,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
   try {
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, name, email, role, avatar_url, phone, created_at')
+      .select('id, name, email, role, avatar_url, phone, emergency_contact_name, emergency_contact_phone, national_id, address, bio, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -260,7 +260,7 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response): 
     return;
   }
   
-  const { name, avatar_url, phone, email, password, currentPassword } = req.body;
+  const { name, avatar_url, phone, email, password, currentPassword, emergency_contact_name, emergency_contact_phone, national_id, address, bio } = req.body;
   
   try {
     // Fetch current user from Supabase Auth Admin
@@ -315,6 +315,11 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res: Response): 
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;
     if (phone !== undefined) updates.phone = phone || null;
     if (email && email.trim() !== '') updates.email = email.trim();
+    if (emergency_contact_name !== undefined) updates.emergency_contact_name = emergency_contact_name || null;
+    if (emergency_contact_phone !== undefined) updates.emergency_contact_phone = emergency_contact_phone || null;
+    if (national_id !== undefined) updates.national_id = national_id || null;
+    if (address !== undefined) updates.address = address || null;
+    if (bio !== undefined) updates.bio = bio || null;
 
     if (Object.keys(updates).length > 0) {
       const { data, error } = await supabaseAdmin
@@ -456,7 +461,7 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
 // PUT /api/users/:id — Update user (owner only)
 router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { name, role, email, password, phone } = req.body;
+  const { name, role, email, password, phone, emergency_contact_name, emergency_contact_phone, national_id, address, bio } = req.body;
 
   try {
     // 1. Update Supabase Auth if email or password is provided
@@ -487,6 +492,11 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
     if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern'].includes(role)) updates.role = role;
     if (email) updates.email = email;
     if (phone !== undefined) updates.phone = phone || null;
+    if (emergency_contact_name !== undefined) updates.emergency_contact_name = emergency_contact_name || null;
+    if (emergency_contact_phone !== undefined) updates.emergency_contact_phone = emergency_contact_phone || null;
+    if (national_id !== undefined) updates.national_id = national_id || null;
+    if (address !== undefined) updates.address = address || null;
+    if (bio !== undefined) updates.bio = bio || null;
 
     if (Object.keys(updates).length > 0) {
       const { data, error } = await supabaseAdmin
@@ -519,6 +529,34 @@ router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Resp
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to update user' });
+  }
+});
+
+// GET /api/users/:id — Get a team member's full profile
+router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  const isManager = req.user?.role === 'owner' || req.user?.role === 'team_leader';
+
+  if (!isManager && id !== req.user?.id) {
+    res.status(403).json({ error: 'Access denied.' });
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    res.json({ user: data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch user' });
   }
 });
 

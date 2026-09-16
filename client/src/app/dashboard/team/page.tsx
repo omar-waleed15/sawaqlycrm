@@ -835,9 +835,9 @@ export default function TeamPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => router.push(`/dashboard/team/${member.id}`)}
-                        className="h-8 text-xs gap-1"
+                        className="h-8 text-xs gap-1 font-semibold"
                       >
-                        <ExternalLink className="size-3" /> {t('team.tasks')}
+                        <ExternalLink className="size-3" /> {t('profile.viewFullProfile')}
                       </Button>
                     )}
                     {user?.role === 'owner' && (

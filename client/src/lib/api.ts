@@ -221,12 +221,13 @@ export const authApi = {
 // Users
 export const usersApi = {
   list: () => request<{ users: import('@/types').User[] }>('/users'),
+  get: (id: string) => request<{ user: import('@/types').User }>(`/users/${id}`),
   create: (data: { name: string; email: string; password: string; role: string; phone?: string | null }) =>
     request<{ user: import('@/types').User }>('/users', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ name: string; role: string; email?: string; password?: string; phone?: string | null }>) =>
+  update: (id: string, data: Partial<import('@/types').User & { password?: string }>) =>
     request<{ user: import('@/types').User }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => request(`/users/${id}`, { method: 'DELETE' }),
-  updateProfile: (data: Partial<{ name: string; avatar_url: string | null; phone: string | null; email: string; password: string; currentPassword: string }>) =>
+  updateProfile: (data: Partial<import('@/types').User & { password?: string; currentPassword?: string }>) =>
     request<{ user: import('@/types').User }>('/users/profile', { method: 'PUT', body: JSON.stringify(data) }),
   uploadAvatar: (file: File) => {
     const formData = new FormData();
@@ -707,6 +708,46 @@ export const socialApi = {
       method: 'PUT',
       body: JSON.stringify({ instagram_session_id }),
     }),
+};
+
+export const reportsApi = {
+  getDailyLogs: (date?: string, clientId?: string) => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (clientId) params.append('clientId', clientId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return request<{ date: string; clients: any[]; totalLogs: number }>(`/reports/daily${qs}`);
+  },
+  addDailyLog: (data: { client_id: string; content: string; category?: string; log_date?: string }) =>
+    request<{ log: import('@/types').ClientDailyLog }>('/reports/daily', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateDailyLog: (id: string, data: { content?: string; category?: string }) =>
+    request<{ log: import('@/types').ClientDailyLog }>(`/reports/daily/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteDailyLog: (id: string) =>
+    request<{ success: boolean }>(`/reports/daily/${id}`, {
+      method: 'DELETE',
+    }),
+  getMonthlyReports: (month?: string) => {
+    const qs = month ? `?month=${month}` : '';
+    return request<{ month: string; clients: any[] }>(`/reports/monthly${qs}`);
+  },
+  saveMonthlyReport: (formData: FormData) =>
+    uploadFile('/reports/monthly', formData) as Promise<{ report: import('@/types').ClientReport }>,
+  deleteMonthlyReport: (id: string) =>
+    request<{ success: boolean }>(`/reports/monthly/${id}`, {
+      method: 'DELETE',
+    }),
+  uploadImage: (file: File, folder: string = 'general') => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', folder);
+    return uploadFile('/reports/upload', fd) as Promise<{ url: string }>;
+  },
 };
 
 

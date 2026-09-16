@@ -5,8 +5,13 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  avatar_url?: string;
-  phone?: string;
+  avatar_url?: string | null;
+  phone?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  national_id?: string | null;
+  address?: string | null;
+  bio?: string | null;
   created_at?: string;
 }
 
@@ -114,6 +119,7 @@ export interface Client {
   company?: string;
   email?: string;
   phone?: string;
+  logo_url?: string | null;
   status: 'active' | 'inactive';
   pipeline_stage: 'new_lead' | 'contacted' | 'no_answer' | 'meeting_scheduled' | 'meeting_done' | 'won' | 'lost';
   sales_rep_id?: string;
@@ -501,6 +507,19 @@ export interface ClientIdea {
   updated_at: string;
 }
 
+export interface ClientDailyLog {
+  id: string;
+  client_id: string;
+  client?: { id: string; name: string; company?: string; };
+  author_id: string;
+  author?: { id: string; name: string; avatar_url?: string | null; role: UserRole; };
+  log_date: string;
+  content: string;
+  category?: 'general' | 'call' | 'publishing' | 'ads' | 'issue';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClientReport {
   id: string;
   client_id: string;
@@ -512,7 +531,14 @@ export interface ClientReport {
   num_reels: number;
   num_stories: number;
   num_photos: number;
-  notes?: string;
+  meta_insights_image_url?: string | null;
+  ads_screenshot_url?: string | null;
+  ad_spend?: number;
+  roas?: number;
+  notes?: string | null;
+  created_by?: string;
+  creator?: { id: string; name: string; avatar_url?: string | null; role: UserRole };
+  auto_counts?: { num_posts: number; num_reels: number; num_stories: number; num_photos: number };
   created_at: string;
   updated_at: string;
 }

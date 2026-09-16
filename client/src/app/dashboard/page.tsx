@@ -200,8 +200,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Renewal Alert Ribbon removed */}
-
       {/* SKELETON LOADERS */}
       {((showFinanceAndClients && (loading || analyticsLoading)) || (!showFinanceAndClients && loading)) ? (
         <div className="space-y-6">

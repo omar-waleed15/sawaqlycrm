@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/lib/i18n';
-import { tasksApi, usersApi } from '@/lib/api';
-import { Task, TaskAssignee, TaskStatus, User } from '@/types';
+import { tasksApi, usersApi, clientsApi } from '@/lib/api';
+import { Task, TaskAssignee, TaskStatus, User, Client } from '@/types';
 import TaskCard from '@/components/TaskCard';
 import SalesDashboard from '@/components/SalesDashboard';
+import ProfileOverviewTab from '@/components/profile/ProfileOverviewTab';
+import ProfileFinancialsTab from '@/components/profile/ProfileFinancialsTab';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +30,9 @@ import {
   LayoutGrid,
   List,
   ArrowUpDown,
+  UserCircle,
+  Wallet,
+  CheckSquare,
 } from 'lucide-react';
 
 import { isDateOverdue } from '@/lib/dateUtils';
@@ -112,7 +117,9 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
 
   const [member, setMember] = useState<User | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeMainTab, setActiveMainTab] = useState<'overview' | 'financials' | 'tasks'>('overview');
   const [activeStatus, setActiveStatus] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,23 +169,39 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
   };
 
   useEffect(() => {
-    if (user && user.role !== 'owner' && user.role !== 'team_leader') {
+    if (user && user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'account_manager') {
       router.replace('/dashboard');
       return;
     }
     const load = async () => {
       try {
-        const [usersData, tasksData] = await Promise.all([
+        const [usersData, tasksData, clientsData, memberData] = await Promise.all([
           usersApi.list(),
           tasksApi.list({ assignee_id: memberId }),
+          clientsApi.list().catch(() => ({ clients: [] })),
+          usersApi.get(memberId).catch(() => ({ user: null })),
         ]);
-        const found = usersData.users.find(u => u.id === memberId);
+        const found = memberData?.user || usersData.users.find(u => u.id === memberId);
         if (!found || found.role === 'client') {
           router.replace('/dashboard/team');
           return;
         }
         setMember(found);
-        setTasks(tasksData.tasks);
+
+        const memberTasks = tasksData.tasks || [];
+        const allClients = clientsData.clients || [];
+
+        // Filter strictly to clients the member is genuinely assigned to (sales rep or assigned tasks)
+        const assignedClients = allClients.filter(c => {
+          if (c.sales_rep_id === memberId) return true;
+          return memberTasks.some(t => {
+            const isAssignee = t.task_assignees?.some(a => a.user_id === memberId);
+            return isAssignee && (t.client_id === c.id || t.client?.id === c.id);
+          });
+        });
+
+        setTasks(memberTasks);
+        setClients(assignedClients);
       } catch {
         router.replace('/dashboard/team');
       } finally {
@@ -194,7 +217,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
     }
   }, [targetMonth, memberId, member]);
 
-  if (!user || (user.role !== 'owner' && user.role !== 'team_leader')) return null;
+  if (!user || (user.role !== 'owner' && user.role !== 'team_leader' && user.role !== 'account_manager')) return null;
 
   const targetVal = targetTasks === '' ? 0 : Number(targetTasks);
   const achievementRate = targetVal > 0 ? Math.round((completedTasks / targetVal) * 100) : 0;
@@ -295,24 +318,85 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
         </div>
       </div>
 
-      {/* Sales Dashboard for Admin viewing representative stats & finance */}
-      {member.role === 'sales' && (
-        <div className="mb-8 space-y-4">
-          <div className="border-t border-dashed pt-6 mt-6" />
-          <h2 className="text-base font-bold text-foreground tracking-tight">{t('memberDetail.repIntelligence')}</h2>
-          <SalesDashboard salesRepId={memberId} />
-        </div>
+      {/* Tabs Navigation */}
+      <div className="flex border-b border-border mb-6 gap-2 sm:gap-6 overflow-x-auto pb-1 scrollbar-none">
+        <button
+          onClick={() => setActiveMainTab('overview')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
+            activeMainTab === 'overview'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <UserCircle className="size-4" />
+          {t('profile.overviewTab')}
+        </button>
+
+
+        <button
+          onClick={() => setActiveMainTab('financials')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
+            activeMainTab === 'financials'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Wallet className="size-4" />
+          {t('profile.financialsTab')}
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('tasks')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 shrink-0 ${
+            activeMainTab === 'tasks'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <CheckSquare className="size-4" />
+          {t('profile.tasksTab')} ({tasks.length})
+        </button>
+      </div>
+
+      {activeMainTab === 'overview' && (
+        <ProfileOverviewTab
+          member={member}
+          onMemberUpdated={setMember}
+          canEdit={user.role === 'owner'}
+          tasks={tasks}
+          clients={clients}
+        />
       )}
 
-      {/* Task Target Setup Card for non-sales employee */}
-      {member.role !== 'sales' && (
-        <Card className="mb-6 border-border/80 shadow-sm overflow-hidden">
-          <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
-            <div>
-              <h3 className="text-sm font-bold tracking-tight">{t('taskTarget.title')}</h3>
-              <p className="text-[11px] text-muted-foreground">{t('taskTarget.subtitle')}</p>
+
+      {activeMainTab === 'financials' && (
+        <ProfileFinancialsTab
+          member={member}
+          currentUser={user}
+          canManage={user.role === 'owner' || user.role === 'team_leader' || user.role === 'account_manager'}
+        />
+      )}
+
+      {activeMainTab === 'tasks' && (
+        <>
+          {/* Sales Dashboard for Admin viewing representative stats & finance */}
+          {member.role === 'sales' && (
+            <div className="mb-8 space-y-4">
+              <div className="border-t border-dashed pt-6 mt-6" />
+              <h2 className="text-base font-bold text-foreground tracking-tight">{t('memberDetail.repIntelligence')}</h2>
+              <SalesDashboard salesRepId={memberId} />
             </div>
-          </CardHeader>
+          )}
+
+          {/* Task Target Setup Card for non-sales employee */}
+          {member.role !== 'sales' && (
+            <Card className="mb-6 border-border/80 shadow-sm overflow-hidden">
+              <CardHeader className="pb-3 pt-4 px-4 sm:px-6">
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">{t('taskTarget.title')}</h3>
+                  <p className="text-[11px] text-muted-foreground">{t('taskTarget.subtitle')}</p>
+                </div>
+              </CardHeader>
           <CardContent className="pt-0 pb-5 px-4 sm:px-6">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-4 max-w-4xl">
               <div className="flex-1 w-full space-y-1.5">
@@ -611,6 +695,8 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

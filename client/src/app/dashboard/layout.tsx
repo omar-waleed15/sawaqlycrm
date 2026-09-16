@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import Sidebar from '@/components/Sidebar';
 import { Menu, LogOut } from 'lucide-react';
@@ -58,18 +59,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="text-sm font-bold text-foreground tracking-tight">{t('common.appName')}</span>
         </div>
         <div className="flex items-center gap-2">
-          {user?.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt={user.name}
-              className="size-8 rounded-full object-cover shrink-0 border border-border"
-              title={`${user.name} (${user.role})`}
-            />
-          ) : (
-            <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0" title={`${user?.name} (${user?.role})`}>
-              {user?.name ? getInitials(user.name) : '?'}
-            </div>
-          )}
+          <Link href="/dashboard/profile" title={t('nav.myProfile')}>
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.name}
+                className="size-8 rounded-full object-cover shrink-0 border border-border hover:ring-2 hover:ring-primary transition-all"
+                title={`${user.name} (${user.role})`}
+              />
+            ) : (
+              <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0 hover:ring-2 hover:ring-primary transition-all" title={`${user?.name} (${user?.role})`}>
+                {user?.name ? getInitials(user.name) : '?'}
+              </div>
+            )}
+          </Link>
           <button
             onClick={logout}
             className="p-2 -mr-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
