@@ -189,6 +189,7 @@ export const en: Record<string, string> = {
   'role.client': 'Client',
   'role.content_creator': 'Content Creator',
   'role.content_creator_intern': 'Content Creator Intern',
+  'role.hr': 'HR',
 
   // ── Dashboard ───────────────────────────────────────────────────────
   'dashboard.greeting.morning': 'Good morning',
@@ -1396,6 +1397,7 @@ export const en: Record<string, string> = {
   'roles.role.account_manager': 'Account Manager',
   'roles.role.content_creator': 'Content Creator',
   'roles.role.content_creator_intern': 'Content Creator Intern',
+  'roles.role.hr': 'Human Resources (HR)',
 
   // ── Client Directory & Onboarding Wizard ─────────────────────────────────────
   'onboarding.title': 'Client Directory & Profile',

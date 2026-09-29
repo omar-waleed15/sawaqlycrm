@@ -16,6 +16,7 @@ const ALL_SYSTEM_ROLES = [
   'account_manager',
   'content_creator',
   'content_creator_intern',
+  'hr',
 ];
 
 // GET /api/roles — List role descriptions

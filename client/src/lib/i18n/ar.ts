@@ -189,6 +189,7 @@ export const ar: Record<string, string> = {
   'role.client': 'عميل',
   'role.content_creator': 'صانع محتوى',
   'role.content_creator_intern': 'متدرب صانع محتوى',
+  'role.hr': 'الموارد البشرية (HR)',
 
   // ── لوحة التحكم ────────────────────────────────────────────────────
   'dashboard.greeting.morning': 'صباح الخير',
@@ -1396,6 +1397,7 @@ export const ar: Record<string, string> = {
   'roles.role.account_manager': 'مدير الحسابات',
   'roles.role.content_creator': 'صانع المحتوى',
   'roles.role.content_creator_intern': 'متدرب صانع محتوى',
+  'roles.role.hr': 'الموارد البشرية (HR)',
 
   // ── دليل ودليل أونبوردنج العميل ──────────────────────────────────────────────
   'onboarding.title': 'دليل وملف العميل',

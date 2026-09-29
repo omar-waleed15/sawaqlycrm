@@ -155,7 +155,7 @@ export default function CalendarPage() {
     if (!user) return;
     setLoading(true);
 
-    const isExecutionMember = ['developer', 'member', 'graphic_designer', 'video_editor', 'reel_maker'].includes(user.role);
+    const isExecutionMember = ['developer', 'member', 'graphic_designer', 'video_editor', 'reel_maker', 'hr'].includes(user.role);
 
     const fetchTasks = tasksApi.list();
     const fetchContracts = (user.role === 'owner' || user.role === 'sales')

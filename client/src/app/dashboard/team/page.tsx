@@ -957,6 +957,7 @@ export default function TeamPage() {
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
+                <SelectItem value="hr">{t('role.hr') || 'HR'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
               </SelectContent>
             </Select>
@@ -1042,6 +1043,7 @@ export default function TeamPage() {
                 <SelectItem value="account_manager">{t('role.account_manager')}</SelectItem>
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
+                <SelectItem value="hr">{t('role.hr') || 'HR'}</SelectItem>
                 <SelectItem value="owner">{t('role.owner')}</SelectItem>
                 <SelectItem value="client">{t('role.client')}</SelectItem>
               </SelectContent>
