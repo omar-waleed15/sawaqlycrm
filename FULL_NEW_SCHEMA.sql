@@ -16,7 +16,7 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('cvs', 'cvs', true) ON CO
 
 
 
-CREATE TABLE IF NOT EXISTS public.profiles (id uuid PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, email text NOT NULL, role text NOT NULL DEFAULT 'member'::text, avatar_url text, phone text);
+CREATE TABLE IF NOT EXISTS public.profiles (id uuid PRIMARY KEY, created_at timestamptz DEFAULT now(), name text NOT NULL, email text NOT NULL, role text NOT NULL DEFAULT 'member'::text, avatar_url text, phone text, emergency_contact_name text, emergency_contact_phone text, national_id text, address text, bio text);
 
 CREATE TABLE IF NOT EXISTS public.attachments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now(), mimetype text, public_url text, storage_path text NOT NULL, filename text NOT NULL, task_id uuid, size int4);
 
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.client_social_analytics_daily (id uuid PRIMARY
 
 CREATE TABLE IF NOT EXISTS public.client_social_posts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), post_id text NOT NULL, platform text NOT NULL, views_count int4 DEFAULT 0, media_url text, posted_at timestamptz DEFAULT now(), permalink text, account_id text NOT NULL, created_at timestamptz DEFAULT now(), client_id uuid NOT NULL, like_count int4 DEFAULT 0, comments_count int4 DEFAULT 0, caption text);
 
-CREATE TABLE IF NOT EXISTS public.clients (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), other_deliverables text, meeting_notes text, name text NOT NULL, content_plan_link text, meeting_attendees _uuid DEFAULT '{}'::uuid[], user_id uuid, deliverables_schedule jsonb DEFAULT '{"posts": [], "reels": [], "photos": [], "stories": []}'::jsonb, done_other bool DEFAULT false, done_photos int4 DEFAULT 0, done_stories int4 DEFAULT 0, done_reels int4 DEFAULT 0, done_posts int4 DEFAULT 0, num_stories int4 DEFAULT 0, num_photos int4 DEFAULT 0, address text, num_reels int4 DEFAULT 0, num_posts int4 DEFAULT 0, start_date date, meeting_date timestamptz, sales_rep_id uuid, created_at timestamptz DEFAULT now(), pipeline_stage text NOT NULL DEFAULT 'new_lead'::text, status text NOT NULL DEFAULT 'active'::text, phone text, email text, company text);
+CREATE TABLE IF NOT EXISTS public.clients (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), other_deliverables text, meeting_notes text, name text NOT NULL, content_plan_link text, meeting_attendees _uuid DEFAULT '{}'::uuid[], user_id uuid, deliverables_schedule jsonb DEFAULT '{"posts": [], "reels": [], "photos": [], "stories": []}'::jsonb, done_other bool DEFAULT false, done_photos int4 DEFAULT 0, done_stories int4 DEFAULT 0, done_reels int4 DEFAULT 0, done_posts int4 DEFAULT 0, num_stories int4 DEFAULT 0, num_photos int4 DEFAULT 0, address text, num_reels int4 DEFAULT 0, num_posts int4 DEFAULT 0, start_date date, meeting_date timestamptz, sales_rep_id uuid, created_at timestamptz DEFAULT now(), pipeline_stage text NOT NULL DEFAULT 'new_lead'::text, status text NOT NULL DEFAULT 'active'::text, phone text, email text, company text, logo_url text);
 
 CREATE TABLE IF NOT EXISTS public.comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), task_id uuid, user_id uuid, created_at timestamptz DEFAULT now(), content text NOT NULL);
 
