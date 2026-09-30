@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { supabaseAdmin, createTempClient } from '../lib/supabase';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-import { ownerOnly } from '../middleware/roleCheck';
+import { ownerOnly, ownerOrTeamLeaderOnly } from '../middleware/roleCheck';
 import multer from 'multer';
 
 const router = Router();
@@ -407,8 +407,8 @@ router.post('/profile/avatar', authMiddleware, upload.single('avatar'), async (r
   }
 });
 
-// POST /api/users — Create a new team member (owner only)
-router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST /api/users — Create a new team member (owner or team leader)
+router.post('/', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const { name, email, password, role, phone } = req.body;
 
   if (!name || !email || !password) {
@@ -416,8 +416,19 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
     return;
   }
 
+  // Prevent team leaders from creating an owner account
+  if (req.user?.role === 'team_leader' && role === 'owner') {
+    res.status(403).json({ error: 'Team leaders cannot create owner accounts' });
+    return;
+  }
+
   const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern', 'hr'];
   const userRole = validRoles.includes(role) ? role : 'member';
+
+  if (req.user?.role === 'team_leader' && userRole === 'owner') {
+    res.status(403).json({ error: 'Team leaders cannot create owner accounts' });
+    return;
+  }
 
   try {
     // Create user in Supabase Auth
@@ -458,12 +469,36 @@ router.post('/', authMiddleware, ownerOnly, async (req: AuthRequest, res: Respon
   }
 });
 
-// PUT /api/users/:id — Update user (owner only)
-router.put('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// PUT /api/users/:id — Update user (owner or team leader)
+router.put('/:id', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
   const { name, role, email, password, phone, emergency_contact_name, emergency_contact_phone, national_id, address, bio } = req.body;
 
   try {
+    // Guards for non-owners (e.g. team_leader)
+    if (req.user?.role !== 'owner') {
+      const { data: targetProfile, error: fetchError } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !targetProfile) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      if (targetProfile.role === 'owner') {
+        res.status(403).json({ error: 'Team leaders cannot modify owner accounts' });
+        return;
+      }
+
+      if (role === 'owner') {
+        res.status(403).json({ error: 'Team leaders cannot promote users to owner' });
+        return;
+      }
+    }
+
     // 1. Update Supabase Auth if email or password is provided
     const authUpdates: any = {};
     if (email) {
@@ -560,11 +595,35 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
   }
 });
 
-// DELETE /api/users/:id — Remove a team member (owner only)
-router.delete('/:id', authMiddleware, ownerOnly, async (req: AuthRequest, res: Response): Promise<void> => {
+// DELETE /api/users/:id — Remove a team member (owner or team leader)
+router.delete('/:id', authMiddleware, ownerOrTeamLeaderOnly, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
 
+  if (req.user?.id === id) {
+    res.status(400).json({ error: 'Cannot delete your own account' });
+    return;
+  }
+
   try {
+    // Guards for non-owners (e.g. team_leader)
+    if (req.user?.role !== 'owner') {
+      const { data: targetProfile, error: fetchError } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !targetProfile) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      if (targetProfile.role === 'owner') {
+        res.status(403).json({ error: 'Team leaders cannot delete owner accounts' });
+        return;
+      }
+    }
+
     // Delete from Supabase Auth (cascades to profiles via DB trigger)
     const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
 

@@ -362,7 +362,7 @@ export default function MemberTasksPage({ params }: { params: Promise<{ memberId
         <ProfileOverviewTab
           member={member}
           onMemberUpdated={setMember}
-          canEdit={user.role === 'owner'}
+          canEdit={user.role === 'owner' || (user.role === 'team_leader' && member.role !== 'owner')}
           tasks={tasks}
           clients={clients}
         />

@@ -645,7 +645,7 @@ export default function TeamPage() {
           <h1 className="page-header-title">{t('team.title')}</h1>
           <p className="page-header-subtitle">{t('team.subtitle')}</p>
         </div>
-        {user.role === 'owner' && activeTab === 'directory' && (
+        {(user.role === 'owner' || user.role === 'team_leader') && activeTab === 'directory' && (
           <Button onClick={() => { resetForm(); setIsCreateOpen(true); }} className="gap-1.5">
             <Plus className="size-4" /> {t('team.addMember')}
           </Button>
@@ -840,7 +840,7 @@ export default function TeamPage() {
                         <ExternalLink className="size-3" /> {t('profile.viewFullProfile')}
                       </Button>
                     )}
-                    {user?.role === 'owner' && (
+                    {(user?.role === 'owner' || (user?.role === 'team_leader' && member.role !== 'owner')) && (
                       <>
                         <Button
                           variant="secondary"
@@ -958,7 +958,9 @@ export default function TeamPage() {
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
                 <SelectItem value="hr">{t('role.hr') || 'HR'}</SelectItem>
-                <SelectItem value="owner">{t('role.owner')}</SelectItem>
+                {user?.role === 'owner' && (
+                  <SelectItem value="owner">{t('role.owner')}</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -1044,7 +1046,9 @@ export default function TeamPage() {
                 <SelectItem value="content_creator">{t('role.content_creator') || 'Content Creator'}</SelectItem>
                 <SelectItem value="content_creator_intern">{t('role.content_creator_intern') || 'Content Creator Intern'}</SelectItem>
                 <SelectItem value="hr">{t('role.hr') || 'HR'}</SelectItem>
-                <SelectItem value="owner">{t('role.owner')}</SelectItem>
+                {user?.role === 'owner' && (
+                  <SelectItem value="owner">{t('role.owner')}</SelectItem>
+                )}
                 <SelectItem value="client">{t('role.client')}</SelectItem>
               </SelectContent>
             </Select>
