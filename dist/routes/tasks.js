@@ -29,14 +29,20 @@ const TASK_SELECT = `
   attachments(id),
   comments(id)
 `;
+// Helper: get YYYY-MM-DD in Africa/Cairo timezone
+function getCairoDateString(date = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(date);
+}
 // Helper: check if user is admin/TL
 function isTaskAdmin(role) {
     return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
 }
 // Helper: check if user is allowed to administer/review a specific task
 async function canAdministerTask(userId, role, taskId) {
-    const isAdminRole = ['owner', 'team_leader', 'moderation', 'account_manager'].includes(role);
-    // An admin/TL/moderator/creator cannot administer or approve a task if they are assigned to it as a worker
+    const isAdminRole = isTaskAdmin(role);
+    if (isAdminRole)
+        return true;
+    // Non-admins (e.g. content_creator): cannot administer/approve if assigned as a worker
     const { data: assignment } = await supabase_1.supabaseAdmin
         .from('task_assignees')
         .select('id')
@@ -46,8 +52,6 @@ async function canAdministerTask(userId, role, taskId) {
     if (assignment) {
         return false; // Assigned worker cannot administer/approve their own task
     }
-    if (isAdminRole)
-        return true;
     // Task creator or Content Creator managing intern task can administer/review
     const { data: task } = await supabase_1.supabaseAdmin
         .from('tasks')
@@ -113,8 +117,13 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             let query = supabase_1.supabaseAdmin
                 .from('tasks')
                 .select(TASK_SELECT)
-                .eq('is_archived', showArchived)
                 .order('created_at', { ascending: false });
+            if (archived === 'all' && (userRole === 'owner' || userRole === 'team_leader' || userRole === 'account_manager')) {
+                // Return ALL tasks (both active and archived)
+            }
+            else {
+                query = query.eq('is_archived', showArchived);
+            }
             if (priority)
                 query = query.eq('priority', priority);
             if (client_id)
@@ -133,7 +142,9 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             tasks = tasks.map((t) => enrichTask(t, req.user.id, userRole));
             // Filter by status if provided (check the computed status)
             if (status) {
-                tasks = tasks.filter((t) => t.status === status);
+                tasks = (status === 'submitted')
+                    ? tasks.filter((t) => t.status === 'submitted' || t.task_assignees?.some((a) => a.status === 'submitted'))
+                    : tasks.filter((t) => t.status === status);
             }
             res.json({ tasks });
         }
@@ -192,7 +203,9 @@ router.get('/', auth_1.authMiddleware, async (req, res) => {
             tasks = tasks.map((t) => enrichTask(t, req.user.id, userRole));
             // Filter by status (check computed status)
             if (status) {
-                tasks = tasks.filter((t) => t.status === status);
+                tasks = (status === 'submitted')
+                    ? tasks.filter((t) => t.status === 'submitted' || t.task_assignees?.some((a) => a.status === 'submitted'))
+                    : tasks.filter((t) => t.status === status);
             }
             res.json({ tasks });
         }
@@ -234,6 +247,15 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
     try {
         const today = new Date().toISOString().split('T')[0];
         const isAdmin = isTaskAdmin(req.user.role);
+        // Week boundaries (Sunday to Saturday)
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday
+        const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0, 0);
+        const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 7, 0, 0, 0, 0);
+        const lastWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 1, 23, 59, 59, 999);
+        const thisWeekStartISO = thisWeekStart.toISOString();
+        const lastWeekStartISO = lastWeekStart.toISOString();
+        const lastWeekEndISO = lastWeekEnd.toISOString();
         if (isAdmin) {
             // Admin: count unique active tasks
             const { data: tasks, error } = await supabase_1.supabaseAdmin
@@ -241,7 +263,7 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
                 .select(`
           id,
           due_date,
-          task_assignees(status)
+          task_assignees(status, updated_at, assigned_at)
         `)
                 .eq('is_archived', false);
             if (error) {
@@ -254,14 +276,30 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
             let submitted = 0;
             let todo = 0;
             let overdue = 0;
+            let completedThisWeek = 0;
+            let completedLastWeek = 0;
             for (const t of (tasks || [])) {
                 total++;
                 const assignees = t.task_assignees || [];
                 // Check if overdue
-                const hasUncompleted = assignees.length === 0 || assignees.some((a) => a.status !== 'completed');
+                const hasUncompleted = assignees.length === 0 || assignees.some((a) => a.status !== 'completed' && a.status !== 'submitted');
                 if (t.due_date && t.due_date < today && hasUncompleted) {
                     overdue++;
                 }
+                // Count weekly completed assignees
+                assignees.forEach((a) => {
+                    if (a.status === 'completed') {
+                        const compTime = a.updated_at || a.assigned_at;
+                        if (compTime) {
+                            if (compTime >= thisWeekStartISO) {
+                                completedThisWeek++;
+                            }
+                            else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+                                completedLastWeek++;
+                            }
+                        }
+                    }
+                });
                 if (assignees.length === 0) {
                     todo++;
                     continue;
@@ -282,13 +320,13 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
                     todo++;
                 }
             }
-            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
+            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue, completedThisWeek, completedLastWeek } });
         }
         else {
             // Member: only see stats for their own assignments
             const { data: assignments, error } = await supabase_1.supabaseAdmin
                 .from('task_assignees')
-                .select('status, task:tasks(due_date, is_archived)')
+                .select('status, updated_at, assigned_at, task:tasks(due_date, is_archived)')
                 .eq('user_id', req.user.id);
             if (error) {
                 res.status(500).json({ error: error.message });
@@ -303,9 +341,24 @@ router.get('/stats', auth_1.authMiddleware, async (req, res) => {
             const todo = items.filter((a) => a.status === 'todo').length;
             const overdue = items.filter((a) => {
                 const dueDate = a.task?.due_date;
-                return dueDate && dueDate < today && a.status !== 'completed';
+                return dueDate && dueDate < today && a.status !== 'completed' && a.status !== 'submitted';
             }).length;
-            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue } });
+            let completedThisWeek = 0;
+            let completedLastWeek = 0;
+            items.forEach((a) => {
+                if (a.status === 'completed') {
+                    const compTime = a.updated_at || a.assigned_at;
+                    if (compTime) {
+                        if (compTime >= thisWeekStartISO) {
+                            completedThisWeek++;
+                        }
+                        else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+                            completedLastWeek++;
+                        }
+                    }
+                }
+            });
+            res.json({ stats: { total, completed, inProgress, submitted, todo, overdue, completedThisWeek, completedLastWeek } });
         }
     }
     catch (err) {
@@ -320,9 +373,9 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOrSalesOrCo
         return;
     }
     if (due_date) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const minDueDate = getCairoDateString();
         const dueDateStr = String(due_date).split('T')[0];
-        if (dueDateStr < todayStr) {
+        if (dueDateStr < minDueDate) {
             res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
             return;
         }
@@ -543,9 +596,9 @@ router.put('/:id', auth_1.authMiddleware, async (req, res) => {
             // Admin: update shared task fields
             const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
             if (due_date) {
-                const createdStr = existing.created_at ? new Date(existing.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                const minDueDate = existing.created_at ? getCairoDateString(new Date(existing.created_at)) : getCairoDateString();
                 const dueDateStr = String(due_date).split('T')[0];
-                if (dueDateStr < createdStr) {
+                if (dueDateStr < minDueDate) {
                     res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
                     return;
                 }
@@ -900,6 +953,13 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => 
                 .update({ due_date, updated_at: new Date().toISOString() })
                 .eq('id', id);
         }
+        // Check if assignee exists & stop timer if active
+        const { data: assignment } = await supabase_1.supabaseAdmin
+            .from('task_assignees')
+            .select('*')
+            .eq('task_id', id)
+            .eq('user_id', userId)
+            .single();
         const updates = {};
         if (status !== undefined) {
             updates.status = status;
@@ -908,6 +968,9 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => 
             }
             else if (status === 'revision') {
                 updates.submitted_at = null;
+            }
+            else if (status === 'completed' && assignment && !assignment.submitted_at) {
+                updates.submitted_at = new Date().toISOString();
             }
         }
         if (feedback !== undefined)
@@ -920,13 +983,6 @@ router.put('/:id/assignees/:userId', auth_1.authMiddleware, async (req, res) => 
             updates.rating = rating;
         }
         updates.updated_at = new Date().toISOString();
-        // Check if assignee has a running timer, stop it if we are updating their record/status
-        const { data: assignment } = await supabase_1.supabaseAdmin
-            .from('task_assignees')
-            .select('*')
-            .eq('task_id', id)
-            .eq('user_id', userId)
-            .single();
         if (assignment && assignment.timer_started_at) {
             const startTime = new Date(assignment.timer_started_at).getTime();
             const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));

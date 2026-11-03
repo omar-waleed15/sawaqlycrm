@@ -15,14 +15,14 @@ const upload = (0, multer_1.default)({
 });
 // GET /api/users — List all team members (owner, team leader, sales, moderation, account_manager, content_creator)
 router.get('/', auth_1.authMiddleware, async (req, res) => {
-    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern'].includes(req.user.role)) {
+    if (!req.user || !['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'content_creator', 'content_creator_intern', 'hr'].includes(req.user.role)) {
         res.status(403).json({ error: 'Access denied.' });
         return;
     }
     try {
         const { data, error } = await supabase_1.supabaseAdmin
             .from('profiles')
-            .select('id, name, email, role, avatar_url, phone, created_at')
+            .select('id, name, email, role, avatar_url, phone, emergency_contact_name, emergency_contact_phone, national_id, address, bio, created_at')
             .order('created_at', { ascending: false });
         if (error) {
             res.status(500).json({ error: error.message });
@@ -41,6 +41,15 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         const sDate = startDate ? String(startDate) : undefined;
         const eDate = endDate ? String(endDate) : undefined;
         const currentMonthStr = new Date().toISOString().substring(0, 7);
+        // Week boundaries (Sunday to Saturday)
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday
+        const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0, 0);
+        const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 7, 0, 0, 0, 0);
+        const lastWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek - 1, 23, 59, 59, 999);
+        const thisWeekStartISO = thisWeekStart.toISOString();
+        const lastWeekStartISO = lastWeekStart.toISOString();
+        const lastWeekEndISO = lastWeekEnd.toISOString();
         // 1. Fetch profiles
         const profilesPromise = supabase_1.supabaseAdmin
             .from('profiles')
@@ -49,7 +58,7 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
         // 2. Fetch task assignees within the date window
         let assigneesQuery = supabase_1.supabaseAdmin
             .from('task_assignees')
-            .select('user_id, status, rating, assigned_at, total_time_spent, task:tasks(estimated_time_minutes)');
+            .select('user_id, status, rating, assigned_at, updated_at, total_time_spent, task:tasks(estimated_time_minutes)');
         if (sDate)
             assigneesQuery = assigneesQuery.gte('assigned_at', sDate);
         if (eDate)
@@ -104,7 +113,7 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
             console.warn('Assignees query with estimated_time_minutes failed, falling back:', assigneesErr.message);
             let fallbackQuery = supabase_1.supabaseAdmin
                 .from('task_assignees')
-                .select('user_id, status, rating, assigned_at, total_time_spent');
+                .select('user_id, status, rating, assigned_at, updated_at, total_time_spent');
             if (sDate)
                 fallbackQuery = fallbackQuery.gte('assigned_at', sDate);
             if (eDate)
@@ -137,11 +146,24 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
             const completedTasks = userAssignments.filter(a => a.status === 'completed').length;
             const incompleteTasks = totalTasks - completedTasks;
             const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            let completedThisWeek = 0;
+            let completedLastWeek = 0;
             const ratedAssignments = userAssignments.filter(a => a.rating !== null && a.rating !== undefined);
             const averageRating = ratedAssignments.length > 0
                 ? Math.round((ratedAssignments.reduce((acc, curr) => acc + (curr.rating || 0), 0) / ratedAssignments.length) * 10) / 10
                 : null;
             const completedAssignments = userAssignments.filter(a => a.status === 'completed');
+            completedAssignments.forEach((a) => {
+                const compTime = a.updated_at || a.assigned_at;
+                if (compTime) {
+                    if (compTime >= thisWeekStartISO) {
+                        completedThisWeek++;
+                    }
+                    else if (compTime >= lastWeekStartISO && compTime <= lastWeekEndISO) {
+                        completedLastWeek++;
+                    }
+                }
+            });
             const averageCompletionTime = completedAssignments.length > 0
                 ? Math.round(completedAssignments.reduce((acc, curr) => acc + (curr.total_time_spent || 0), 0) / completedAssignments.length)
                 : null;
@@ -191,6 +213,8 @@ router.get('/performance', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (
                     onTimeRate,
                     netTimeVarianceSeconds,
                     overtimeTasksCount,
+                    completedThisWeek,
+                    completedLastWeek,
                     taskTarget: targetMap.get(user.id) || null
                 },
                 salesStats: {
@@ -217,7 +241,7 @@ router.put('/profile', auth_1.authMiddleware, async (req, res) => {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }
-    const { name, avatar_url, phone, email, password, currentPassword } = req.body;
+    const { name, avatar_url, phone, email, password, currentPassword, emergency_contact_name, emergency_contact_phone, national_id, address, bio } = req.body;
     try {
         // Fetch current user from Supabase Auth Admin
         const { data: authUserData, error: getUserError } = await supabase_1.supabaseAdmin.auth.admin.getUserById(req.user.id);
@@ -271,6 +295,16 @@ router.put('/profile', auth_1.authMiddleware, async (req, res) => {
             updates.phone = phone || null;
         if (email && email.trim() !== '')
             updates.email = email.trim();
+        if (emergency_contact_name !== undefined)
+            updates.emergency_contact_name = emergency_contact_name || null;
+        if (emergency_contact_phone !== undefined)
+            updates.emergency_contact_phone = emergency_contact_phone || null;
+        if (national_id !== undefined)
+            updates.national_id = national_id || null;
+        if (address !== undefined)
+            updates.address = address || null;
+        if (bio !== undefined)
+            updates.bio = bio || null;
         if (Object.keys(updates).length > 0) {
             const { data, error } = await supabase_1.supabaseAdmin
                 .from('profiles')
@@ -347,15 +381,24 @@ router.post('/profile/avatar', auth_1.authMiddleware, upload.single('avatar'), a
         res.status(500).json({ error: err.message || 'Failed to upload avatar' });
     }
 });
-// POST /api/users — Create a new team member (owner only)
-router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// POST /api/users — Create a new team member (owner or team leader)
+router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const { name, email, password, role, phone } = req.body;
     if (!name || !email || !password) {
         res.status(400).json({ error: 'Name, email, and password are required' });
         return;
     }
-    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern'];
+    // Prevent team leaders from creating an owner account
+    if (req.user?.role === 'team_leader' && role === 'owner') {
+        res.status(403).json({ error: 'Team leaders cannot create owner accounts' });
+        return;
+    }
+    const validRoles = ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern', 'hr'];
     const userRole = validRoles.includes(role) ? role : 'member';
+    if (req.user?.role === 'team_leader' && userRole === 'owner') {
+        res.status(403).json({ error: 'Team leaders cannot create owner accounts' });
+        return;
+    }
     try {
         // Create user in Supabase Auth
         const { data: authData, error: authError } = await supabase_1.supabaseAdmin.auth.admin.createUser({
@@ -391,11 +434,31 @@ router.post('/', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) 
         res.status(500).json({ error: 'Failed to create user' });
     }
 });
-// PUT /api/users/:id — Update user (owner only)
-router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// PUT /api/users/:id — Update user (owner or team leader)
+router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
     const id = req.params.id;
-    const { name, role, email, password, phone } = req.body;
+    const { name, role, email, password, phone, emergency_contact_name, emergency_contact_phone, national_id, address, bio } = req.body;
     try {
+        // Guards for non-owners (e.g. team_leader)
+        if (req.user?.role !== 'owner') {
+            const { data: targetProfile, error: fetchError } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .select('role')
+                .eq('id', id)
+                .single();
+            if (fetchError || !targetProfile) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+            if (targetProfile.role === 'owner') {
+                res.status(403).json({ error: 'Team leaders cannot modify owner accounts' });
+                return;
+            }
+            if (role === 'owner') {
+                res.status(403).json({ error: 'Team leaders cannot promote users to owner' });
+                return;
+            }
+        }
         // 1. Update Supabase Auth if email or password is provided
         const authUpdates = {};
         if (email) {
@@ -420,12 +483,22 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         const updates = {};
         if (name)
             updates.name = name;
-        if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern'].includes(role))
+        if (role && ['owner', 'team_leader', 'sales', 'member', 'developer', 'graphic_designer', 'video_editor', 'reel_maker', 'moderation', 'account_manager', 'client', 'content_creator', 'content_creator_intern', 'hr'].includes(role))
             updates.role = role;
         if (email)
             updates.email = email;
         if (phone !== undefined)
             updates.phone = phone || null;
+        if (emergency_contact_name !== undefined)
+            updates.emergency_contact_name = emergency_contact_name || null;
+        if (emergency_contact_phone !== undefined)
+            updates.emergency_contact_phone = emergency_contact_phone || null;
+        if (national_id !== undefined)
+            updates.national_id = national_id || null;
+        if (address !== undefined)
+            updates.address = address || null;
+        if (bio !== undefined)
+            updates.bio = bio || null;
         if (Object.keys(updates).length > 0) {
             const { data, error } = await supabase_1.supabaseAdmin
                 .from('profiles')
@@ -457,10 +530,54 @@ router.put('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res
         res.status(500).json({ error: err.message || 'Failed to update user' });
     }
 });
-// DELETE /api/users/:id — Remove a team member (owner only)
-router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOnly, async (req, res) => {
+// GET /api/users/:id — Get a team member's full profile
+router.get('/:id', auth_1.authMiddleware, async (req, res) => {
     const id = req.params.id;
+    const isManager = req.user?.role === 'owner' || req.user?.role === 'team_leader';
+    if (!isManager && id !== req.user?.id) {
+        res.status(403).json({ error: 'Access denied.' });
+        return;
+    }
     try {
+        const { data, error } = await supabase_1.supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('id', id)
+            .single();
+        if (error) {
+            res.status(404).json({ error: 'User not found' });
+            return;
+        }
+        res.json({ user: data });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message || 'Failed to fetch user' });
+    }
+});
+// DELETE /api/users/:id — Remove a team member (owner or team leader)
+router.delete('/:id', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async (req, res) => {
+    const id = req.params.id;
+    if (req.user?.id === id) {
+        res.status(400).json({ error: 'Cannot delete your own account' });
+        return;
+    }
+    try {
+        // Guards for non-owners (e.g. team_leader)
+        if (req.user?.role !== 'owner') {
+            const { data: targetProfile, error: fetchError } = await supabase_1.supabaseAdmin
+                .from('profiles')
+                .select('role')
+                .eq('id', id)
+                .single();
+            if (fetchError || !targetProfile) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+            if (targetProfile.role === 'owner') {
+                res.status(403).json({ error: 'Team leaders cannot delete owner accounts' });
+                return;
+            }
+        }
         // Delete from Supabase Auth (cascades to profiles via DB trigger)
         const { error } = await supabase_1.supabaseAdmin.auth.admin.deleteUser(id);
         if (error) {

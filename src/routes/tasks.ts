@@ -30,6 +30,11 @@ const TASK_SELECT = `
   comments(id)
 `;
 
+// Helper: get YYYY-MM-DD in Africa/Cairo timezone
+function getCairoDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(date);
+}
+
 // Helper: check if user is admin/TL
 function isTaskAdmin(role: string): boolean {
   return role === 'owner' || role === 'team_leader' || role === 'moderation' || role === 'account_manager';
@@ -121,8 +126,14 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
       let query = supabaseAdmin
         .from('tasks')
         .select(TASK_SELECT)
-        .eq('is_archived', showArchived)
+
         .order('created_at', { ascending: false });
+
+      if (archived === 'all' && (userRole === 'owner' || userRole === 'team_leader' || userRole === 'account_manager')) {
+        // Return ALL tasks (both active and archived)
+      } else {
+        query = query.eq('is_archived', showArchived);
+      }
 
       if (priority) query = query.eq('priority', priority as string);
       if (client_id) query = query.eq('client_id', client_id as string);
@@ -145,7 +156,9 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
       // Filter by status if provided (check the computed status)
       if (status) {
-        tasks = tasks.filter((t: any) => t.status === status);
+        tasks = (status === 'submitted')
+          ? tasks.filter((t: any) => t.status === 'submitted' || t.task_assignees?.some((a: any) => a.status === 'submitted'))
+          : tasks.filter((t: any) => t.status === status);
       }
 
       res.json({ tasks });
@@ -206,7 +219,9 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response): Promise
 
       // Filter by status (check computed status)
       if (status) {
-        tasks = tasks.filter((t: any) => t.status === status);
+        tasks = (status === 'submitted')
+          ? tasks.filter((t: any) => t.status === 'submitted' || t.task_assignees?.some((a: any) => a.status === 'submitted'))
+          : tasks.filter((t: any) => t.status === status);
       }
 
       res.json({ tasks });
@@ -388,9 +403,9 @@ router.post('/', authMiddleware, ownerOrTeamLeaderOrSalesOrContentCreator, async
   }
 
   if (due_date) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const minDueDate = getCairoDateString();
     const dueDateStr = String(due_date).split('T')[0];
-    if (dueDateStr < todayStr) {
+    if (dueDateStr < minDueDate) {
       res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
       return;
     }
@@ -627,9 +642,10 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response): Prom
       const { title, description, priority, due_date, drive_link, content_type, content_description, assignee_ids, client_id, is_archived, is_deliverable, deliverable_type, deliverable_month, estimated_time_minutes } = req.body;
 
       if (due_date) {
-        const createdStr = existing.created_at ? new Date(existing.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+        const minDueDate = existing.created_at ? getCairoDateString(new Date(existing.created_at)) : getCairoDateString();
         const dueDateStr = String(due_date).split('T')[0];
-        if (dueDateStr < createdStr) {
+        if (dueDateStr < minDueDate) {
           res.status(400).json({ error: 'Due date cannot be earlier than task creation date' });
           return;
         }

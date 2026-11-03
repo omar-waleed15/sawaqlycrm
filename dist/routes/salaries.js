@@ -15,9 +15,11 @@ const SALARY_SELECT = `
 const attachAdvancesToSalaries = async (salaries) => {
     if (!salaries || salaries.length === 0)
         return salaries;
-    const salaryIds = salaries.map(s => s.id).filter(Boolean);
-    if (salaryIds.length === 0)
+    const salaryIds = salaries.filter(s => !s.is_fallback).map(s => s.id).filter(Boolean);
+    if (salaryIds.length === 0) {
+        salaries.forEach(s => { s.advances = []; });
         return salaries;
+    }
     try {
         const { data: advancesData, error } = await supabase_1.supabaseAdmin
             .from('salary_advances')
@@ -31,15 +33,20 @@ const attachAdvancesToSalaries = async (salaries) => {
                 advancesMap[adv.salary_id].push(adv);
             });
             salaries.forEach(s => {
-                s.advances = advancesMap[s.id] || [];
+                if (!s.is_fallback) {
+                    s.advances = advancesMap[s.id] || [];
+                }
+                else {
+                    s.advances = [];
+                }
             });
         }
         else {
-            salaries.forEach(s => { s.advances = s.advances || []; });
+            salaries.forEach(s => { s.advances = []; });
         }
     }
     catch (err) {
-        salaries.forEach(s => { s.advances = s.advances || []; });
+        salaries.forEach(s => { s.advances = []; });
     }
     return salaries;
 };
@@ -75,7 +82,23 @@ router.get('/', auth_1.authMiddleware, roleCheck_1.ownerOrTeamLeaderOnly, async 
                 userSalaryMap[s.user_id] = s;
             }
         });
-        const resultSalaries = Object.values(userSalaryMap);
+        const resultSalaries = Object.values(userSalaryMap).map(s => {
+            const isExactMonth = s.month && s.month.startsWith(month);
+            if (!isExactMonth) {
+                return {
+                    ...s,
+                    month: `${month}-01`,
+                    paid: false,
+                    paid_date: null,
+                    installments: [],
+                    penalties: [],
+                    bonuses: [],
+                    advances: [],
+                    is_fallback: true,
+                };
+            }
+            return s;
+        });
         const enriched = await attachAdvancesToSalaries(resultSalaries);
         res.json({ salaries: enriched });
     }
@@ -115,11 +138,24 @@ router.get('/my-salary', auth_1.authMiddleware, async (req, res) => {
                 .limit(1)
                 .maybeSingle();
             if (latestSalary) {
-                salary = latestSalary;
+                salary = {
+                    ...latestSalary,
+                    month: firstDayOfMonth,
+                    paid: false,
+                    paid_date: null,
+                    installments: [],
+                    penalties: [],
+                    bonuses: [],
+                    advances: [],
+                    is_fallback: true,
+                };
             }
         }
-        if (salary) {
+        if (salary && !salary.is_fallback) {
             await attachAdvancesToSalaries([salary]);
+        }
+        else if (salary) {
+            salary.advances = [];
         }
         // Fetch available historical months for this user
         const { data: monthsData } = await supabase_1.supabaseAdmin
